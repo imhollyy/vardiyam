@@ -1,6 +1,6 @@
 # AGENTS.md — Vardiyam Codex çalışma protokolü
 
-> **Bağlayıcı ajan çalışma kuralı; ürün anayasası v1.0-rc1 hâlen kurucu onayı bekliyor.**
+> **Bağlayıcı ajan çalışma kuralı; ürün anayasası v1.0 APPROVED (2026-11-05).**
 > Öncelik: `PROJECT_CONSTITUTION.md` > bu dosya > `PRODUCT_SPEC.md` > görev belgesi.
 > Tam Kare'nin Inspect/Plan/Implement/Verify/Review/Report disiplini uyarlanmıştır; Supabase/RLS/multi-tenant/web görevleri burada yoktur.
 
@@ -8,7 +8,7 @@
 
 1. `PROJECT_CONSTITUTION.md`, `AGENTS.md`, `PRODUCT_SPEC.md`, `docs/progress/PROGRESS.md`, `docs/DECISIONS.md` ve açık task'ı oku.
 2. `git status --short`, aktif branch, mevcut değişiklik ve son commit'i denetle. Kullanıcının yerel değişikliklerini silme.
-3. En küçük doğrulanabilir görevi seç. Anayasa onaylanmadan çelişkili mimari veya ücret kuralı kesinleştirme.
+3. En küçük doğrulanabilir görevi seç. Anayasa onaylıdır; ancak bölüm 14'teki açık ürün kararlarını kurucu onayı olmadan kesinleştirme.
 4. `docs/progress/PROGRESS.md` dosyasına START kaydı ekle: tarih/UTC, task ID, branch, hedef, risk, alt ajanlar, skill.
 5. Kapsam dışı refactor yapma; her değişikliği geri alınabilir tut.
 
