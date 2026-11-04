@@ -14,6 +14,7 @@
 | ADR-008 | 2026-11-05 | Anayasa v1.0-rc1 PR ile incelemeye sunulur; merge ve production kurucu onayıyla | PROPOSED | Tam Kare git disiplini |
 | ADR-009 | 2026-11-05 | Yasal kurallar ve işyeri ücret politikası ayrı sürümlenir | PROPOSED | Yanlış hakediş iddiasını önleme |
 | ADR-010 | 2026-11-05 | 149 TL Pro fiyatı yalnız test hipotezi | PROPOSED | Fiyat testi bekliyor |
+| ADR-011 | 2026-11-05 | PROJECT_CONSTITUTION.md v1.0 bütünüyle geliştirme anayasası olarak onaylandı; bölüm 14'teki açık kararlar ayrı onay bekler | APPROVED | Kurucu sohbet içinde açıkça 'onaylıyorum' dedi; PR #1 için merge yetkisi |
 
 ## Açık kurucu kararları
 
@@ -23,4 +24,4 @@
 - **Q4:** Pro özellikleri/fiyatı ve ücretsiz özelliklerin son ayrımı?
 - **Q5:** Ana branch akışı: Tam Kare'deki develop -> main mi, yoksa MVP için PR -> main mi?
 - **Q6:** Uygulama adının mağaza/marka araştırması sonrası nihai durumu?
-- **Q7:** Anayasa v1.0-rc1'in onayı ve ilk 4 ekranın görsel yönü?
+- **Q7:** Anayasa v1.0 onaylandı. İlk 4 ekranın görsel yönü için kurucu seçimi bekleniyor.
