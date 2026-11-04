@@ -30,12 +30,19 @@
 ### 2026-11-05 — G0 / VDY-000 — START
 
 - **İş:** GitHub repo keşfi, Tam Kare çalışma düzenini gerçek dosyalardan inceleme, derin araştırma raporunu anayasaya uyarlama.
-- **Kaynak:** `imhollyy/tam-kare` deposundaki `AGENTS.md`, `PROJECT_CONSTITUTION.md`, `.codex/config.toml`, `docs/development-quality-tooling.md`.
+- **Kaynak:** `yetkili Tam Kare iç deposu` deposundaki `AGENTS.md`, `PROJECT_CONSTITUTION.md`, `.codex/config.toml`, `docs/development-quality-tooling.md`.
 - **Uygulama:** Boş Vardiyam deposu README ile başlatıldı; anayasa ve harness ayrı branch üzerinde taslak.
 - **Alt ajan:** GitHub bağlantısı üzerinden belge yazımı; bağımsız Codex alt ajan review'u **henüz yapılmadı**. Bu kayıt bunu tamamlanmış göstermez.
 - **Skill:** Repo-local skill dosyaları oluşturulacak; Codex tarafından kullanımı doğrulanmadı.
 - **Test:** SKIP (uygulama kodu ve yerel runtime yok).
 - **Risk:** Ücret/hukuk hesaplarının uzman doğrulaması ve cihaz testi yayın öncesi zorunlu.
+
+### 2026-11-05 — G0 / VDY-000 — PR OPENED
+
+- **Taslak PR:** https://github.com/imhollyy/vardiyam/pull/1 (draft; kurucu review bekleniyor).
+- **Yapılan:** 20 dosyada anayasa, 4 repo-local skill, Codex protokolü, QA ve ilerleme kayıtları önerildi.
+- **Gerçek doğrulama:** GitHub'da dosya/PR oluşturma başarılı. Yerel typecheck/lint/test/cihaz ve Codex alt ajan çağrısı **NOT RUN**.
+- **Sonraki eylem:** Kurucu incelemesi; VDY-001 Codex local preflight.
 
 ### 2026-11-05 — G0 / VDY-000 — CHECKPOINT
 
