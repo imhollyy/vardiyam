@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
-- **Durum:** VDY-001 DONE; VDY-002 DRAFT_PR_OPEN (#4; final CI re-run pending; main merge/release yok)
+- **Durum:** VDY-001 DONE; VDY-002 DRAFT_PR_OPEN (#4; local + remote CI PASS; main merge/release yok)
 - **Aktif branch:** `feat/vdy-002-expo-scaffold`
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. PR #4 güncel head'inde CI re-run sonucunu doğrula; ardından kurucu/reviewer incelemesini bekle. Merge için ayrıca açık kurucu onayı gerekir.
+1. Draft PR #4'ün kurucu/reviewer incelemesini bekle; merge için ayrıca açık kurucu onayı gerekir.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -54,8 +54,9 @@
 - **Local commits:** `dbbd15c` (önceden var olan VDY-001/Playwright/config değişikliklerinin koruma commit'i), `c97a730` (VDY-002 scaffold), `2c086bc` (PR/progress kayıtları). Feature branch push edildi; `main` push edilmedi.
 - **PR:** [#4 — feat: VDY-002 Expo Router and SQLite scaffold](https://github.com/imhollyy/vardiyam/pull/4), draft, base `main`, head `feat/vdy-002-expo-scaffold`. PR, local VDY-001 koruma commit'ini de içerir; eski draft PR #2 inspected but not merged.
 - **CI runtime düzeltmesi:** `2c086bc` GitHub check SUCCESS oldu ancak `checkout@v4`/`setup-node@v4` Node20 zorlaması ve `ubuntu-latest` migration uyarısı bıraktı. Resmî action.yml manifestlerinde checkout v7.0.1 ve setup-node v7.1.0 `node24` kullandığı doğrulanıp workflow `ubuntu-24.04` + bu action sürümlerine güncellendi. Bağımsız reviewer APPROVE; final head check yeniden çalışıyor.
+- **Güncel remote CI:** GitHub Actions `286097f` head'inde `Verify Expo scaffold` SUCCESS; 0 annotation. Güncel workflow action sürümleri ve sabit runner doğrulandı.
 - **Durum:** PR #4 açıldı ve Codex task'a eklendi. Merge ve release yapılmadı.
-- **NEXT ACTION:** PR #4 güncel head'inde CI re-run sonucunu doğrula; ardından kurucu/reviewer incelemesini bekle. Merge için ayrıca açık kurucu onayı gerekir.
+- **NEXT ACTION:** Draft PR #4'ün kurucu/reviewer incelemesini bekle; merge için ayrıca açık kurucu onayı gerekir.
 
 ### 2026-11-05 — G0 / VDY-000 — FOUNDER APPROVED
 
