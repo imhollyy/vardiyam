@@ -39,6 +39,22 @@
 | P16 | Avans, kesinti, ikramiye | ayrı kategoriler, çift toplama yok |
 | P17 | Sözleşme 40 saat; fiilî 43 saat | 3 saat fazla sürelerle çalışma kategorisi |
 | P18 | Denkleştirme aktif | kesin fazla mesai iddiası yerine uyarı/manuel politika |
+| P19 | Aylık brüt ücret modu | ücret girişi opsiyonel kalır; tahmini brüt yalnız profile ait saat böleni açıkça ayarlanmışsa hesaplanır |
+| P20 | Saatlik brüt ücret modu | tanımlı saatlik bazla hesaplanır; aylık bölen uygulanmaz |
+| P21 | Yalnız net ödeme modu | bordro neti ve fiilî net ödeme kaydedilebilir; tahmini brüt alanı/tutarı hiç üretilmez |
+| P22 | Ücret girişi atlanır | vardiya/çalışma kaydı ve ödeme takibi kullanılabilir; brüt tahmini gösterilmez |
+| P23 | Aylık brüt var, işyeri profilinde saat böleni yok | otomatik sabit bölen kullanılmaz; saatlik türetme ve ona bağlı tahmini brüt yapılmaz; ayar ihtiyacı açıklanır |
+| P24 | Bordro dönemi ayın 15'i–14'ü | yalnız seçili dönemdeki saat ve ödeme kayıtları özetlenir; önceki kayıtlar taşınmaz |
+| P25 | Cumartesi çalışması; profil hafta tatili başka gün | hafta sonu etiketi ile gerçek hafta tatili sınıfı ayrıdır; cumartesi kendi başına yasal hafta tatili sayılmaz |
+| P26 | Resmî tatil, hafta sonu ve işyeri özel günü çakışır | sınıflar ayrı korunur; ek oranlar otomatik toplanmaz ve aynı dakika çift sayılmaz |
+| P27 | Tek aday +%100 işyeri hafta tatili kuralı | başlangıç oranı +%100 (2,00×) olarak açıklanır; profil değişikliği sonrası yeni oran uygulanır |
+| P28 | Bir saat için birden fazla kural adayı, açık seçim yok | kesin tutar otomatik sunulmaz; uyarı ve manuel düzeltme gösterilir |
+| P29 | Açık profil kuralı çakışan adaylardan birini seçer | yalnız seçilen kural bir kez uygulanır; kural adı ve seçilme nedeni ayrıntıda görünür |
+| P30 | Net-only kullanıcıya kazanç özeti | tahmini brüt etiketi, tutarı veya brüt-net farkı görünmez; bordro neti ile fiilî net ödeme ayrı gösterilir |
+| P31 | Takvim hafta sonu oranı | işyeri profili başlangıç oranı +%100 (2,00×); bağımsız değiştirilebilir ve değişiklik sonrası seçilen oran açıklanır |
+| P32 | Gerçek işyeri hafta tatili oranı | işyeri profili başlangıç oranı +%100 (2,00×); takvim hafta sonu ayarından ayrı ve bağımsız değiştirilebilir |
+| P33 | İşyeri özel tatili oranı | işyeri profili başlangıç oranı +%100 (2,00×); resmî tatil ayarından ayrı ve bağımsız değiştirilebilir |
+| P34 | Resmî tatil için işyeri oranı tanımlı | başlangıç oranı +%100 (2,00×); özel tatil ayarından ayrı ve bağımsız değiştirilebilir; tanımlı işyeri oranı yoksa kesin katsayı varsayılmaz |
 
 ## Yasal uyarı / ürün davranışı
 

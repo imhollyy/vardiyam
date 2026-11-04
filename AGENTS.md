@@ -1,35 +1,34 @@
 # AGENTS.md — Vardiyam Codex çalışma protokolü
 
-> **Bağlayıcı ajan çalışma kuralı; ürün anayasası v1.0 APPROVED (2026-11-05).**
+> **Bağlayıcı ajan çalışma kuralı; ürün anayasası v1.1 APPROVED (2026-11-05).**
 > Öncelik: `PROJECT_CONSTITUTION.md` > bu dosya > `PRODUCT_SPEC.md` > görev belgesi.
 > Tam Kare'nin Inspect/Plan/Implement/Verify/Review/Report disiplini uyarlanmıştır; Supabase/RLS/multi-tenant/web görevleri burada yoktur.
 
-## Her oturumun ilk 5 dakikası
+## Oturum başlangıcı
 
-1. `PROJECT_CONSTITUTION.md`, `AGENTS.md`, `PRODUCT_SPEC.md`, `docs/progress/PROGRESS.md`, `docs/DECISIONS.md` ve açık task'ı oku.
-2. `git status --short`, aktif branch, mevcut değişiklik ve son commit'i denetle. Kullanıcının yerel değişikliklerini silme.
-3. En küçük doğrulanabilir görevi seç. Anayasa onaylıdır; ancak bölüm 14'teki açık ürün kararlarını kurucu onayı olmadan kesinleştirme.
-4. `docs/progress/PROGRESS.md` dosyasına START kaydı ekle: tarih/UTC, task ID, branch, hedef, risk, alt ajanlar, skill.
+1. Etkin `AGENTS.md`, `docs/progress/PROGRESS.md` içindeki aktif task/NEXT ACTION ve ilgili `docs/tasks/` dosyasını oku.
+2. `git status --short --branch` ile dirty state ve branch'i doğrula. Erişim/sandbox hatasını repo bozukluğu sanma; izinli bağlamda tekrar dene. Kullanıcının yerel değişikliklerini silme.
+3. Anayasa'yı ürün sınırı, veri/hukuk, mimari veya release etkileniyorsa aç; `PRODUCT_SPEC.md`'yi UI/kullanıcı davranışı değişiyorsa aç. `DECISIONS.md` ve `RISKS.md` yalnız ilgili karar/risk için aç. Bölüm 14 kararlarını kendin kesinleştirme.
+4. Risk sınıfını belirle; task başlangıcı, önemli karar/blokaj ve bitişte PROGRESS kaydı tut (olağan durumda en fazla üç checkpoint).
 5. Kapsam dışı refactor yapma; her değişikliği geri alınabilir tut.
 
-## Her görevde zorunlu alt ajan + beceri
+## Risk bazlı ajan ve beceri kullanımı
 
-- **Her geliştirme görevi** en az iki gerçekten ayrı alt ajan rolü gerektirir: (A) uygulayıcı, (B) bağımsız reviewer. Ajanları mevcut Codex sürümünün desteklediği gerçek mekanizmayla başlat. Bir rolün çıktısını diğerine körü körüne onaylatma.
-- Her görevde `$vardiyam-task-flow` becerisini aç ve uygula; ayrıca konuya göre `$vardiyam-pay-calculation` veya `$vardiyam-ui-quality` becerisini aç. Bu repo becerileri `.agents/skills/` altında bulunur.
-- Domain/hukuk değişikliği: calculation ajanı + QA/reviewer; UI değişikliği: UI ajanı + a11y/reviewer; gizlilik/veri değişikliği: security reviewer; release: release reviewer. Uzman hukuki inceleme gerektiğinde AI ajanı hukuk uzmanı yerine geçmez.
-- **Gerçek alt ajan özelliği mevcut değilse:** `BLOCKED_AGENT_UNAVAILABLE` yaz; kullanıcıya bildir; farklı oturum/insan review'u için açık onay al. Sahte ajan çıktısı veya 'çalıştırıldı' beyanı yasaktır.
-- Skill erişilemiyorsa `BLOCKED_SKILL_UNAVAILABLE` yaz; gerçek dosyayı incelemeden kullanılmış sayma.
-- İki ajan küçük işte yeterlidir; 3+ ajan yalnız risk gerekçesiyle. Paralel ajanlar aynı dosyayı eşzamanlı düzenlemez.
+- Risk sınıfları ve zorunlu review eşiği `PROJECT_CONSTITUTION.md` §12'de tanımlıdır. R0 ana ajanla; R1 ana ajanla ve gerekirse bir reviewer'la; R2 bağımsız reviewer ajanla; R3 reviewer ve gerekçeli uzman ajanla yürütülür.
+- `$vardiyam-task-flow` yalnız R1+ çok dosyalı/davranış değiştiren görevlerde veya koordinasyon gerektiren preflight/release işlerinde kullanılır. Konuya göre tek ilgili skill yüklenir: ücret (`vardiyam-pay-calculation`), UI (`vardiyam-ui-quality`), kullanıcı verisi (`vardiyam-data-safety`), test seçimi (`vardiyam-test-gate`), mağaza/RC (`vardiyam-release`).
+- Domain/hukukta hesap reviewer'ı, UI'da erişilebilirlik reviewer'ı, veri güvenliğinde security reviewer'ı seç. AI ajanı hukuk uzmanı yerine geçmez.
+- R2/R3'te gerçek reviewer ajanı yoksa `BLOCKED_AGENT_UNAVAILABLE` kaydet ve kullanıcıya bildir; R0/R1'de ajan yokluğu tek başına blokaj değildir. Rol simülasyonunu gerçek ajan gibi gösterme.
+- Skill kullanılamıyorsa ve görev o skill'e bağlıysa `BLOCKED_SKILL_UNAVAILABLE` yaz; başka uygun skill ile güvenli ilerleme mümkünse durma.
 
 ## Geliştirme döngüsü (kesintisiz kayıt)
 
 1. **Inspect:** repo/uygulama/etkilenen testleri incele.
 2. **Plan:** 3–7 maddelik kısa plan, acceptance ve non-goals.
-3. **Skill:** kullanılacak beceri adı/sürümü ve gerekçesini görev dosyasına yaz.
-4. **Delegate:** alt ajan görevlerini, dosya sınırlarını ve beklenen çıktıyı açık tanımla.
-5. **Implement:** dar kapsamlı kod; her anlamlı checkpoint'te PROGRESS kaydı.
+3. **Skill:** risk ve konuya göre gerekli tek beceriyi seç; ad/sürüm/gerekçeyi kaydet.
+4. **Delegate:** yalnız risk eşiği gerektiriyorsa reviewer/uzman ajanı; dosya sınırı ve beklenen kanıtı açıkla.
+5. **Implement:** dar kapsamlı değişiklik; başlangıç, karar/blokaj ve bitiş PROGRESS kaydı.
 6. **Verify:** ilgili komutları gerçekten çalıştır; PASS/FAIL/SKIP ve gerekçesini kaydet.
-7. **Review:** bağımsız alt ajan diff, hesap, veri, UX ve test etkisini inceler; P0/P1 bulgular kapanmadan Done yok.
+7. **Review:** risk eşiği gerektiriyorsa reviewer diff, acceptance, regressions, privacy/data loss ve test etkisini inceler; P0/P1 bulgular kapanmadan Done yok. Diğer işlerde ana ajan review'u ve kanıt yeterlidir.
 8. **Report:** commit/PR, değişen dosyalar, kanıt, açık risk, sonraki eylem; PROGRESS + task durumunu güncelle.
 
 **Kritik:** İşlem token/süre/bağlantı nedeniyle kesilirse ilk sonraki oturum PROGRESS'teki `NEXT ACTION` ile devam eder. Sadece sohbet geçmişine güvenme.
@@ -53,7 +52,7 @@
 - UI işi: UI skill + light/dark + küçük telefon + büyük font + ekran okuyucu + Android/iOS cihaz screenshot; gerçek cihaz yoksa 'device NOT TESTED'.
 - Veri işi: migration ve backup/restore round-trip; veri kaybı riski varsa release engellenir.
 - Mağaza/IAP işi: sandbox purchase/restore, gizlilik beyanı, offline entitlement, gerçek cihaz.
-- Dış hizmet ve MCP: Context7/UI Skills gibi araçların kurulu veya erişilebilir olduğu **varsayılmaz**; gerçek çağrı ve sürüm eşlemesiyle doğrula. Kaynak kodunu dış sağlayıcıya gönderen taramayı onaysız çalıştırma.
+- Dış hizmet ve MCP: Context7 CLI/skill ve UI Skills CLI/skill yalnız ilgili dokümantasyon/UI görevinde yüklenir; bağlantı veya kurulum varsayılmaz, gerçek çağrıyla doğrulanır. Kota/ağ/kimlik hatasında API/SDK/CLI ayrıntılarını resmi canlı kaynaktan doğrula; doğrulama yoksa tahmin etme. Skill'in sandbox dışına çıkma önerisi kendiliğinden yetki değildir; normal sandbox/approval sınırlarına uy. OpenAI Developer Docs MCP yalnız Codex/OpenAI ayarı sorularında kullanılır. Graphify ancak anlamlı kod grafiği oluşunca eklenir. Kaynak kodunu dış sağlayıcıya gönderen taramayı onaysız çalıştırma.
 - Test yapılmadıysa PASS yazma; ekran açılıyor = Done değil.
 
 ## Git / yayın / anayasa değişikliği
