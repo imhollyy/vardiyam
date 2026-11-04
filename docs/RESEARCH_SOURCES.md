@@ -42,7 +42,7 @@
 
 ## Codex geliştirme düzeni
 
-- Tam Kare'nin gerçek depo belgeleri: `imhollyy/tam-kare` içinde `AGENTS.md`, `PROJECT_CONSTITUTION.md`, `.codex/config.toml`, `docs/development-quality-tooling.md`. Bu özel depo dokümanlarının içerikleri Vardiyam'ın public deposuna aynen kopyalanmamıştır.
+- Tam Kare'nin gerçek depo belgeleri: `yetkili Tam Kare iç deposu` içinde `AGENTS.md`, `PROJECT_CONSTITUTION.md`, `.codex/config.toml`, `docs/development-quality-tooling.md`. Bu özel depo dokümanlarının içerikleri Vardiyam'ın public deposuna aynen kopyalanmamıştır.
 - [OpenAI — Repo-local skills ve AGENTS.md](https://developers.openai.com/blog/skills-agents-sdk): `.agents/skills/<skill>/SKILL.md` yaklaşımı.
 - [OpenAI — Codex geliştirme iş akışı](https://developers.openai.com/cookbook/examples/codex/iterating-development-workflows-with-codex): kalıcı bağlam ve doğrulama.
 - Harici Context7/UI Skills MCP yapılandırması Tam Kare'den **uyarlandı**; Vardiyam'da gerçekten erişilebilirliği henüz test edilmedi.
