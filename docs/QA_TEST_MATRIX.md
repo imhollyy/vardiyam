@@ -55,6 +55,9 @@
 | P32 | Gerçek işyeri hafta tatili oranı | işyeri profili başlangıç oranı +%100 (2,00×); takvim hafta sonu ayarından ayrı ve bağımsız değiştirilebilir |
 | P33 | İşyeri özel tatili oranı | işyeri profili başlangıç oranı +%100 (2,00×); resmî tatil ayarından ayrı ve bağımsız değiştirilebilir |
 | P34 | Resmî tatil için işyeri oranı tanımlı | başlangıç oranı +%100 (2,00×); özel tatil ayarından ayrı ve bağımsız değiştirilebilir; tanımlı işyeri oranı yoksa kesin katsayı varsayılmaz |
+| P35 | Aylık brüt için saat böleni önerisi | 225 saat düzenlenebilir işyeri profili önerisi olarak görünür; açık kullanıcı onayı olmadan hiçbir hesap bu değeri kullanmaz |
+| P36 | Saat böleni değişikliği | yeni sürüm gelecekteki hesaplara uygulanır; önceki onaylı CalculationSnapshot değişmez |
+| P37 | Aynı dakikada birden fazla farklı katsayılı kural | geçerli en yüksek tek katsayı bir kez seçilir ve açıklanır; oranlar toplanmaz; aynı katsayılı eşit adaylarda uyarı + manuel düzeltme sunulur |
 
 ## Yasal uyarı / ürün davranışı
 

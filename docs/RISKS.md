@@ -14,5 +14,6 @@
 | R10 | P2 | MVP kapsamının büyümesi | G0–G5 kapıları, yeni özellik için kurucu onayı | OPEN |
 | R11 | P2 | 'Vardiyam' isim/marka çakışması | App Store/Play Store/TÜRKPATENT araştırması | OPEN |
 | R12 | P2 | Dış MCP/skill araçlarının veri/telemetri paylaşımı | Önce izin ve sağlayıcı incelemesi | OPEN |
+| R13 | P2 | Expo 58 CLI/fingerprint bağımlılık zincirinde npm audit orta seviye bulguları (`glob`, `minimatch`); otomatik fix SDK 52'ye düşürmeyi öneriyor | Expo uyumluluğunu bozmadan resmi SDK patch güncellemelerini izle; zorunlu downgrade/override yapma; build tooling dışında kişisel veri akışı yok | OPEN 2026-11-05 |
 
 **P0/P1 açık riskle production release yapılamaz.** Risk kapatma: kanıt, tarih, reviewer ve kurucu onayı.

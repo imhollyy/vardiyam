@@ -6,25 +6,48 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** G0 — ürün şartnamesi kurucu onay kapısı
-- **Durum:** VDY-001 DONE; VDY-002 pre-gate şartname taslağı hazır, kurucu onayı bekliyor
-- **Aktif branch:** `chore/vdy-001-agent-orchestration`
+- **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
+- **Durum:** VDY-001 DONE; VDY-002 READY_FOR_PR (yerel scaffold/review/test tamamlandı; merge/release yok)
+- **Aktif branch:** `feat/vdy-002-expo-scaffold`
 - **Ana depo:** `imhollyy/vardiyam`
-- **Ürün kodu:** HENÜZ YOK
-- **Expo/SQLite scaffold:** NOT STARTED
+- **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
+- **Expo/SQLite scaffold:** READY_FOR_PR
 - **Gerçek alt ajan çağrısı:** Implementer + bağımsız reviewer önceki preflight'te; R2 reviewer son diff'i ayrıca inceledi ve düzeltmelerden sonra bulgu bırakmadı. Uzman ajan denemesi repo erişimi olmadığı için sayılmadı; R2 sınıfında uzman zorunlu değil.
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
 - **Typecheck / lint / test / cihaz:** SKIP — ürün uygulaması/scaffold yok.
-- **Kurucu onayı:** APPROVED (2026-11-05, anayasa v1.0 + ajan/skill orkestrasyonu v1.1; açık ürün kararları hariç)
+- **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. Kurucu, `PRODUCT_SPEC.md` v0.1 taslağını ve açık Q1–Q3 (onboarding ücret seçimi; işyeri saat böleni yöntemi/değeri; yapılandırılmış çakışma önceliği) karara bağlayıp açık onay versin; bundan önce VDY-002 scaffold başlatma.
+1. VDY-002 branch'ini GitHub'a push edip draft PR hazırla; main'e merge veya release yapma.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — G1 / VDY-002 — START
+
+- **Görev kaynağı/onay:** GitHub [Issue #3](https://github.com/imhollyy/vardiyam/issues/3) okundu. Product Spec v0.1 ve Q1–Q3 onayı `PRODUCT_SPEC.md`, ADR-013/014 içine kaydedildi: onboarding son isteğe bağlı adım (aylık brüt/saatlik brüt/net-only/atla); 225 saat yalnız düzenlenebilir öneri ve açık kullanıcı onayı olmadan hesapta kullanılmaz; çakışmada en yüksek tek katsayı, eşit/kararsız adaylarda uyarı/manual. Bu onay main merge/release yetkisi değildir.
+- **Başlangıç Git kanıtı:** Branch `chore/vdy-001-agent-orchestration`, `HEAD=ebad4dc`, 14 tracked değişiklik + 4 untracked repo skill dizini. Önceki değişiklikleri korumak için yerel `dbbd15c` safety commit oluşturuldu (repo-local veya global Git kimliği değiştirilmeden açık `Codex Vardiyam Agent <codex-vardiyam-agent@localhost>` kimliği kullanıldı), sonra `feat/vdy-002-expo-scaffold` branch'i açıldı. Değişiklikler ve Playwright kurulumu korunmuştur.
+- **PR #2:** GitHub'da açık draft/mergeable durumunu salt-okunur kontrol ettim; eski VDY-001 handoff bağlamlı. Merge edilmedi.
+- **Risk/plan:** R2. (1) Resmî SDK uyumluluğu; (2) Expo Router + 4 tab UI; (3) SQLite bootstrap/idempotent ilk migration + migration testi; (4) strict TS/lint/test/CI; (5) `npm ci`, typecheck/lint/test/Expo Doctor; (6) hedefli bağımsız review ve final progress.
+- **Skills:** `vardiyam-task-flow` v1.0, `vardiyam-ui-quality` v1.0, `vardiyam-data-safety` v1.0, `vardiyam-test-gate` v1.0 okundu/uygulanacak.
+- **Expo kanıtı:** Expo official SDK 58 reference: RN 0.88, React 19.3.0, minimum Node 22.13.x; yerel Node v24.20.0 uygundur. Expo 58 Router/SQLite docs `npx expo install` ile SDK-compatible sürüm seçimini öneriyor. Kaynak: https://docs.expo.dev/versions/latest/; Context7 SDK 58 docs.
+- **Gerçek ajanlar:** İstenen implementer uygulama/config/test dosyalarına atanacak; bağımsız reviewer yalnız dar final diff ve acceptance alacak. Üçüncü/uzman ajan planlanmıyor (R2, gerekçesiz fazla uzman yok).
+- **Testler:** Scaffold henüz yokken uygulama testleri çalıştırılmadı. Typecheck/lint/test/doctor bu başlangıç kaydında NOT RUN; sonuçları finalde gerçek komutlarla güncellenecek.
+
+### 2026-11-05 — G1 / VDY-002 — LOCAL IMPLEMENTATION / REVIEW APPROVED
+
+- **SDK/dependency uyumluluğu:** Resmî Expo SDK reference güncel stable SDK 58.0.0 -> React Native 0.88, React 19.3.0, minimum Node 22.13.x. Yerel Node 24.20.0 uyumlu. Repo tam sürüm pinleri: Expo 58.0.23, Router 58.0.30, SQLite 58.0.15, React/DOM 19.3.0, RN 0.88.1, RN Web 0.21.4, Expo Doctor 1.21.6. `npx expo install --check` PASS (SDK local compatibility map).
+- **Ajan/skill:** `vdy002_scaffold_implementer` gerçek uygulayıcı; `vdy002_scaffold_reviewer` bağımsız reviewer. `vardiyam-task-flow`, `vardiyam-ui-quality`, `vardiyam-data-safety`, `vardiyam-test-gate` repo skills okundu/uygulandı. UI Skills CLI native category çağrısı yapıldı; performance-only skill uygun görülmedi ve kullanılmadı.
+- **Uygulama:** Dört Expo Router sekmesi (Bugün/Takvim/Kazanç/Ayarlar), native light/dark tokenları, başlık/summary/tab erişilebilirlik rolleri, SQLiteProvider/bootstrap, user_version tabanlı additive/idempotent ilk migration, Node `node:sqlite` in-memory testleri, strict TS, ESLint ve GitHub Actions eklendi. Hesap motoru, tam onboarding, yedek/IAP/senkronizasyon eklenmedi.
+- **Gerçek doğrulama:** `npm ci` PASS (786 packages); `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (3/3, migration SQL gerçek in-memory SQLite'a uygulandı); `npx expo-doctor` PASS (20/20); `npx expo install --check` PASS; `npx expo export --platform android` PASS (bundle); `git diff --check` PASS. Reviewer bu komutları bağımsız tekrar edip aynı sonucu raporladı.
+- **Güvenlik taraması:** `npm audit --omit=dev` FAIL — 5 orta seviye bulgu (`@expo/cli`, `@expo/fingerprint`, `expo`, `glob`, `minimatch`); npm'in önerdiği otomatik fix Expo'yu 52.0.49'a düşürüyor, uygulanmadı. Tam audit toplam 12 orta; high/critical yok. Expo CLI zinciri/toolchain riski açık kalıyor.
+- **Bağımsız review:** APPROVE; P0/P1 yok. Reviewer migration'ın transaction, additive/idempotent davranış, daha yeni user_version koruması; dört tab, pinler, CI ve test kanıtını doğruladı. ESLint 9.39.5 Expo preset eklenti uyumluluğu nedeniyle pinlendi; ESLint 10'daki API hatası giderim kapsamı dışında toolchain riskidir.
+- **Cihaz/ürün sınırı:** Android/iOS gerçek cihaz testi NOT RUN; Android export bir cihaz testi değildir. Web smoke gerekli görülmedi ve çalıştırılmadı. Maaş/secret/.env/production kullanılmadı. Eski PR #2 açık bırakıldı, merge edilmedi.
+- **Durum:** Yerel branch PR'ya hazır. `main` merge/release yapılmadı.
+- **NEXT ACTION:** `feat/vdy-002-expo-scaffold` branch'ini GitHub'a push edip draft PR aç; PR'ı merge etme.
 
 ### 2026-11-05 — G0 / VDY-000 — FOUNDER APPROVED
 

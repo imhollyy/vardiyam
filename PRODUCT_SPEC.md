@@ -1,6 +1,6 @@
-# Vardiyam — Product Spec v0.1 (kurucu onayı bekliyor)
+# Vardiyam — Product Spec v0.1 (APPROVED — 2026-11-05)
 
-> **Durum:** Taslak; bu dosyanın güncellenmesi kurucu onayı değildir. Ücret girişi, dönem, oran ve çakışma davranışları aşağıdaki şartlara göre uygulanır; şartnamede ayrıca belirtilmeyen varsayımlar kesinleştirilmez.
+> **Durum:** Kurucu 2026-11-05 tarihinde GitHub Issue #3 üzerinden v0.1'i ve Q1–Q3 kararlarını açıkça onayladı. Q1–Q3 kapsam ve sınırları Issue #3'te kaydedildi. Bu onay `main` merge veya production release izni değildir.
 
 ## 1. Kullanıcı hikâyesi
 
@@ -14,7 +14,9 @@ Bir fabrika çalışanı vardiya döngüsünü kurar, ayın takvimini görür, g
 1. Hoş geldin / gizlilik: 'Veriler cihazında kalır'.
 2. Vardiya düzeni: sabit, 3 vardiya, 2+2+2, 4+2, 6+1, haftalık dönüşümlü, özel döngü. Başlangıç günü ve başlangıç vardiyası.
 3. İşyeri kuralları: haftalık sözleşme süresi ve gerçek hafta tatili düzeni; birbirinden bağımsız oran alanları olarak normal fazla çalışma +%50, takvim hafta sonu +%100, gerçek hafta tatili +%100, resmî tatil +%100 ve işyeri özel tatili +%100. Her oran değiştirilebilir; 'Bu işyeri varsayılanıdır, yasal oran iddiası değildir'.
-4. Ücret ve dönem: ücret girişi atlanabilir. Seçilirse aylık brüt, saatlik brüt veya yalnız net ödeme takibi seçilebilir; uygulama bunlardan birini kullanıcı adına varsayılan seçmez. Bordro dönemi ve ödeme günü yapılandırılabilir.
+4. Ücret ve dönem: son ve isteğe bağlı adım. Kullanıcı Aylık brüt, Saatlik brüt, Yalnız net ödeme veya Şimdilik geç seçeneklerinden birini kendisi seçer. Bordro dönemi ve ödeme günü yapılandırılabilir.
+
+**Aylık brüt başlangıç önerisi:** Saatlik hesap için 225 saat, işyeri profiline bağlı ve düzenlenebilir başlangıç önerisi olarak gösterilebilir. Kullanıcı bu böleni açıkça onaylamadan herhangi bir hesaplamada kullanılamaz; evrensel veya yasal kesin değer iddiası değildir. Değişiklik sürümlenir ve geçmiş hesapları sessizce değiştirmez.
 
 **Boş veri:** Örnek kişisel veri üretme; sentetik tanıtım ekranı kullanılabilir ama gerçek kayda karışmaz.
 
@@ -44,12 +46,12 @@ Bir fabrika çalışanı vardiya döngüsünü kurar, ayın takvimini görür, g
 
 - Saat/dakika segmentasyon noktaları: mola, yerel gece yarısı, hafta başlangıcı, resmî tatil başlangıç/bitişi (13.00 yarım gün), kural geçerlilik değişimi, yapılandırılabilir bordro dönemi sınırı.
 - Ücret girişi üç moddan biridir: aylık brüt, saatlik brüt veya yalnız net ödeme takibi; ücret bilgisi vermeden devam etmek de mümkündür. Hesaplanmış tahmini brüt, yalnız brüt baz ve gerekli işyeri kuralı bilgileri mevcut olduğunda gösterilir. Net-only modunda tahmini brüt hesaplanmaz ve gösterilmez.
-- Baz saatlik ücret, ücret türü ve bordro dönemi dikkate alınarak belirlenir. Aylık brütü saatliğe çeviren saat böleni WorkplaceProfile/işyeri profiline ait ayardır. Ürün tarafından kesin bir bölen sabiti atanmaz; kullanıcı/kurucu onayı ve işyeri profili ayarı olmadan saatlik türetim ve buna bağlı brüt tahmini yapılmaz.
+- Baz saatlik ücret, ücret türü ve bordro dönemi dikkate alınarak belirlenir. Aylık brütü saatliğe çeviren saat böleni WorkplaceProfile/işyeri profiline ait ayardır. 225 saat yalnız düzenlenebilir başlangıç önerisidir; kullanıcı açıkça onaylamadan hesapta kullanılamaz. Bölen değişikliği sürümlenir ve geçmiş snapshot'ları sessizce değiştirmez.
 - İş günü sınıfları birbirinden ayrıdır: takvim hafta sonu (Cumartesi/Pazar etiketi), işyeri tarafından takvim/döngü üzerinde belirlenen gerçek hafta tatili, kaynaklı ulusal/resmî tatil ve işyeri tarafından tanımlanan özel tatil. Hafta sonu günü tek başına hafta tatili veya resmî tatil sayılmaz.
 - İşyeri profili için başlangıç ek oranları: normal fazla çalışma +%50 (1,50×), takvim hafta sonu +%100 (2,00×), gerçek işyeri hafta tatili +%100 (2,00×), resmî tatil +%100 (2,00×) ve işyeri özel tatili +%100 (2,00×). Tatil türleri ve oran ayarları ayrı tutulur; tüm oranlar bağımsız değiştirilebilir. Bunlar işyeri ödeme başlangıçlarıdır, yasal oran iddiası değildir.
 - Haftalık sözleşme süresi 45 saatin altındaysa, fazla sürelerle çalışma (+%25 / 1,25×) kavramı ayrı kategori ve yasal bilgilendirmedir; işyeri başlangıç katsayılarıyla karıştırılmaz.
 - UBGT çalışması için zaten ödenmiş/maaşa dahil normal günlük tutar ayrıca tekrar eklenmez; ek ödeme ayrı satırda.
-- Bir zaman aralığına birden fazla mesai/tatil kuralı uyuyorsa ek oranlar otomatik toplanmaz ve aynı dakika iki kez ücretlendirilmez. Uygulanan tek kural ile seçilme gerekçesi kayıtta ve detayda açıklanır. İşyerinin açıkça yapılandırılmış kuralı seçimi belirlemiyorsa belirsizlik uyarısı gösterilir; kullanıcı manuel düzeltme yapabilir. Belirsiz durum otomatik kesin hakediş olarak sunulmaz.
+- Bir zaman aralığına birden fazla mesai/tatil kuralı uyuyorsa ek oranlar otomatik toplanmaz ve aynı dakika iki kez ücretlendirilmez. Başlangıç işyeri politikası geçerli en yüksek tek katsayıyı seçer. Çakışma, seçilen tek kural ve seçim gerekçesi kayıtta ve detayda açıklanır; eşit en yüksek katsayı veya başka çözümlenmemiş belirsizlik varsa uyarı gösterilir ve kullanıcı manuel düzeltme yapabilir. Bu politika yasal hakediş garantisi değildir.
 - 'İşyeri kuralı' ve 'yasal bilgilendirme' iki farklı metin/alan; hukuki uzman onayı olmadan kesin yasal hak iddiası yok.
 - Bordro dönemi başlangıç/bitişi (ör. takvim ayı veya ayın 15'i–14'ü) yapılandırılabilir ve işyeri profiliyle ilişkilendirilir. Dönem değişikliği mevcut ödeme/bordro kayıtlarını sessizce başka döneme taşımaz.
 - Snapshot hesaplanan sonuçları, ücret türü/bazı, aylık bölen ayarı (kullanıldıysa), kural sürümü, uygulanan tek kural ve temel verilerle sabitler; kullanıcı manuel yeniden hesaplama talep ederse önce farkı gösterir.
