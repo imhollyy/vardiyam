@@ -1,6 +1,6 @@
-# VARDİYAM — PROJE ANAYASASI v1.0-rc1
+# VARDİYAM — PROJE ANAYASASI v1.0
 
-> **Durum: KURUCU ONAYI BEKLEYEN TASLAK.** 2026-11-05. Bu belge onaylanana kadar değiştirilebilir; hiçbir ajan tek taraflı olarak bağlayıcı ilan edemez.
+> **Durum: APPROVED — kurucu tarafından 2026-11-05 tarihinde onaylandı.** Bu anayasa bağlayıcıdır; değişiklikler ayrı karar ve kurucu onayı gerektirir. Bölüm 14'teki açık kararlar henüz kesinleşmemiştir.
 > **Öncelik:** Kurucunun açık kararı > onaylanmış bu anayasa > AGENTS.md > PRODUCT_SPEC.md > görev belgeleri. Hukuk, mağaza kuralları ve güvenlik yükümlülükleri bu sırayla bertaraf edilemez.
 > **Köken:** Tam Kare deposundaki PROJECT_CONSTITUTION.md v2.2, AGENTS.md ve Development Quality Tooling disiplininden **uyarlanmıştır**. Tam Kare'nin Supabase, RLS, çok kiracılı SaaS, web ve sektör modülü zorunlulukları **aktarılmamıştır**.
 
@@ -141,4 +141,4 @@ Bulut senkronizasyonu, üyelik/şifre/SMS, işveren paneli, GPS/konum/puantaj iz
 
 İlk araştırma: **2026-11-05**. Yayın öncesi mevzuat, mağaza ve SDK sürümleri yeniden doğrulanır. Ayrıntılı bağlantılar `docs/RESEARCH_SOURCES.md` içindedir.
 
-**Bu dosyanın statüsü:** v1.0-rc1; kurucu onayı gelmeden `v1.0 APPROVED` olarak işaretlenmez.
+**Bu dosyanın statüsü:** `v1.0 APPROVED` (2026-11-05). Bölüm 14 açık kararları ayrı onay bekler.
