@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
-- **Durum:** VDY-001 DONE; VDY-002 READY_FOR_PR (yerel scaffold/review/test tamamlandı; merge/release yok)
+- **Durum:** VDY-001 DONE; VDY-002 DRAFT_PR_OPEN (#4; main merge/release yok)
 - **Aktif branch:** `feat/vdy-002-expo-scaffold`
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. VDY-002 branch'ini GitHub'a push edip draft PR hazırla; main'e merge veya release yapma.
+1. Draft PR #4'ün kurucu/reviewer incelemesini bekle; merge için ayrıca açık kurucu onayı gerekir.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -48,6 +48,13 @@
 - **Cihaz/ürün sınırı:** Android/iOS gerçek cihaz testi NOT RUN; Android export bir cihaz testi değildir. Web smoke gerekli görülmedi ve çalıştırılmadı. Maaş/secret/.env/production kullanılmadı. Eski PR #2 açık bırakıldı, merge edilmedi.
 - **Durum:** Yerel branch PR'ya hazır. `main` merge/release yapılmadı.
 - **NEXT ACTION:** `feat/vdy-002-expo-scaffold` branch'ini GitHub'a push edip draft PR aç; PR'ı merge etme.
+
+### 2026-11-05 — G1 / VDY-002 — DRAFT PR OPEN
+
+- **Local commits:** `dbbd15c` (önceden var olan VDY-001/Playwright/config değişikliklerinin koruma commit'i) ve `c97a730` (VDY-002 scaffold). Feature branch push edildi; `main` push edilmedi.
+- **PR:** [#4 — feat: VDY-002 Expo Router and SQLite scaffold](https://github.com/imhollyy/vardiyam/pull/4), draft, base `main`, head `feat/vdy-002-expo-scaffold`. PR, local VDY-001 koruma commit'ini de içerir; eski draft PR #2 inspected but not merged.
+- **Durum:** PR #4 açıldı ve Codex task'a eklendi. Merge ve release yapılmadı.
+- **NEXT ACTION:** Draft PR #4'ün kurucu/reviewer incelemesini bekle; merge için ayrıca açık kurucu onayı gerekir.
 
 ### 2026-11-05 — G0 / VDY-000 — FOUNDER APPROVED
 
