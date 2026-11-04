@@ -7,7 +7,7 @@
 ## Her oturumun ilk 5 dakikası
 
 1. `PROJECT_CONSTITUTION.md`, `AGENTS.md`, `PRODUCT_SPEC.md`, `docs/progress/PROGRESS.md`, `docs/DECISIONS.md` ve açık task'ı oku.
-2. `git status --short`, aktif branch, mevcut değişiklik ve son commit'i denetle. Kullanıcının yerel değişikliklerini silme.
+2. `git rev-parse --is-inside-work-tree` ve `git status --short --branch` ile gerçek worktree, aktif branch, mevcut değişiklik ve son commit'i denetle. Git worktree bozuksa önce `docs/LOCAL_GIT_RECOVERY.md`; branch/kurulum/kod değişikliği yapma. Kullanıcının yerel değişikliklerini silme.
 3. En küçük doğrulanabilir görevi seç. Anayasa onaylıdır; ancak bölüm 14'teki açık ürün kararlarını kurucu onayı olmadan kesinleştirme.
 4. `docs/progress/PROGRESS.md` dosyasına START kaydı ekle: tarih/UTC, task ID, branch, hedef, risk, alt ajanlar, skill.
 5. Kapsam dışı refactor yapma; her değişikliği geri alınabilir tut.
@@ -15,11 +15,21 @@
 ## Her görevde zorunlu alt ajan + beceri
 
 - **Her geliştirme görevi** en az iki gerçekten ayrı alt ajan rolü gerektirir: (A) uygulayıcı, (B) bağımsız reviewer. Ajanları mevcut Codex sürümünün desteklediği gerçek mekanizmayla başlat. Bir rolün çıktısını diğerine körü körüne onaylatma.
-- Her görevde `$vardiyam-task-flow` becerisini aç ve uygula; ayrıca konuya göre `$vardiyam-pay-calculation` veya `$vardiyam-ui-quality` becerisini aç. Bu repo becerileri `.agents/skills/` altında bulunur.
+- Her görevde `$vardiyam-task-flow` becerisini aç ve uygula; ayrıca konuya göre `$vardiyam-pay-calculation`, `$vardiyam-ui-quality`, `$vardiyam-data-safety` veya `$vardiyam-tooling-preflight` becerisini aç. Bu repo becerileri `.agents/skills/` altında bulunur.
 - Domain/hukuk değişikliği: calculation ajanı + QA/reviewer; UI değişikliği: UI ajanı + a11y/reviewer; gizlilik/veri değişikliği: security reviewer; release: release reviewer. Uzman hukuki inceleme gerektiğinde AI ajanı hukuk uzmanı yerine geçmez.
 - **Gerçek alt ajan özelliği mevcut değilse:** `BLOCKED_AGENT_UNAVAILABLE` yaz; kullanıcıya bildir; farklı oturum/insan review'u için açık onay al. Sahte ajan çıktısı veya 'çalıştırıldı' beyanı yasaktır.
 - Skill erişilemiyorsa `BLOCKED_SKILL_UNAVAILABLE` yaz; gerçek dosyayı incelemeden kullanılmış sayma.
 - İki ajan küçük işte yeterlidir; 3+ ajan yalnız risk gerekçesiyle. Paralel ajanlar aynı dosyayı eşzamanlı düzenlemez.
+
+## Düşük kredi / maliyet kontrollü ajan düzeni
+
+- **Tam politika:** `docs/AGENT_COST_POLICY.md`. Zorunlu iki gerçek alt ajanı koru: 1 uygulayıcı + 1 bağımsız reviewer. Üçüncü ajanı varsayılan açma.
+- Görev başına tek küçük plan, tek uygulama ve tek bağımsız review; tekrar eden review turlarını yalnız gerçek P0/P1 bulgular için ve hedefli yap.
+- Koordinatör önce yerel git/grep/test ile hedefi daraltır. Alt ajanlara tüm repo yerine ilgili dosyalar ve kısa kabul kriteri ver; tam repo okuması gerekiyorsa nedenini kaydet.
+- Reviewer ayrı sandbox'ta repo göremiyorsa güncel redakte patch ve test kanıtı ile gerçekten bağımsız `PATCH_ONLY_REVIEW` yapabilir; patch de yoksa `BLOCKED_REVIEW_UNAVAILABLE`. Kısmi review'u tam repo review'u diye sunma.
+- Context7 yalnız sürüme duyarlı API belirsizliğinde, UI Skills yalnız UI görevinde; Graphify/Strix gibi belirsiz veya maliyetli araçlar doğrulanmadan kurulmaz. `docs/TOOLING_MATRIX.md` esas alınır.
+- Desteklenmeyen model isimleri veya garanti edilmeyen token bütçeleri uydurma. Codex'in gerçekten desteklediği düşük maliyet/effort ayarlarını yerelde doğrula; finans/güvenlik görevlerinde kaliteyi düşürme.
+- Görev raporuna gerçek ajan çağrısı, MCP sorgusu, tekrar turu ve mevcutsa token/kredi kullanımını yaz; bilinmiyorsa `ölçülemedi`.
 
 ## Geliştirme döngüsü (kesintisiz kayıt)
 
@@ -88,3 +98,6 @@ NEXT ACTION: ...
 - `docs/RISKS.md` — riskler
 - `docs/QA_TEST_MATRIX.md` — hesap ve cihaz test matrisi
 - `docs/RESEARCH_SOURCES.md` — mevzuat ve tasarım kaynakları
+- `docs/AGENT_COST_POLICY.md` — ekonomik iki alt ajan akışı
+- `docs/TOOLING_MATRIX.md` — MCP/CLI/skill doğrulama durumu
+- `docs/LOCAL_GIT_RECOVERY.md` — Windows worktree kurtarma
