@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** G0 — araştırma + anayasa + Codex geliştirme düzeni
-- **Durum:** IN_REVIEW / kurucu anayasa onayı bekleniyor
+- **Durum:** APPROVED_CONSTITUTION / VDY-001 yerel Codex preflight bekliyor
 - **Aktif branch:** `docs/constitution-v1-and-codex-harness`
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** HENÜZ YOK
@@ -15,17 +15,26 @@
 - **Gerçek alt ajan çağrısı:** NOT RUN — bu GitHub belge hazırlama oturumunda Codex local alt ajan çalıştırma aracı mevcut değil.
 - **Repo skill kullanımı:** Dosyalar PR'da önerilecek; Codex ortamında çağrılma testi NOT RUN.
 - **Typecheck / lint / test / cihaz:** NOT RUN — henüz uygulama/yerel yürütme ortamı yok.
-- **Kurucu onayı:** PENDING
+- **Kurucu onayı:** APPROVED (2026-11-05, anayasa v1.0; açık ürün kararları hariç)
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION (ilk açılışta bunu yap)
 
-1. Kurucu anayasa PR'ını gözden geçirip açık kararları yanıtlasın.
+1. Anayasa v1.0 kurucu tarafından onaylandı; PR #1 merge sonrası VDY-001'i yerel Codex'te başlat. Bölüm 14 açık kararları gerektiğinde ayrıca sor.
 2. Local Codex, repo checkout'u üzerinde `AGENTS.md` + `.agents/skills/` dosyalarını gerçekten okusun; alt ajan desteğini doğrulasın. `codex mcp list` ve UI Skills/Context7 erişimini gerçek çağrıyla denetlesin.
 3. VDY-001 görevini onaylanmış kurallara göre başlat; START/VERIFY/REVIEW kayıtları ekle.
 4. Expo scaffold ve CI yalnız VDY-002 kapsamında; typecheck/test çalışmadan 'bitti' deme.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — G0 / VDY-000 — FOUNDER APPROVED
+
+- **Kurucu kararı:** 'onaylıyorum' — PROJECT_CONSTITUTION.md v1.0 geliştirme anayasası onaylandı.
+- **Kapsam:** PR #1 dokümantasyonunun main'e merge edilmesine izin; bölüm 14'teki açık kararlar ayrıca kararlaştırılacak.
+- **Ajan/skill:** GitHub doküman onay ve merge adımı; yerel Codex alt ajan ve skill çalıştırması NOT RUN.
+- **Test:** Ürün kodu bulunmadığı için typecheck/lint/test/cihaz SKIP; GitHub PR merge durumu ayrıca doğrulanacak.
+- **NEXT ACTION:** VDY-001 yerel preflight, sonra VDY-002 scaffold.
+
 
 ### 2026-11-05 — G0 / VDY-000 — START
 
