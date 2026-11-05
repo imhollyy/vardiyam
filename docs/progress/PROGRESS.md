@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
-- **Durum:** VDY-003A R2_REVIEW_APPROVED / DRAFT_PR_PENDING; VDY-002 PR #4 remains device BLOCKED; main merge/release yok
+- **Durum:** VDY-003A R2_REVIEW_APPROVED / DRAFT_PR_OPEN (#7); VDY-002 PR #4 remains device BLOCKED; main merge/release yok
 - **Aktif branch:** feat/vdy-003a-shift-cycle-engine
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. Stacked VDY-003A draft PR incelemesini bekle; merge için ayrıca açık kurucu onayı gerekir. Main/release yok.
+1. PR #7 incelemesini ve kurucu kararını bekle; merge için ayrıca açık onay gerekir. Main/release yok.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -278,11 +278,12 @@ NEXT ACTION:
 - **Plan:** (1) TS saf domain modülünü ekle; (2) fixture'daki 30 projeksiyon + 5 override + 4 pencere + 11 invalid vakayı ayrı otomatik testlere bağla; (3) artık/yıl sınırı, 181 günlük aralık, negatif offset ve TZ metadata değişimini ek test et; (4) istenen dört komutu çalıştır; (5) dar diff ve kanıtı bağımsız R2 review'a ver.
 - **Başlangıç testleri:** Henüz çalıştırılmadı; NOT RUN.
 - **NEXT ACTION:** Saf domain motorunu ve fixture-driven testleri uygula.
-### 2026-11-05 — G1 / VDY-003A — IMPLEMENTED / R2 REVIEW APPROVED
+### 2026-11-05 — G1 / VDY-003A — IMPLEMENTED / R2 REVIEW APPROVED / PR #7 OPEN
 
 - **Değişiklik:** src/domain/shift-cycle/index.ts saf Gregorian ordinal/modulo, cycle/template/override validation, day/range projection, local overnight nominal window, single-day override ve fixed/weekly-three/2+2+2/4+2/6+1/custom constructors içerir. React/Expo/SQLite/pay/WorkRecord bağımlılığı eklenmedi.
 - **Test kapsamı:** PR #6 fixture'ındaki C01–C30, O01–O05, W01–W04 ve E01–E11 tüm 50 vaka tests/domain/shift-cycle.test.mjs içinde gerçek test oldu. Ek regresyonlar 181 günlük range, leap/year/yıl<100, negatif offset, timezone metadata + host TZ değişimi, override yayılımı ve OFF semantiği.
 - **Gerçek komutlar:** npm run typecheck PASS; npm run lint PASS; npm test PASS (62/62 total: 3 existing migration + 59 shift-cycle, including 50/50 fixture cases); git diff --check PASS. İlk denemede lint unused constant ve E02 test mapping hatası verdi; düzeltildi, final tam koşu PASS.
-- **Task belgesi:** docs/tasks/VDY-003.md VDY-003A implementasyonu, doğrulama ve reviewer bekleyen durum ile güncellendi. VDY-003B/C NOT STARTED; SQLite/UI/cihaz/ücret kapsam dışı.
+- **Task belgesi:** docs/tasks/VDY-003.md VDY-003A implementasyonu, doğrulama, APPROVE ve PR #7 durumuyla güncellendi. VDY-003B/C NOT STARTED; SQLite/UI/cihaz/ücret kapsam dışı.
 - **Reviewer:** Gerçek bağımsız R2 reviewer APPROVE; P0/P1/P2 yok. Reviewer npm test komutunu bağımsız çalıştırıp 62/62 PASS doğruladı; dosya değiştirmedi.
-- **NEXT ACTION:** Değişiklikleri yeni branch'te commit/push edip hazırlık branch'ini hedefleyen draft PR aç; merge/release yok.
+- **PR/commit:** feat/vdy-003a-shift-cycle-engine; bfa349f; draft PR #7 targets docs/vdy-003-shift-cycle-contract: https://github.com/imhollyy/vardiyam/pull/7. GitHub compare: 1 commit ahead, 0 behind. PR #4/#6/main merge veya release yok.
+- **NEXT ACTION:** PR #7 incelemesini ve kurucu kararını bekle; merge/release yalnız ayrıca açık onayla.
