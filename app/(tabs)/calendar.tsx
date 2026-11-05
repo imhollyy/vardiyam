@@ -12,7 +12,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 import {
@@ -139,7 +139,7 @@ function Cell({
 }
 
 export default function CalendarScreen() {
-  const database = useSQLiteContext();
+  const database = useAppDatabase();
   const router = useRouter();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? colors.dark : colors.light;

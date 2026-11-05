@@ -6,9 +6,9 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-006 — Bordro neti ve gerçek ödeme takibi
-- **Durum:** DONE / R3 REVIEW APPROVED / CI PASS; branch `feat/vdy-006-net-payments-reconciliation`, commit `a8216ecd342c0fddc24ce05de0ea274e907ce32a`. Taslak PR [#22](https://github.com/imhollyy/vardiyam/pull/22) açık/unmerged, PR #20 HEAD `42002fc4a4ac84c9a559847e6a79230db529662b` üzerine stacked. GitHub Actions run #29 `42041568683` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged korundu.
-- **Aktif branch:** feat/vdy-006-net-payments-reconciliation
+- **Aktif aşama:** VDY-008 — çevrimdışı yedekleme/geri yükleme ve veri silme
+- **Durum:** IN PROGRESS / R3. PR #22 head `6de08ec4bc5a474445d338f44c14f932c1ba53ca` doğrulandı; `feat/vdy-008-backup-restore-data-wipe` dalı oluşturuldu. Mevcut VDY-007 docs ile kullanıcıya ait `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri korundu. Expo SDK 58 SQLite serialization/backup API'leri ve riskli file/provider lifecycle değerlendiriliyor; gerçek doğrulama tamamlanmadan restore/silme güvenli sayılmayacak.
+- **Aktif branch:** feat/vdy-008-backup-restore-data-wipe
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,9 +22,31 @@
 
 ## NEXT ACTION
 
-1. MVP'nin uçtan uca kullanıcı kabulü ve eksik ürün özelliklerinin önceliklendirilmesi. PR/main merge ve release yok.
+1. VDY-008 — çevrimdışı yedekleme/geri yükleme ve tüm kullanıcı verisini silme; round-trip/veri bütünlüğü testleri. PR/main merge ve release yok.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-008 — START / BASE VERIFIED
+
+- Issue #24 ve VDY-007 NO GO kanıtı okundu. PR #22 güncel head `6de08ec4bc5a474445d338f44c14f932c1ba53ca`; yerel HEAD eşleşiyor. Branch `feat/vdy-008-backup-restore-data-wipe` bu commit'ten açıldı.
+- Başlangıçta local modifications: `docs/QA_TEST_MATRIX.md`, `docs/progress/PROGRESS.md`, `docs/tasks/VDY-004.md`, `expo-env.d.ts`, untracked `docs/tasks/VDY-007.md`. Önceki VDY-007 QA/progress/task raporları korunacak; özellikle VDY-004 ve expo-env.d.ts stage/overwrite/stash/reset edilmeyecek.
+- R3: çalışan/ödemeler/ücret snapshot'ları için şifreli portability, migration compatibility, restore rollback, destructive wipe ve concurrency. Plan: (1) API/crypto kütüphane ve provider yaşam döngüsü doğrulaması; (2) gerçek AEAD formatı + sürümlü SQLite validator/export/import; (3) exclusive DB bakım kapısı, rollback-safe restore ve data wipe; (4) ayarlarda parola/dosya seçici/paylaşım/onay akışı; (5) negatif/round-trip testleri ve quality gates; (6) bağımsız security review/fix, docs ve PR #22'ye stacked draft.
+- Beceriler: `vardiyam-task-flow` v1.0 ve `vardiyam-data-safety` v1.0 okundu/uygulandı. Context7 Expo SDK 58 kaynağı ve kurulu expo-sqlite 58.0.15 types `serializeAsync`, `backupDatabaseAsync`, `deserializeDatabaseAsync`, `deleteDatabaseAsync` doğruladı. `deserializeDatabaseAsync` yalnız memory DB açar; file-provider share/restore API'leri şu an bağımlılık değil.
+- Gerçek uzman `vdy008_crypto_expert` API/crypto/provider risk sınırlarını değerlendirdi; gerçek bağımsız `vdy008_security_reviewer` R3 review için bekliyor. Her ikisi de kaynak koduna değişiklik yapmadı.
+- **NEXT ACTION:** uygun pinned crypto/file-picker/share dependencies ve mevcut Expo SQLite provider yaşam döngüsünü doğrula; güvenli backup modelini uygula.
+
+### 2026-11-05 — VDY-007 — ACCEPTANCE REVIEW COMPLETE / BETA NOT READY
+
+- **Başlangıç / koruma:** PR #22 güncel HEAD ve yerel HEAD `6de08ec4bc5a474445d338f44c14f932c1ba53ca` eşleşti. Branch `feat/vdy-006-net-payments-reconciliation`. Çalışma ağacındaki önceden var olan `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri aynen bırakıldı. Merge/rebase/force-push/release yapılmadı.
+- **PR zinciri:** #4 → #6 → #7 → #9 → #11 → #12 → #14 → #16 → #18 → #20 → #22 açık, draft, unmerged ve doğrulama anında mergeable; taban/head zinciri lineer. Her birinin güncel head CI koşusu SUCCESS. PR #22 CI run #30 `42042008425` SUCCESS. GitHub'da bazı PR'larda formal submitted APPROVE yok; yerel reviewer kayıtları GitHub review state yerine geçmez. Zincir draft/review beklediğinden bugün merge-ready değil.
+- **Otomatik kabul:** Typecheck PASS; lint PASS; `npm test` PASS 210/210; Expo Doctor PASS 20/20 (ağ erişimli retry); Android JS export PASS (1203 modül, 3 MB Hermes); `git diff --check` PASS; GitHub Actions PR #22 run #30 SUCCESS. Android export, cihaz testi değildir.
+- **Dört yol:** Vardiya düzeni/bugün/takvim/gün override; fiilî çalışma/zamanlı mola/gece/geçmiş; ücret/mesai/tahmini brüt/onaylı snapshot; bordro neti/banka-elden/kısmi dağıtım/mutabakat için domain/repository ve otomatik test kanıtı PASS. Gerçek ekranda uçtan uca tıklama/rahatlık değerlendirmesi **NOT RUN**: CUA uygulama envanterinde Android Studio/emulator yoktu. Tek hedefli Android Expo Go testi bu oturumda yapılamadı. iOS **NOT RUN** (R08 açık). Güncel PR #22 ekran görüntüsü yok; VDY-003B tarihli görseller korunmuş olsa da bu sürüm için kanıt sayılmaz.
+- **Diğer QA:** Yedekleme/geri yükleme/export/import ve tam yerel veri silme uygulaması bulunamadı (**P1**). Gerçek veride yedeksiz cihaz kaybı/uninstall kullanıcı defterini kaybettirebilir. Uçak modu/cold start runtime, ekran okuyucu, büyük yazı, küçük ekran ve light/dark görsel geçiş **NOT RUN**. Kodda ilk boş Bugün ekranından vardiya kurulum CTA'sı var; rehberli onboarding yok (**P2**, akışa hapsolma kanıtı yok). Core yerel SQLite ve network çağrısı görünmemesi offline çalışmayı olası kılar, fakat offline kabulü değildir. P0 tespit edilmedi.
+- **Sınıflandırma ve karar:** P1 beta blocker: versioned offline backup/restore ve kullanıcı kontrollü full data deletion; güvenli staging/atomic restore, bozuk yedek rollback, v1–v6 round-trip, onaylı snapshot/ödeme ledger korunumu test edilmeden gerçek kullanıcı beta verisi alınmamalı. P2: cihaz üstünde dört akış, R08 iOS, erişilebilirlik/tema/büyük yazı, offline/cold-start QA, rehberli ilk kullanım. P3: draft PR zinciri temizliği ve merge koordinasyonu. Mevcut review'da yeni küçük/izole kod düzeltmesi gerektiren kritik bug bulunmadı; yedekleme kapsamı küçük acceptance fix'i değil, ayrı güvenli özellik işi.
+- **Bağımsız reviewer:** `mvp_acceptance_reviewer` bağımsız challenge: no P0; backup/restore/export/delete-all eksikliği P1 ve beta NO GO; onboarding P2; CI/stack doğrulandı.
+- **PR birleştirme sırası (öneri, yetki değil):** #4, #6, #7, #9, #11, #12, #14, #16, #18, #20, #22 sırasıyla; her ebeveyn `main`'e girdikten sonra bir sonraki PR yalnız o taban `main`'de olduğunda retarget edilir, diff'in tek PR değişikliği kaldığı kontrol edilir, CI/review yenilenir. Şu anda hiçbir PR değiştirilmedi veya birleştirilmedi.
+- **Açık takip:** R08 iOS; R13 açık 12 orta seviye audit bulgusu; Ethernet profil/politika durumu; yayın öncesi Türk iş hukuku uzman değerlendirmesi. Bunlar kapatılmış sayılmıyor.
+- **NEXT ACTION:** VDY-008 — çevrimdışı yedekleme/geri yükleme ve tüm kullanıcı verisini silme; round-trip/veri bütünlüğü testleri.
 
 ### 2026-11-05 — VDY-006 — DONE / R3 REVIEW APPROVED / PR #22 CI PASS
 
@@ -495,3 +517,13 @@ NEXT ACTION:
 - R3 finansal veri ve SQLite migration. `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-pay-calculation`, `vardiyam-ui-quality`, `vardiyam-test-gate` okundu. Gerçek uzman ajan sınırları ve bağımsız R3 reviewer başlatıldı.
 - Net bordro geçmişi revizyonlu; dönem kimliği sınır ve timezone değerlerini donduracak; ödeme tarihi dönemi belirlemeyecek; allocation ve bakiye kuruş integer; unknown bordro neti farkı NULL. VDY-005C2 snapshotlarına dokunulmayacak.
 - NEXT ACTION: v6 migration, repository/ledger domain ve otomatik sentetik testler.
+
+### 2026-11-05 — VDY-008 — IMPLEMENTED / R3 FINAL REVIEW AND PR PENDING
+
+- Base PR #22 head `6de08ec4bc5a474445d338f44c14f932c1ba53ca`; branch `feat/vdy-008-backup-restore-data-wipe` created directly from that head. No merge/rebase/force-push/release.
+- Added password-protected offline backup/export, validated restore with two-stage overwrite confirmation, and confirmed logical all-data wipe. SDK58 SQLite backup/serialization is used; existing migration history v1–v6 is unchanged. Maintenance provider pauses queued DB access, closes before swap and reopens after; startup recovery is fail-closed.
+- Encryption: pinned Expo SDK58 native AES-256-GCM, native CSPRNG, PBKDF2-HMAC-SHA256 600,000 rounds, authenticated versioned header, strict file/password limits. No sensitive/user data in logs or tests.
+- Evidence: typecheck PASS; lint PASS; npm test 243/243 PASS (210 retained + 33 new); Expo Doctor PASS 20/20; final Android JS export PASS (1,252 modules); diff-check PASS. Android/iOS native file picker/share/restore smoke NOT RUN because no emulator/device was available; export is not device acceptance. GitHub CI pending PR creation.
+- Independent reviewer identified schema and rollback validation, restore/wipe candidate cleanup, closed-handle recovery UI, and restart marker coverage gaps. Added canonical migration schema comparison, rollback integrity/FK/row-count/serialization/hash validation, candidate cleanup, fail-closed provider, and tested pure recovery policy used by native startup recovery. Final R3 reviewer **APPROVE; no P0/P1**. Native filesystem marker replay/cold restart remains NOT RUN.
+- PR #4–#22 remain unmerged. Preserve local `docs/tasks/VDY-004.md` and `expo-env.d.ts`; do not stage/commit. R08, R13, Ethernet Public profile policy blocker and labor-law review remain OPEN.
+- **NEXT ACTION:** Create the VDY-008 draft PR against PR #22 and record its actual CI state. Next product milestone: one end-to-end Android acceptance, onboarding/accessibility gaps, and safe merge readiness.

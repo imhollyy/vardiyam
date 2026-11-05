@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { appendEarningsProfileVersion, getLatestEarningsProfile } from '@/src/data/earningsRepository';
 import { createDefaultRules, createDefaultSettings, isEarningsSettings, type EarningsSettings } from '@/src/features/earnings/profile';
@@ -52,7 +52,7 @@ function parseRateBasisPoints(value: string): number | null {
 }
 
 export default function EarningsSettingsScreen() {
-  const database = useSQLiteContext();
+  const database = useAppDatabase();
   const router = useRouter();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? colors.dark : colors.light;

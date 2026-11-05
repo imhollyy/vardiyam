@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 import {
@@ -54,7 +54,7 @@ function PlanCard({ plan, template, eyebrow, theme }: {
 }
 
 export default function TodayScreen() {
-  const database = useSQLiteContext();
+  const database = useAppDatabase();
   const router = useRouter();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? colors.dark : colors.light;
