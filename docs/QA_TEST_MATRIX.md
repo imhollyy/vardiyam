@@ -286,3 +286,21 @@ Reviewer: independent R2 reviewer **APPROVE** after fixes; first review caught a
 Security implementation: encrypted file uses PBKDF2-HMAC-SHA256 (600,000 rounds), random 16-byte salt, random 12-byte nonce, AES-256-GCM authenticated header/payload, version/size checks and no plaintext DB export. Restore validates canonical schema, integrity, foreign keys and migration compatibility before replacement; rollback copy is validated before use. Wipe performs a confirmed logical replacement with empty v6 DB; flash forensic erasure is not claimed.
 
 Independent R3 data-security reviewer: **APPROVE; no P0/P1**. P2 evidence boundary remains: native Expo Go picker/share/AES and filesystem cold-recovery were not exercised; no real-device result is claimed.
+
+### VDY-008A — committed database recovery hardening (2026-11-05)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Committed valid candidate before rollback cleanup | PASS | Real v6 SQLite files: candidate digest/schema/integrity/FK/count validates before rollback cleanup. |
+| Corrupt committed live DB + verified rollback | PASS | Corrupt file replaced from copied rollback; rollback retained across a simulated interruption and validated again on retry. |
+| Missing/corrupt rollback + invalid live DB | PASS | Recovery rejects, retains marker/stage and leaves corrupt live bytes unchanged; no empty DB fallback. |
+| Empty v6 candidate for all-data wipe | PASS | Real SQLite file restore validates schema version 6 and zero user rows before cleanup. |
+| Cleanup failure and repeated startup | PASS | Cleanup interruption leaves marker/rollback; second recovery is idempotent. |
+| Malformed marker | PASS | Versioned marker parser rejects malformed/invalid digest and leaves DB bytes untouched. |
+| Typecheck / lint / tests | PASS | `npm run typecheck`; `npm run lint`; `npm test` 248/248 (243 existing + 5 new top-level/integration cases including nested scenarios). |
+| Expo Doctor | PASS | `npx expo-doctor --verbose` 20/20. |
+| Android JS export | PASS | `npx expo export --platform android`; 1,252 modules. Not device acceptance. |
+| Native Expo filesystem cold restart / real Android UI | NOT RUN | No Android emulator/device in active environment; Node SQLite-file recovery tests are not native platform evidence. |
+| GitHub CI | PENDING | VDY-008A commit will update PR #25; record its actual Actions conclusion after push. |
+
+Independent R3 data-security review: **APPROVE; no P0/P1/P2**. Candidate and rollback have separate digest/count expectations. Recovery copy is retained until the copied live DB passes the same integrity, FK, canonical schema, protections, count and digest checks.
