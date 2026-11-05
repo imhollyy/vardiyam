@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-004 — Fiilî Çalışma ve Mesai Kayıtları
-- **Durum:** VDY-004 implementation/local verification/review PASS; PR/CI remote verification pending on `feat/vdy-004-work-records`, based on PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`. PR #4/#6/#7/#9/#11 remain open and unmerged.
+- **Durum:** VDY-004 READY_FOR_REVIEW; local verification, independent R2 review, and GitHub CI PASS. Draft PR #12 is open against PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`. PR #4/#6/#7/#9/#11 remain open and unmerged.
 - **Aktif branch:** feat/vdy-004-work-records
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C schedules/calendar/Today complete; VDY-004 work-record implementation in progress
@@ -16,13 +16,13 @@
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / unit test / Expo Doctor:** VDY-004 local PASS: typecheck, lint, 103/103 tests, Expo Doctor 20/20, Android export, diff check. GitHub CI will be checked after branch push. R13 remains OPEN.
+- **Typecheck / lint / unit test / Expo Doctor:** VDY-004 local PASS: typecheck, lint, 103/103 tests, Expo Doctor 20/20, Android export, diff check. GitHub CI run 42004438035 PASS on feature commit `ad4bfdc`. R13 remains OPEN.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. Commit only VDY-004 files (exclude local `expo-env.d.ts`), push feature branch, open draft PR against PR #11, and verify its GitHub CI. Do not merge.
+1. Founder/reviewer review of draft PR #12; wait for a separate explicit merge decision. Do not merge or release.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -36,7 +36,10 @@
 - **Cihaz:** VDY-004 Android/iOS cihaz UI kabul testi ve ekran görüntüsü NOT RUN; kapsam dışı/önkoşul değil. VDY-003C cihaz smoke kapsamı hakkında yeni iddia yok.
 - **Ayrı riskler:** R08 iOS/device coverage, R13 npm audit moderate bulguları ve Ethernet ağ profili konusu açık ve ayrı takipte; bu görevde değişiklik yok.
 - **QA matrisi:** `docs/QA_TEST_MATRIX.md` içine WR01–WR09 otomatik senaryoları ve kanıt dosyaları eklendi. PR/CI head durumu push sonrasında kaydedilecek.
-- **NEXT ACTION:** VDY-004 dosyalarını açık path listesiyle commit et (expo-env.d.ts hariç), branch'i push et, PR #11'i hedefleyen draft PR aç ve GitHub CI sonucunu kaydet; merge/release yapma.
+- **Teslimat:** Commit `ad4bfdc13328ef73c1b8dde6f7e54974fd7f2d98` (13 explicit paths; local `expo-env.d.ts` excluded). Branch pushed. Taslak [PR #12](https://github.com/imhollyy/vardiyam/pull/12) açık, base `feat/vdy-003c-shift-calendar-ui`, PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`. PR #11 ve diğer bağlı PR'lar merge edilmedi.
+- **GitHub CI:** run 42004438035 SUCCESS; setup, checkout, install locked dependencies, typecheck, lint, unit tests ve Expo dependency health adımlarının tamamı success.
+- **Çalışma ağacı:** Yalnız önceden var olan `expo-env.d.ts` modified/un-staged. VDY-004 dosyaları clean/staged değil; bu `expo-env.d.ts` değişikliği branch/commit'e dahil edilmedi.
+- **NEXT ACTION:** Kurucu/reviewer PR #12'yi inceleyip karar versin; merge için ayrıca açık kurucu onayı gerekir.
 
 ### 2026-11-05 — G1 / VDY-002 — START
 
