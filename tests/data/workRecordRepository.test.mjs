@@ -22,6 +22,7 @@ import {
   getWorkRecordWithTimedBreaks,
   listWorkRecords,
   listWorkRecordsWithTimedBreaks,
+  listWorkRecordsWithTimedBreaksInRange,
   replaceTimedBreaksForWorkRecord,
   updateWorkRecord,
   WorkRecordStorageError,
@@ -380,5 +381,17 @@ test('repository validation rejects breaks longer than the actual interval', asy
     const invalid = manual('bad-break', '2026-04-01T05:00:00.000Z', '2026-04-01T06:00:00.000Z', { breakMinutes: 61 });
     await assert.rejects(createWorkRecord(database, invalid), /Mola dakikası/);
     assert.equal(await getWorkRecord(database, invalid.id), null);
+  } finally { sqlite.close(); }
+});
+
+test('period work query returns every overlapping record across the explicit full-week UTC range', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    const first = manual('period-before', '2026-01-05T04:00:00.000Z', '2026-01-05T05:00:00.000Z');
+    const overlap = manual('period-overlap', '2026-01-05T05:30:00.000Z', '2026-01-05T06:30:00.000Z');
+    const after = manual('period-after', '2026-01-12T00:00:00.000Z', '2026-01-12T01:00:00.000Z');
+    await createWorkRecord(database, first); await createWorkRecord(database, overlap); await createWorkRecord(database, after);
+    const result = await listWorkRecordsWithTimedBreaksInRange(database, '2026-01-06T00:00:00.000Z', '2026-01-05T05:00:00.000Z');
+    assert.deepEqual(result.map(({ record }) => record.id), ['period-overlap']);
   } finally { sqlite.close(); }
 });

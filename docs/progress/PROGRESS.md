@@ -6,9 +6,9 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-005C1 — Mesai ve brüt kazanç hesaplama motoru
-- **Durum:** READY_FOR_REVIEW; taslak PR #18 açık, PR #16'nın güncel başlangıç head'i `f3184a349d0dd2d34fae2d41c0a45275b4d0bb68` üzerine stack edildi. Kod commit `ef3694b1df3615c62eef88e049cf104b4f5b7c58`; code CI run #22 `42029068508` ve docs-closure head `af0cee9297f9a296caed0e1a2ea5d47b39b367ee` CI run #23 `42029467408` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri unstaged ve korunuyor.
-- **Aktif branch:** feat/vdy-005c1-earnings-engine
+- **Aktif aşama:** VDY-005C2 — Gerçek Kazanç ekranı ve kalıcı ücret ayarları
+- **Durum:** IMPLEMENTED / R3 APPROVED; code commits `1312e367fced093017dcaa1c53d27320567820b8` + effective-date fix `50cdc5b0d21052778656f55d5bb90619837644d0`; taslak PR [#20](https://github.com/imhollyy/vardiyam/pull/20) açık/unmerged, PR #18'in branch `feat/vdy-005c1-earnings-engine` güncel head'i `44dcbd563004c43eec224e8fa3a6db5aa156da97` üzerine. Final code CI run #27 `42036369312` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged korundu.
+- **Aktif branch:** feat/vdy-005c2-earnings-ui-persistence
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,9 +22,31 @@
 
 ## NEXT ACTION
 
-1. VDY-005C2 — ücret ayarları, sürümlü hesap kayıtları ve gerçek Kazanç ekranı; VDY-005C1 taslak PR #18'in founder/reviewer kararından sonra. Merge/release yok.
+1. VDY-006 — bordro neti, gerçek net ödeme kayıtları ve ödeme mutabakatı; PR #20 kurucu/reviewer kararından sonra. Merge/release yok.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-005C2 — IMPLEMENTED / R3 APPROVED / PR #20 CI PASS
+
+- **Branch / base / PR:** `feat/vdy-005c2-earnings-ui-persistence`, commit `1312e367fced093017dcaa1c53d27320567820b8`; PR #18 head `44dcbd563004c43eec224e8fa3a6db5aa156da97` doğrulandı. Taslak PR [#20](https://github.com/imhollyy/vardiyam/pull/20) bu branch'i hedefler; PR #20 açık/draft/unmerged, merge/release yok.
+- **Uygulama:** SQLite v5 additive/transactional; sürümlü immutable ücret/rule kayıtları; ayrı geçerlilik başlangıçları (varsayılan bugün, geçmiş ücret profili belirsizliğinde withheld); kaynak ve profil sürümüyle stale-preview kontrolü; yalnız onaylı COMPLETE, satır toplamı tutarlı snapshot yazımı; trigger ile update/delete reddi. Gerçek Kazanç ekranı dört ücret modu, bordro dönemi, gerçek kayıt+mola aralığı sorgusu, haftalık tamlık onayı, açıklanabilir satırlar, settings, onaylı tarihçe ve önceki aynı dönemle farkı sunar. NET_ONLY/SKIP brüt tutar göstermiyor. Aylık baz ve ek tahmin ayrıdır.
+- **Beceriler/kaynak:** `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-pay-calculation`, `vardiyam-ui-quality`, `vardiyam-test-gate`; Context7 `/expo/expo/expo_58.0.0` transaction serialization ve rollback davranışını doğruladı. UI Skills CLI çağrısı sonuç vermedi; yeni kütüphane eklenmedi. Graphify aracı bu oturumda mevcut değildi; Playwright kullanılmadı (native RN, cihaz smoke kapsam dışı).
+- **Ajanlar:** gerçek uzman `c2_pay_data_expert` snapshot/coverage/maaş semantiği sınırlarını gözden geçirdi. Gerçek bağımsız R3 `r3_final_reviewer` final APPROVE verdi; P0/P1/P2 yok, kaynak fingerprint, immutability, migration ve net-only gösterim incelendi.
+- **Yerel doğrulama:** `npm test` PASS **197/197** (önceki 184 korunmuş; migration v4→v5 ve rollback, CRUD/versiyon, preview write-free, stale profile/source, immutable snapshot, cold reopen, UI modu ve effective-date testleri); `npm run typecheck` PASS; `npm run lint` PASS; `git diff --check` PASS; Expo Doctor PASS **20/20**. Android export PASS, Hermes **2.9 MB**; ilk denemede sandbox sistem TEMP yazma izni engellendi, yalnız repo içi kısa TEMP ile başarıya ulaşıldı ve üretilen artefakt silindi. Gerçek cihaz smoke NOT RUN (bu görevde önkoşul değil).
+- **GitHub CI:** Actions run #27 `42036369312`, PR #20 final code head `50cdc5b...`, SUCCESS.
+- **Değişiklik koruması:** `docs/tasks/VDY-004.md` ve `expo-env.d.ts` başlangıçtan beri unstaged kaldı; commit/PR'a alınmadı. Merge/release yapılmadı.
+- **Açık riskler:** Türk iş hukuku uzman incelemesi yayın öncesi açık; R08, R13 ve Ethernet profili ayrı takipte. Gerçek resmî tatil listesi kaynağı/kapsamı kullanıcı tarafından doğrulanmalı.
+- **NEXT ACTION:** VDY-006 — bordro neti, gerçek net ödeme kayıtları ve ödeme mutabakatı.
+
+### 2026-11-05 — VDY-005C2 — START / BASE VERIFIED
+
+- PR #18 güncel HEAD `44dcbd563004c43eec224e8fa3a6db5aa156da97`, yerel HEAD eşleşti; base PR #16 dalı `feat/vdy-005b-timed-breaks`. Yeni dal bu SHA'dan açıldı.
+- Başlangıç dirty state: yalnız `docs/tasks/VDY-004.md` ve `expo-env.d.ts`; stage/overwrite/stash/reset yapılmayacak.
+- R3 risk: tahmini brüt ve kişisel ücret verisi + migration + snapshot. Uzman pay/data ajanı verdiği danışmanlıkta aylık baz ile ek tutarı ayırma, tam hafta kullanıcı teyidi, tatil kaynak kapsamı, açık denkleştirme belirsizliği, immutable tam provenance ve preview-write ayrımı gereğini belirtti.
+- Beceriler: `vardiyam-data-safety`, `vardiyam-pay-calculation`, `vardiyam-ui-quality`, `vardiyam-test-gate`, `vardiyam-task-flow` uygulandı. Başlangıç kodu, migration v4, repository queue, mevcut C1 hesap motoru, placeholder ve test altyapısı incelendi.
+- Kısa uygulama sırası: (1) additive v5 tablo/trigger ve repository; (2) test-first migration/profile/snapshot ve preview invariants; (3) ücret ayar ekranı ve gerçek dönemli Kazanç ekranı, net-only gizleme; (4) kalite kapıları, R3 review/fix, QA/PROGRESS, PR #18'e stacked taslak.
+- Başlangıç test/CI sonuçları bu görev için henüz alınmadı.
+- **NEXT ACTION:** v5 migration, sürümlü repository ve ekran akışını uygula.
 
 ### 2026-11-05 — VDY-005C1 — IMPLEMENTED / R3 APPROVED / PR #18 CI PASS
 

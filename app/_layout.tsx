@@ -11,6 +11,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="work-records" />
+        <Stack.Screen name="earnings-settings" />
       </Stack>
     </SQLiteProvider>
   );
