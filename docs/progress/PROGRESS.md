@@ -6,25 +6,50 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-005B — Zamanlı Mola Kayıtları ve SQLite v4
-- **Durum:** VDY-005B READY_FOR_REVIEW; stacked draft PR #16 open/unmerged; local checks, Android bundle export, independent R2 review, and GitHub CI run #20 PASS on implementation commit `5353f032236ac02b6fa0db70fa72dc6871f097ca`. PR #16 targets PR #14 at `5b6c1fc848a263095c34198379aaa411ed0bce20`. Existing local `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain unstaged and untouched.
-- **Aktif branch:** feat/vdy-005b-timed-breaks
+- **Aktif aşama:** VDY-005C1 — Mesai ve brüt kazanç hesaplama motoru
+- **Durum:** READY_FOR_REVIEW; taslak PR #18 açık, PR #16'nın güncel başlangıç head'i `f3184a349d0dd2d34fae2d41c0a45275b4d0bb68` üzerine stack edildi. Kod commit `ef3694b1df3615c62eef88e049cf104b4f5b7c58`; code CI run #22 `42029068508` ve docs-closure head `af0cee9297f9a296caed0e1a2ea5d47b39b367ee` CI run #23 `42029467408` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri unstaged ve korunuyor.
+- **Aktif branch:** feat/vdy-005c1-earnings-engine
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
-- **Gerçek alt ajan çağrısı:** Implementer + bağımsız reviewer önceki preflight'te; R2 reviewer son diff'i ayrıca inceledi ve düzeltmelerden sonra bulgu bırakmadı. Uzman ajan denemesi repo erişimi olmadığı için sayılmadı; R2 sınıfında uzman zorunlu değil.
-- **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
+- **Gerçek alt ajan çağrısı:** `r3_pay_expert` uzman alan sınırları önerisi verdi; `r3_earnings_reviewer` ara hesap bulguları verdi; `r3_final_reviewer` güncel diff'i bağımsız inceledi ve APPROVE etti. Uzman değerlendirmesi hukuk mütalaası değildir.
+- **Repo skill kullanımı:** VDY-005C1 için `vardiyam-task-flow`, `vardiyam-pay-calculation`, `vardiyam-test-gate`; MDN JavaScript `BigInt`/`Number.isSafeInteger` Context7 kaynağıyla doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / unit test / Expo Doctor:** VDY-005A `npm run typecheck` PASS, `npm run lint` PASS, `npm test` PASS 114/114, `npx expo-doctor --verbose` PASS 20/20, `git diff --check` PASS. GitHub CI run `42016969104` (#17) PASS on implementation head and run `42017401511` (#18) PASS on documentation closure head. R08, R13 and Ethernet profile remain separate/open.
+- **VDY-005C1 doğrulama:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS 184/184 (57 yeni domain testi, 40 sayı fixture'ı); focused earnings 57/57; `npx expo-doctor --verbose` PASS 20/20 (network retry); `git diff --check` PASS; GitHub CI run #22 code PASS and run #23 docs closure PASS. R08, R13 and Ethernet profile remain separate/open.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. VDY-005C — design and implement the explainable overtime-multiplier/gross-entitlement engine on the reviewed VDY-005B stack; keep expert/legal classification boundaries separate and do not merge/release without explicit approval.
+1. VDY-005C2 — ücret ayarları, sürümlü hesap kayıtları ve gerçek Kazanç ekranı; VDY-005C1 taslak PR #18'in founder/reviewer kararından sonra. Merge/release yok.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-005C1 — IMPLEMENTED / R3 APPROVED / PR #18 CI PASS
+
+- **Başlangıç ve branch:** PR #16 open/draft/unmerged ve güncel head `f3184a349d0dd2d34fae2d41c0a45275b4d0bb68` doğrulandı. `feat/vdy-005c1-earnings-engine` bu HEAD'den açıldı. Code commit `ef3694b1df3615c62eef88e049cf104b4f5b7c58`.
+- **Uygulama:** Saf `src/domain/earnings.ts` mevcut WorkRecord, timed break ve VDY-005A segmenter'ı kullanır. Dört ücret modu; 225 saat onay kapısı; 45h altında +25 / üstünde +50; takvim hafta sonu/gerçek işyeri rest/resmî/özel gün ayrımı; en yüksek tek katsayı/eşit katsayıda manuel seçim; BigInt rational kuruş, half-up sürümü, tam-hafta/mola/tatil coverage, sözleşme ve kural geçerlilik kesitleri; açıklanabilir line/snapshot domain contract eklendi. SQLite/ayar UI/Kazanç UI yok.
+- **Belirsizlik güvenliği:** Net-only/SKIP brüt üretmez. Aggregate-only break, eksik haftalık kapsam, coverage'ı olmayan holiday dataset, çakışan WorkRecord, denkleştirme politikası belirsizliği, eşit kural ve safe integer taşması toplamı engeller. Normal aylık baz ücret tekrar eklenemez.
+- **Testler:** Önceki 127 test korundu; `npm test` PASS **184/184**, odaklı kazanç PASS **57/57** (40 bağımsız sayısal fixture). `npm run typecheck`, `npm run lint`, `git diff --check` PASS. `npx expo-doctor --verbose` ilk ağsız denemede DNS nedeniyle 18/20; ağ erişimli yeniden denemede PASS 20/20. Android/iOS device tests NOT RUN (saf domain işi, kapsam dışı).
+- **R3 reviewer:** `r3_earnings_reviewer` ara incelemede amount-basis tutarsızlığı ve overflow eksikliği yakaladı; ödeme semantiği, safe coefficient, satır/aggregate overflow ve regressions eklendi. `r3_final_reviewer` güncel kodu/focused 56 senaryoyu inceledi; **APPROVE**, P0/P1/P2 yok. Sonradan sadece bir ek +%75 özel tatil testi eklendi; üretim kodu değişmedi ve tüm testler tekrar PASS.
+- **Uzman ajan:** `r3_pay_expert` sözleşme haftası, eksik veri, OFF/weekend ayrımı, holiday provenance ve belirsizlik için sınırlar önerdi. Gerçek Türk iş hukuku mütalaası alınmadı; constitution'daki pre-release hukuk incelemesi açık risk olarak kalır.
+- **Beceriler/kaynak:** `vardiyam-task-flow`, `vardiyam-pay-calculation`, `vardiyam-test-gate`; Context7 `/mdn/content` ile BigInt precision ve `Number.isSafeInteger` doğrulandı. Graphify bu oturumda kurulu/tool olarak mevcut değildi; kod grafiği çalıştırılmadı. Playwright kullanılmadı; değişiklik tarayıcı/UI değil.
+- **PR/CI:** Taslak PR [#18](https://github.com/imhollyy/vardiyam/pull/18), base `feat/vdy-005b-timed-breaks` / PR #16 başlangıç head `f3184a3`, açık ve unmerged. GitHub Actions run #22 `42029068508` on source commit `ef3694b...` SUCCESS; docs-closure head `af0cee9...` run #23 `42029467408` SUCCESS. Merge/release yok.
+- **Değişiklik koruması:** `docs/tasks/VDY-004.md` ve `expo-env.d.ts` başlangıçtaki unstaged değişiklikleriyle bırakıldı; stage/commit edilmedi.
+- **Açık riskler:** Resmî hukuk uzmanı yayın öncesi incelemesi, R08 iOS kabulü, R13 audit ve Ethernet network profile ayrı/açık kalır. R08/R13/Ethernet bu domain task'ının blokajı değildir.
+- **NEXT ACTION:** VDY-005C2 — ücret ayarları, sürümlü hesap kayıtları ve gerçek Kazanç ekranı; PR #18 founder/reviewer kararından sonra.
+
+### 2026-11-05 — VDY-005C1 — START / BASE VERIFIED
+
+- **Başlangıç:** Issue #17, constitution v1.1 §§5–6/12, PRODUCT_SPEC, Issue #3 Q1–Q3/ADR-014, QA matrisi ve VDY-005A/B domain API'leri incelendi. PR #16 open/draft/unmerged; remote ve local head `f3184a349d0dd2d34fae2d41c0a45275b4d0bb68` eşleşti. Yeni branch `feat/vdy-005c1-earnings-engine` bu HEAD'den oluşturuldu.
+- **Kapsam/risk:** R3 finansal algoritma. Saf TS domain only; DB snapshot, ayarlar UI, Kazanç UI, ücret/net tax, Android/iOS smoke ve hukuk garantisi yok. 225 böleni açık onay olmadan kullanılamaz. Para kuruş integer/rational ve sürümlü half-up rounding; kaynak belirsizliği/çakışma kesin tutarı engeller.
+- **Değişiklik koruması:** Başlangıçtaki unstaged `docs/tasks/VDY-004.md` ve `expo-env.d.ts` branch değişiminden sonra da unstaged kaldı; stage/reset/stash yapılmayacak.
+- **Beceriler:** `vardiyam-task-flow` v1.0, `vardiyam-pay-calculation` v1.0 ve `vardiyam-test-gate` v1.0 okundu/uygulanıyor. R3 için dar bağımsız hesap reviewer'ı ve uzman ajan incelemesi isteniyor.
+- **Uzman ajan:** `r3_pay_expert` gerçek ajanı anayasa/Issue #17 kural sınırlarını gözden geçiriyor. Bu, resmî hukuk görüşü yerine geçmez; yayın öncesi profesyonel hukuk incelemesi hâlâ açık kalır.
+- **Plan:** (1) bağımsız tablo fixture'larını önce yaz; (2) oran/validity/holiday/pay profile/snapshot domain kontratlarını ve tek-katsayı sınıflandırmasını uygula; (3) dakika/baz/rational rounding ile açıklanabilir tahmin üret ve bilinmeyeni tipli döndür; (4) test/typecheck/lint/Expo Doctor/diff; (5) R3 review, task/QA kayıtları, commit, push, stacked draft PR ve CI.
+- **İlk doğrulama:** 005C1 testleri ve kalite kapıları henüz çalıştırılmadı.
+- **NEXT ACTION:** Test-first implementasyonu sürdür; yerel değişiklikleri commit etme.
 
 ### 2026-11-05 — VDY-005B — IMPLEMENTED / R2 APPROVED / LOCAL VERIFY PASS
 

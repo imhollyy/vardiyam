@@ -105,6 +105,30 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 | P36 | Saat böleni değişikliği | yeni sürüm gelecekteki hesaplara uygulanır; önceki onaylı CalculationSnapshot değişmez |
 | P37 | Aynı dakikada birden fazla farklı katsayılı kural | geçerli en yüksek tek katsayı bir kez seçilir ve açıklanır; oranlar toplanmaz; aynı katsayılı eşit adaylarda uyarı + manuel düzeltme sunulur |
 
+### VDY-005C1 — Saf brüt kazanç motoru (sentetik fixture)
+
+| ID | Senaryo | Beklenen | Otomatik kanıt |
+|---|---|---|---|
+| E01 | 40 ayrı katsayı/baz fixture'ı | kuruş tam sayı, sürümlü half-up, doğru tek katsayılı sonuç | `tests/domain/earnings.test.mjs` |
+| E02 | 2 saat × 200 TL × 1,50 | 600 TL; normal maaşa dahil kalem tekrar eklenmez | aynı |
+| E03 | 40 saat sözleşme, 43 saat tamamlanmış hafta | 3 saat +%25; 45 saat üzeri kuralından ayrı | aynı |
+| E04 | 45 saat tamamlanmış hafta ve daha fazla çalışma | yalnız 45 saat sonrası +%50 sınıfı | aynı |
+| E05 | +%100, özel katsayı ve farklı oranlı tatil çakışması | en yüksek tek oran, toplama yok; kaynak/sürüm detayı satırda | aynı |
+| E06 | Eşit-en-yüksek farklı kurallar | kesin toplam null; açık manuel seçimle çözülebilir | aynı |
+| E07 | Aylık / saatlik / net-only / ücret atlama | aylık bölen onayı gerekli; net-only/SKIP brüt ve snapshot üretmez | aynı |
+| E08 | 225 saat önerisi onaysız | hesaplama withheld; öneri otomatik uygulanmaz | aynı |
+| E09 | Maaşa dahil normal/holiday baz | normal baz eklenmez; PREMIUM_ONLY ve FULL_MULTIPLIER açık semantik taşır | aynı |
+| E10 | Aggregate-only / timed mola | mola belirsizliği kesin tutarı engeller; gerçek aralık biliniyorsa net dakika hesaplanır | aynı |
+| E11 | Takvim hafta sonu / gerçek işyeri hafta tatili / OFF | sadece açık kaynaklı kategoriler; takvim günü ve OFF rest-day türetmez | aynı |
+| E12 | 28 Ekim 13:00, 31 Aralık→1 Ocak, DST | UTC dakika, yerel tarih ve dönem sınırlarında çift sayım yok | aynı |
+| E13 | Bordro ayın 15'inde başlar; ücret kuralı hafta içinde değişir | dönem/versiyon kesitleri doğru; eksik/ambiguous rule aralığı kesin tutarı bekletir | aynı |
+| E14 | Kayıt çakışması, eksik tam-hafta kapsamı, eksik tatil kaynağı, denkleştirme belirsizliği | total kesin tutar null; tipli uyarı | aynı |
+| E15 | Kural/saat böleni revizyonu | snapshot kontratı rule/contract/holiday/engine/rounding versiyonlarını taşır; eski nesne değişmez | aynı |
+
+Gerçek doğrulama sonuçları VDY-005C1 kapanış kaydında `docs/progress/PROGRESS.md` içinde tutulur. Bu testler sentetiktir; hukuk mütalaası, gerçek işyeri bordro teyidi veya kalıcı snapshot/SQLite kabulü değildir.
+
+Son çalıştırma: `npm test` PASS 184/184 (57 yeni domain testi, 40 ayrı sayı fixture'ı); focused kazanç testi 57/57; `npm run typecheck` PASS; `npm run lint` PASS; `npx expo-doctor --verbose` PASS 20/20 (ağ erişimli yeniden deneme); `git diff --check` PASS; taslak PR #18 code CI run #22 (`42029068508`) ve docs-closure run #23 (`42029467408`) PASS.
+
 ## Yasal uyarı / ürün davranışı
 
 | ID | Senaryo | Beklenen |
