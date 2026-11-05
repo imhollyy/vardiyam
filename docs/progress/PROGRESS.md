@@ -7,8 +7,8 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
-- **Durum:** VDY-001 DONE; VDY-002 DRAFT_PR_OPEN (#4; local + remote CI PASS; final Android/iOS device validation BLOCKED; main merge/release yok)
-- **Aktif branch:** `feat/vdy-002-expo-scaffold`
+- **Durum:** VDY-003A R2_REVIEW_APPROVED / DRAFT_PR_PENDING; VDY-002 PR #4 remains device BLOCKED; main merge/release yok
+- **Aktif branch:** feat/vdy-003a-shift-cycle-engine
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -16,13 +16,13 @@
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / test / cihaz:** SKIP — ürün uygulaması/scaffold yok.
+- **Typecheck / lint / test / diff-check:** VDY-003A PASS (62/62 unit tests, 50/50 fixture); cihaz testi kapsam dışı ve NOT RUN.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. SDK 58 uyumlu Android cihaz/emülatör ortamında VDY-002 cihaz kabul kriterlerini çalıştır; sonra desteklenen iOS simülatör/cihaz yolunda doğrula ve kanıtları ekle. Merge/release yok.
+1. Stacked VDY-003A draft PR incelemesini bekle; merge için ayrıca açık kurucu onayı gerekir. Main/release yok.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -268,3 +268,21 @@ NEXT ACTION:
 - **Risk:** R08 OPEN; R13 OPEN (npm audit orta seviye Expo CLI/fingerprint zinciri). Downgrade/override yok.
 - **Güvenlik:** Gerçek maaş verisi, secret, .env veya production erişimi kullanılmadı. Main merge/release yapılmadı.
 - **NEXT ACTION:** SDK 58 Android emulator/cihazı olan ortamda gerçek cihaz smoke testlerini ve ekran görüntülerini üret; ardından iOS destekli ortamda D07 iOS kriterini çalıştır.
+### 2026-11-05 — G1 / VDY-003A — START
+
+- **Kaynak/kabul:** GitHub Issue #5 ve PR #6 okundu; PR #6 hazırlık branch'i docs/vdy-003-shift-cycle-contract, HEAD 80ecdce. PR #6 base'i feat/vdy-002-expo-scaffold HEAD dd87e8e ile ortak merge-base doğrulandı. Contract ve task belgesi ile 50 sentetik fixture incelendi.
+- **Branch/başlangıç:** Yeni feat/vdy-003a-shift-cycle-engine branch'i origin/docs/vdy-003-shift-cycle-contract üzerine açıldı; PR #4/PR #6/main merge edilmedi. Önceki branch üzerindeki tek geçici fixture stash ile korundu; PR #6 branch'indeki fixture blob SHA aynı doğrulandı ve yalnız staging stash'i temizlendi. Başlangıç çalışma ağacında app/domain değişikliği yok.
+- **Risk:** R2 — ücret/payroll değil; ancak deterministik planlanan vardiya projeksiyonu kullanıcı çizelgesini etkiler, yanlış anchor/modulo tarih kayması riski vardır. Anayasa §12 gereği bağımsız reviewer zorunlu.
+- **Kapsam:** saf TypeScript Gregorian ordinal/modulo, fixed/weekly-three/2+2+2/4+2/6+1/custom döngü kurucuları, OFF/SHIFT/LEAVE override projeksiyonu, overnight nominal pencere ve strict validation. SQLite v2, UI/takvim entegrasyonu, WorkRecord, mesai/ücret ve cihaz testleri kapsam dışı.
+- **Skills:** vardiyam-task-flow v1.0 ve vardiyam-test-gate v1.0 okundu/uygulanıyor. Shift-cycle'e özgü ayrı repo skill bulunmadı; pay/UI/data skill'leri bu domain-only değişiklik için ilgili değil.
+- **Plan:** (1) TS saf domain modülünü ekle; (2) fixture'daki 30 projeksiyon + 5 override + 4 pencere + 11 invalid vakayı ayrı otomatik testlere bağla; (3) artık/yıl sınırı, 181 günlük aralık, negatif offset ve TZ metadata değişimini ek test et; (4) istenen dört komutu çalıştır; (5) dar diff ve kanıtı bağımsız R2 review'a ver.
+- **Başlangıç testleri:** Henüz çalıştırılmadı; NOT RUN.
+- **NEXT ACTION:** Saf domain motorunu ve fixture-driven testleri uygula.
+### 2026-11-05 — G1 / VDY-003A — IMPLEMENTED / R2 REVIEW APPROVED
+
+- **Değişiklik:** src/domain/shift-cycle/index.ts saf Gregorian ordinal/modulo, cycle/template/override validation, day/range projection, local overnight nominal window, single-day override ve fixed/weekly-three/2+2+2/4+2/6+1/custom constructors içerir. React/Expo/SQLite/pay/WorkRecord bağımlılığı eklenmedi.
+- **Test kapsamı:** PR #6 fixture'ındaki C01–C30, O01–O05, W01–W04 ve E01–E11 tüm 50 vaka tests/domain/shift-cycle.test.mjs içinde gerçek test oldu. Ek regresyonlar 181 günlük range, leap/year/yıl<100, negatif offset, timezone metadata + host TZ değişimi, override yayılımı ve OFF semantiği.
+- **Gerçek komutlar:** npm run typecheck PASS; npm run lint PASS; npm test PASS (62/62 total: 3 existing migration + 59 shift-cycle, including 50/50 fixture cases); git diff --check PASS. İlk denemede lint unused constant ve E02 test mapping hatası verdi; düzeltildi, final tam koşu PASS.
+- **Task belgesi:** docs/tasks/VDY-003.md VDY-003A implementasyonu, doğrulama ve reviewer bekleyen durum ile güncellendi. VDY-003B/C NOT STARTED; SQLite/UI/cihaz/ücret kapsam dışı.
+- **Reviewer:** Gerçek bağımsız R2 reviewer APPROVE; P0/P1/P2 yok. Reviewer npm test komutunu bağımsız çalıştırıp 62/62 PASS doğruladı; dosya değiştirmedi.
+- **NEXT ACTION:** Değişiklikleri yeni branch'te commit/push edip hazırlık branch'ini hedefleyen draft PR aç; merge/release yok.
