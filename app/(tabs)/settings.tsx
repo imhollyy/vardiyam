@@ -8,7 +8,6 @@ import {
   Text,
   TextInput,
   View,
-  useColorScheme,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
@@ -33,6 +32,7 @@ import {
   type ShiftPattern,
 } from '@/src/features/shifts/schedule';
 import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 const PATTERNS: { id: ShiftPattern; title: string; hint: string }[] = [
   { id: 'fixed', title: 'Sabit', hint: 'Her gün seçilen vardiya' },
@@ -233,8 +233,7 @@ function Chip({ label, selected, onPress, theme, accessibilityLabel }: {
 export default function SettingsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
   const [cycle, setCycle] = useState<ShiftCycle | null>(null);
   const [storedTemplates, setStoredTemplates] = useState<ShiftTemplate[]>([]);
   const [draft, setDraft] = useState<ScheduleDraft>(() => createDefaults());
@@ -488,7 +487,7 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          {error ? <Text accessibilityRole="alert" style={[styles.error, { color: scheme === 'dark' ? '#FFB4A8' : '#A12B20' }]}>{error}</Text> : null}
+          {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
           {success ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{success}</Text> : null}
           <View style={styles.actionRow}>
             <Action label={saving ? 'Kaydediliyor…' : 'Vardiya düzenini kaydet'} onPress={() => void save()} theme={theme} disabled={saving} />

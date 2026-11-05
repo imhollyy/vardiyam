@@ -35,8 +35,8 @@ async function createReferenceDatabase() {
   return { database: expoAdapter(sqlite), close: async () => sqlite.close() };
 }
 
-test('synthetic v1-v6 database images validate, migrate in staging, and preserve prior metadata', async (t) => {
-  for (let sourceVersion = 1; sourceVersion <= 6; sourceVersion += 1) {
+test('synthetic v1-v7 database images validate, migrate in staging, and preserve prior metadata', async (t) => {
+  for (let sourceVersion = 1; sourceVersion <= 7; sourceVersion += 1) {
     await t.test(`v${sourceVersion} to v${CURRENT_SCHEMA_VERSION}`, async () => {
       const source = createHistoricalDatabase(sourceVersion);
       const image = source.serialize();
@@ -59,17 +59,17 @@ test('synthetic v1-v6 database images validate, migrate in staging, and preserve
   }
 });
 
-test('backup validation rejects future schemas, missing v6 guards, and foreign key corruption', async (t) => {
+test('backup validation rejects future schemas, missing immutable guards, and foreign key corruption', async (t) => {
   await t.test('future user_version', async () => {
-    const sqlite = createHistoricalDatabase(6);
+    const sqlite = createHistoricalDatabase(7);
     try {
-      sqlite.exec('PRAGMA user_version = 7;');
+      sqlite.exec('PRAGMA user_version = 8;');
       await assert.rejects(validateBackupDatabase(expoAdapter(sqlite), { createReferenceDatabase }), /sürümü desteklenmiyor/);
     } finally { sqlite.close(); }
   });
 
   await t.test('missing immutable ledger trigger', async () => {
-    const sqlite = createHistoricalDatabase(6);
+    const sqlite = createHistoricalDatabase(7);
     try {
       sqlite.exec('DROP TRIGGER payment_ledger_events_no_delete;');
       await assert.rejects(validateBackupDatabase(expoAdapter(sqlite), { createReferenceDatabase }), /koruma kuralları eksik/);
@@ -77,7 +77,7 @@ test('backup validation rejects future schemas, missing v6 guards, and foreign k
   });
 
   await t.test('same-named table with altered columns does not pass canonical schema validation', async () => {
-    const sqlite = createHistoricalDatabase(6);
+    const sqlite = createHistoricalDatabase(7);
     try {
       sqlite.exec('ALTER TABLE payment_ledger_events ADD COLUMN injected TEXT;');
       await assert.rejects(validateBackupDatabase(expoAdapter(sqlite), { createReferenceDatabase }), /tabloları, ilişkileri veya koruma kuralları/);
@@ -85,7 +85,7 @@ test('backup validation rejects future schemas, missing v6 guards, and foreign k
   });
 
   await t.test('foreign key violation', async () => {
-    const sqlite = createHistoricalDatabase(6);
+    const sqlite = createHistoricalDatabase(7);
     try {
       sqlite.exec('PRAGMA foreign_keys = OFF;');
       sqlite.exec("INSERT INTO payment_allocations (id,payment_id,period_id,amount_minor,created_at_utc,updated_at_utc) VALUES ('synthetic-orphan','missing-payment','missing-period',1,'2026-11-05T12:00:00.000Z','2026-11-05T12:00:00.000Z');");
@@ -94,7 +94,7 @@ test('backup validation rejects future schemas, missing v6 guards, and foreign k
   });
 });
 
-test('full synthetic v6 database image preserves plans, work, breaks, approved earnings, and payment ledger', async () => {
+test('full synthetic v7 database image preserves plans, work, breaks, approved earnings, and payment ledger', async () => {
   const source = new DatabaseSync(':memory:');
   const sourceAdapter = expoAdapter(source);
   const stamp = '2026-11-05T12:00:00.000Z';
@@ -130,7 +130,7 @@ test('full synthetic v6 database image preserves plans, work, breaks, approved e
     const restored = new DatabaseSync(':memory:');
     try {
       restored.deserialize(serialized);
-      const result = await validateBackupDatabase(expoAdapter(restored), { createReferenceDatabase, expectedSchemaVersion: 6 });
+      const result = await validateBackupDatabase(expoAdapter(restored), { createReferenceDatabase, expectedSchemaVersion: 7 });
       assert.equal(result.recordCount, 14);
       assert.equal(restored.prepare('SELECT note FROM work_records WHERE id=?').get('syn-work').note, 'synthetic');
       assert.equal(restored.prepare('SELECT started_at_utc FROM break_intervals WHERE id=?').get('syn-break').started_at_utc, '2026-11-05T10:00:00.000Z');

@@ -60,6 +60,13 @@ export function daysInMonth(value: string): number {
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
 
+const MONDAY_ANCHOR_ORDINAL = dayOrdinal('1970-01-05');
+
+/** Returns the Monday-first weekday index (Monday 0 … Sunday 6) for a full local date. */
+export function mondayFirstWeekdayOffset(value: LocalDate): number {
+  const daysFromMonday = dayOrdinal(value) - MONDAY_ANCHOR_ORDINAL;
+  return ((daysFromMonday % 7) + 7) % 7;
+}
 export function mondayFirstOffset(value: string): number {
   const { year, month } = parseYearMonth(value);
   return (new Date(Date.UTC(year, month - 1, 1, 12)).getUTCDay() + 6) % 7;

@@ -223,6 +223,53 @@ export async function createWorkRecord(
   });
 }
 
+/** Atomically converts the persisted clock-in row to a complete WorkRecord. */
+export async function completeActiveWorkSessionWithRecord(
+  database: WorkRecordDatabase,
+  record: WorkRecord,
+  timedBreaks: readonly TimedBreakInterval[] = [],
+): Promise<void> {
+  validateWorkRecord(record);
+  validateBreaks(record, timedBreaks);
+  await withDatabaseTransaction(database, async () => {
+    await assertForeignKeysEnabled(database);
+    const active = await database.getFirstAsync<{
+      started_at_utc: string; timezone: string; planned_snapshot_json: string | null;
+    }>("SELECT started_at_utc, timezone, planned_snapshot_json FROM active_work_sessions WHERE id = 'active';");
+    if (!active) throw new WorkRecordStorageError('NOT_FOUND', 'Açık mesai bulunamadı.');
+    if (active.started_at_utc !== record.startedAtUtc || active.timezone !== record.timezone) {
+      throw new WorkRecordStorageError('DATABASE_INTEGRITY_ERROR', 'Açık mesai başlangıcı değişmiş. Ekranı yenileyip tekrar dene.');
+    }
+    if (record.source === 'PLANNED' && (!record.planned ||
+        !active.planned_snapshot_json || JSON.stringify(record.planned) !== active.planned_snapshot_json)) {
+      throw new WorkRecordStorageError('PLAN_LINK_IMMUTABLE', 'Başlangıçtaki vardiya bilgisi değişmiş.');
+    }
+    let recordToInsert = record;
+    if (record.source === 'PLANNED' && record.planned) {
+      const cycle = record.planned.cycleId
+        ? await database.getFirstAsync<{ id: string }>('SELECT id FROM shift_cycles WHERE id = ?;', record.planned.cycleId)
+        : null;
+      const template = record.planned.templateId
+        ? await database.getFirstAsync<{ id: string }>('SELECT id FROM shift_templates WHERE id = ?;', record.planned.templateId)
+        : null;
+      if (!cycle || !template) {
+        recordToInsert = {
+          ...record,
+          planned: {
+            ...record.planned,
+            cycleId: cycle ? record.planned.cycleId : null,
+            templateId: template ? record.planned.templateId : null,
+          },
+        };
+      }
+    }
+    assertNoOverlap(await findOverlap(database, recordToInsert));
+    await insertInternal(database, recordToInsert);
+    await replaceTimedBreaksInternal(database, record.id, timedBreaks);
+    await database.runAsync("DELETE FROM active_work_sessions WHERE id = 'active';");
+  });
+}
+
 export async function updateWorkRecord(
   database: WorkRecordDatabase,
   record: WorkRecord,

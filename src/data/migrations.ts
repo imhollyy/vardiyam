@@ -33,6 +33,24 @@ function canonicalUtcMinuteCheck(column: string): string {
   `;
 }
 
+function canonicalLocalDateCheck(column: string): string {
+  return `
+    length(${column}) = 10
+    AND ${column} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+    AND CAST(substr(${column}, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+    AND CAST(substr(${column}, 9, 2) AS INTEGER) BETWEEN 1 AND CASE CAST(substr(${column}, 6, 2) AS INTEGER)
+      WHEN 2 THEN CASE
+        WHEN CAST(substr(${column}, 1, 4) AS INTEGER) % 400 = 0
+          OR (CAST(substr(${column}, 1, 4) AS INTEGER) % 4 = 0
+            AND CAST(substr(${column}, 1, 4) AS INTEGER) % 100 <> 0) THEN 29
+        ELSE 28
+      END
+      WHEN 4 THEN 30 WHEN 6 THEN 30 WHEN 9 THEN 30 WHEN 11 THEN 30
+      ELSE 31
+    END
+  `;
+}
+
 export const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -425,6 +443,25 @@ export const migrations: readonly Migration[] = [
         BEGIN SELECT RAISE(ABORT, 'payment ledger history is immutable'); END;
       CREATE TRIGGER payment_ledger_events_no_delete BEFORE DELETE ON payment_ledger_events
         BEGIN SELECT RAISE(ABORT, 'payment ledger history is immutable'); END;
+    `,
+  },
+  {
+    version: 7,
+    sql: `
+      CREATE TABLE active_work_sessions (
+        id TEXT PRIMARY KEY NOT NULL CHECK (id = 'active'),
+        started_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('started_at_utc')}),
+        started_local_date TEXT NOT NULL CHECK (${canonicalLocalDateCheck('started_local_date')}),
+        timezone TEXT NOT NULL CHECK (length(trim(timezone)) > 0),
+        planned_snapshot_json TEXT CHECK (planned_snapshot_json IS NULL OR json_valid(planned_snapshot_json))
+      );
+
+      CREATE TABLE work_day_statuses (
+        local_date TEXT PRIMARY KEY NOT NULL CHECK (${canonicalLocalDateCheck('local_date')}),
+        status TEXT NOT NULL CHECK (status IN ('LEAVE', 'SICK_REPORT', 'NOT_WORKED')),
+        note TEXT CHECK (note IS NULL OR length(note) <= 2000),
+        updated_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('updated_at_utc')})
+      );
     `,
   },
 ];

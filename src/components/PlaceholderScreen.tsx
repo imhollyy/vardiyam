@@ -1,7 +1,7 @@
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 type PlaceholderScreenProps = {
   eyebrow: string;
@@ -10,8 +10,7 @@ type PlaceholderScreenProps = {
 };
 
 export function PlaceholderScreen({ eyebrow, title, description }: PlaceholderScreenProps) {
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>

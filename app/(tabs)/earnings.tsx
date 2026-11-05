@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -12,7 +12,7 @@ import { getOrCreatePayrollPeriod, getPeriodPaymentLedger } from '@/src/data/pay
 import { isEarningsSettings, makeCalculationInput, type EarningsSettings } from '@/src/features/earnings/profile';
 import { canApproveEarnings, shouldShowGrossEstimate } from '@/src/features/earnings/presentation';
 import { formatLocalDate, getLocalToday, shiftYearMonth } from '@/src/features/shifts/dates';
-import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { payrollPeriodForMonth } from '@/src/features/payments/period';
 
 function startOfWeek(date: LocalDate, weekStartsOn: number): LocalDate {
@@ -42,8 +42,7 @@ type Preview = { input: PreviewInput; result: EarningsCalculationResult; periodS
 export default function EarningsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
   const [periodMonth, setPeriodMonth] = useState(() => getLocalToday('Europe/Istanbul').slice(0, 7));
   const [version, setVersion] = useState<EarningsProfileVersion<EarningsSettings, EarningsRule[]> | null>(null);
   const [records, setRecords] = useState<Awaited<ReturnType<typeof listWorkRecordsWithTimedBreaksInRange>>>([]);

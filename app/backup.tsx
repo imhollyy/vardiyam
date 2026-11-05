@@ -8,18 +8,19 @@ import {
   Text,
   TextInput,
   View,
-  useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
+import { CURRENT_SCHEMA_VERSION } from '@/src/data/migrations';
 
 import { useAppDatabase, useDatabaseMaintenance } from '@/src/data/AppDatabaseProvider';
 import { applyDataWipe, applyPreparedRestore, createBackupFile, createEmptyDatabaseForWipe, prepareRestoreFile, type RestorePreview } from '@/src/data/backupService';
 import { MAX_BACKUP_BYTES, validateBackupPassword } from '@/src/features/backup/backupContainer';
 import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 
@@ -27,8 +28,7 @@ export default function BackupScreen() {
   const database = useAppDatabase();
   const { runDatabaseMaintenance, busy: maintenanceBusy } = useDatabaseMaintenance();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
   const candidate = useRef<SQLite.SQLiteDatabase | null>(null);
   const [exportPassword, setExportPassword] = useState('');
   const [exportConfirm, setExportConfirm] = useState('');
@@ -205,7 +205,7 @@ export default function BackupScreen() {
         {preview ? (
           <View style={[styles.preview, { borderColor: theme.border }]}>
             <Text style={[styles.previewTitle, { color: theme.foreground }]}>Yedek doğrulandı</Text>
-            <Text style={[styles.body, { color: theme.muted }]}>Şema v{preview.databaseSchemaVersion} → v6 · SQLite {preview.sqliteVersion}</Text>
+            <Text style={[styles.body, { color: theme.muted }]}>Şema v{preview.databaseSchemaVersion} → v{CURRENT_SCHEMA_VERSION} · SQLite {preview.sqliteVersion}</Text>
             <Text style={[styles.body, { color: theme.muted }]}>{new Date(preview.createdAtUtc).toLocaleString('tr-TR')} · {preview.recordCount} kayıt</Text>
             <Text style={[styles.hint, { color: theme.muted }]}>Geri yüklemek mevcut tüm uygulama verilerinin yerine geçer. Devam etmeden önce ikinci onay alınır.</Text>
             <Action label="Bu yedeği geri yükle" disabled={busy || maintenanceBusy} onPress={confirmRestore} theme={theme} destructive />

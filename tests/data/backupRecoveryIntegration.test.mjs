@@ -35,13 +35,13 @@ async function openReference() {
   return { database: adapter(sqlite), close: async () => sqlite.close() };
 }
 
-async function createV6(path, value = null) {
+async function createV7(path, value = null) {
   const sqlite = new DatabaseSync(path);
   const db = adapter(sqlite);
   await db.execAsync('PRAGMA foreign_keys = ON;');
   await initializeDatabase(db);
   if (value !== null) await db.runAsync('INSERT INTO app_metadata (key,value) VALUES (?,?);', 'synthetic_recovery_fixture', value);
-  const validation = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 6 });
+  const validation = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 7 });
   const image = sqlite.serialize();
   const digest = hex(sha256(image));
   image.fill(0);
@@ -65,7 +65,7 @@ function fixtureMarker(candidate, rollback, state = 'committed') {
 }
 
 async function createHarness(t) {
-  const directory = await mkdtemp(join(tmpdir(), 'vdy008a-'));
+  const directory = await mkdtemp(join(tmpdir(), 'vdy010a-'));
   t.after(async () => rm(directory, { recursive: true, force: true }));
   const path = (name) => join(directory, name);
   const portFor = (marker, { failCleanupOnce = false, failAfterRestoreOnce = false } = {}) => {
@@ -111,7 +111,7 @@ async function verify(path, digest, expectedCount) {
   try {
     sqlite = new DatabaseSync(path);
     const db = adapter(sqlite);
-    const result = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 6 });
+    const result = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 7 });
     const image = sqlite.serialize();
     const actualDigest = hex(sha256(image));
     image.fill(0);
@@ -124,8 +124,8 @@ async function writeMarker(path, marker) { await writeFile(path, JSON.stringify(
 
 test('committed recovery verifies the candidate before deleting the old rollback copy', async (t) => {
   const h = await createHarness(t);
-  const old = await createV6(h.path(ROLLBACK), 'old-data');
-  const candidate = await createV6(h.path(STAGE), 'new-data');
+  const old = await createV7(h.path(ROLLBACK), 'old-data');
+  const candidate = await createV7(h.path(STAGE), 'new-data');
   await copyFile(h.path(STAGE), h.path(LIVE));
   const marker = fixtureMarker(candidate, old);
   await writeMarker(h.path(MARKER), marker);
@@ -139,10 +139,10 @@ test('committed recovery verifies the candidate before deleting the old rollback
   live.close();
 });
 
-test('committed all-data wipe validates empty v6 candidate while retaining rollback until validation', async (t) => {
+test('committed all-data wipe validates empty v7 candidate while retaining rollback until validation', async (t) => {
   const h = await createHarness(t);
-  const old = await createV6(h.path(ROLLBACK), 'old-data');
-  const empty = await createV6(h.path(STAGE));
+  const old = await createV7(h.path(ROLLBACK), 'old-data');
+  const empty = await createV7(h.path(STAGE));
   assert.equal(empty.count, 0);
   await copyFile(h.path(STAGE), h.path(LIVE));
   const marker = fixtureMarker(empty, old);
@@ -151,7 +151,7 @@ test('committed all-data wipe validates empty v6 candidate while retaining rollb
 
   assert.equal(await run.recover(), 'finish-commit');
   const live = new DatabaseSync(h.path(LIVE));
-  assert.equal(live.prepare('PRAGMA user_version;').get().user_version, 6);
+  assert.equal(live.prepare('PRAGMA user_version;').get().user_version, 7);
   assert.equal(live.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
   live.close();
   assert.equal(await exists(h.path(ROLLBACK)), false);
@@ -159,8 +159,8 @@ test('committed all-data wipe validates empty v6 candidate while retaining rollb
 
 test('corrupt committed live database is replaced from verified rollback and survives a second startup', async (t) => {
   const h = await createHarness(t);
-  const old = await createV6(h.path(ROLLBACK), 'old-data');
-  const candidate = await createV6(h.path(STAGE), 'new-data');
+  const old = await createV7(h.path(ROLLBACK), 'old-data');
+  const candidate = await createV7(h.path(STAGE), 'new-data');
   await writeFile(h.path(LIVE), Buffer.from('corrupt live sqlite bytes'));
   const marker = fixtureMarker(candidate, old);
   await writeMarker(h.path(MARKER), marker);
@@ -182,7 +182,7 @@ test('missing or corrupt rollback fails closed without changing a corrupt live d
     await t.test(rollbackKind, async (t2) => {
       const h = await createHarness(t2);
       const old = { digest: '0'.repeat(64), count: 1 };
-      const candidate = await createV6(h.path(STAGE), 'new-data');
+      const candidate = await createV7(h.path(STAGE), 'new-data');
       const liveBytes = Buffer.from('damaged-live');
       await writeFile(h.path(LIVE), liveBytes);
       if (rollbackKind === 'corrupt') await writeFile(h.path(ROLLBACK), Buffer.from('damaged-rollback'));
@@ -199,8 +199,8 @@ test('missing or corrupt rollback fails closed without changing a corrupt live d
 
 test('recovery retries after cleanup failure and after a stop during rollback copy', async (t) => {
   const h = await createHarness(t);
-  const old = await createV6(join(h.directory, 'cleanup-old.db'), 'old-data');
-  const candidate = await createV6(h.path(STAGE), 'new-data');
+  const old = await createV7(join(h.directory, 'cleanup-old.db'), 'old-data');
+  const candidate = await createV7(h.path(STAGE), 'new-data');
   await copyFile(join(h.directory, 'cleanup-old.db'), h.path(ROLLBACK));
   await copyFile(h.path(STAGE), h.path(LIVE));
   const marker = fixtureMarker(candidate, old);
@@ -212,8 +212,8 @@ test('recovery retries after cleanup failure and after a stop during rollback co
   assert.equal(await exists(h.path(ROLLBACK)), false);
 
   // A second fixture simulates process termination after restoring bytes but before clearing the marker.
-  const secondOld = await createV6(join(h.directory, 'old.db'), 'old-again');
-  const secondCandidate = await createV6(join(h.directory, 'candidate.db'), 'candidate-again');
+  const secondOld = await createV7(join(h.directory, 'old.db'), 'old-again');
+  const secondCandidate = await createV7(join(h.directory, 'candidate.db'), 'candidate-again');
   await copyFile(join(h.directory, 'old.db'), h.path(ROLLBACK));
   await writeFile(h.path(LIVE), Buffer.from('corrupt live'));
   const secondMarker = fixtureMarker(secondCandidate, secondOld);

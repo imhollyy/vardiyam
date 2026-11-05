@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,13 +9,13 @@ import {
   Text,
   TextInput,
   View,
-  useColorScheme,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 import {
+  dayOrdinal,
   getNominalShiftWindow,
   type PlanOverride,
   type PlannedShift,
@@ -43,6 +43,7 @@ import {
   shiftYearMonth,
 } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 type OverrideKind = PlanOverride['kind'];
@@ -141,8 +142,9 @@ function Cell({
 export default function CalendarScreen() {
   const database = useAppDatabase();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const params = useLocalSearchParams<{ initialDate?: string | string[] }>();
+  const initialDateParam = Array.isArray(params.initialDate) ? params.initialDate[0] : params.initialDate;
+  const { theme } = useAppTheme();
   const today = getLocalToday('Europe/Istanbul');
   const [month, setMonth] = useState(monthForLocalDate(today));
   const [selectedDate, setSelectedDate] = useState(today);
@@ -158,6 +160,20 @@ export default function CalendarScreen() {
   const [overrideKind, setOverrideKind] = useState<OverrideKind>('SHIFT');
   const [overrideTemplateId, setOverrideTemplateId] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
+
+  useEffect(() => {
+    if (!initialDateParam) return;
+    const updateSelection = setTimeout(() => {
+      try {
+        dayOrdinal(initialDateParam);
+        setSelectedDate(initialDateParam);
+        setMonth(monthForLocalDate(initialDateParam));
+      } catch {
+        // Ignore malformed deep-link dates and keep the current calendar selection.
+      }
+    }, 0);
+    return () => clearTimeout(updateSelection);
+  }, [initialDateParam]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -419,7 +435,7 @@ export default function CalendarScreen() {
                 />
               </View>
               <Text style={[styles.overrideHint, { color: theme.muted }]}>Bu değişiklik yalnız seçili günü etkiler. OFF, yasal hafta tatili anlamına gelmez.</Text>
-              {error ? <Text accessibilityRole="alert" style={[styles.error, { color: scheme === 'dark' ? '#FFB4A8' : '#A12B20' }]}>{error}</Text> : null}
+              {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
               <Button label={saving ? 'Kaydediliyor…' : editingOverride ? 'Değişikliği kaydet' : 'Gün istisnasını kaydet'} onPress={() => void saveOverride()} theme={theme} disabled={saving} />
               {editingOverride ? <Button label="İstisnayı kaldır" onPress={removeOverride} theme={theme} secondary={true} disabled={saving} /> : null}
             </ScrollView>

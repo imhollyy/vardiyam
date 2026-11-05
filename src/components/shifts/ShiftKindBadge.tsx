@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { PlannedShift, ShiftTemplate } from '@/src/domain/shift-cycle/index';
-import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 type ShiftKindBadgeProps = {
   kind: PlannedShift['kind'];
@@ -16,8 +16,7 @@ const kindCopy = {
 };
 
 export function ShiftKindBadge({ kind, template, compact = false }: ShiftKindBadgeProps) {
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
   const copy = kindCopy[kind];
   const title = kind === 'SHIFT' ? template?.name ?? 'Vardiya' : copy.title;
   const detail = kind === 'SHIFT' ? template?.code ?? 'V' : kind === 'OFF' ? 'Planlı boş gün' : 'İzin günü';

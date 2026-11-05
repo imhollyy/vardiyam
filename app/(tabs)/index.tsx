@@ -1,186 +1,532 @@
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator, Alert, BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+} from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
-
-import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
-import {
-  getNominalShiftWindow,
-  type PlannedShift,
-  type ShiftCycle,
-  type ShiftTemplate,
-} from '@/src/domain/shift-cycle/index';
-import { getPlannedShiftsForRange, listShiftCycles, listShiftTemplates } from '@/src/data/shiftCycleRepository';
-import { addLocalDays, formatLocalDate, getLocalToday } from '@/src/features/shifts/dates';
+import { deleteWorkDayStatus, getActiveWorkSession, listWorkDayStatuses, saveWorkDayStatus, startActiveWorkSession, type WorkDayStatus, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
+import { createPlanOverride, deletePlanOverride, getPlanOverride, getPlannedShiftsForRange, listShiftCycles, listShiftTemplates, updatePlanOverride } from '@/src/data/shiftCycleRepository';
+import { completeActiveWorkSessionWithRecord, listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
+import { getLocalDateTimeCandidates, getRecordRangeDifferenceMinutes, localDateTimeToUtc, utcToLocalDateTime, type PlannedWorkSnapshot, type WorkRecord } from '@/src/domain/work-record';
+import { getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTemplate } from '@/src/domain/shift-cycle';
+import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalToday, localDateForMonthDay, monthForLocalDate, monthRange, mondayFirstOffset, mondayFirstWeekdayOffset, shiftYearMonth } from '@/src/features/shifts/dates';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { colors } from '@/src/theme/tokens';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
+const ZONE = 'Europe/Istanbul';
+const WEEKDAYS = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
+const STATUS_LABELS: Record<WorkDayStatus, string> = { LEAVE: 'İzin', SICK_REPORT: 'Rapor', NOT_WORKED: 'Gidilmedi' };
 
-function Button({ label, onPress, theme, secondary = false }: { label: string; onPress: () => void; theme: Theme; secondary?: boolean }) {
+function localClock(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+}
+
+function currentDateTime(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA-u-ca-gregory-nu-latn', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}T${value.hour}:${value.minute}`;
+}
+
+function shortDate(date: string): string {
+  return formatLocalDate(date, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function localRecordDate(item: WorkRecordWithTimedBreaks): string {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: item.record.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(item.record.startedAtUtc));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function shiftMinutes(template: ShiftTemplate): number {
+  const [startHour, startMinute] = template.startLocalTime.split(':').map(Number);
+  const [endHour, endMinute] = template.endLocalTime.split(':').map(Number);
+  let minutes = endHour * 60 + endMinute - startHour * 60 - startMinute;
+  if (minutes <= 0) minutes += 24 * 60;
+  return minutes;
+}
+
+function durationLabel(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} sa ${remainder} dk` : `${hours} sa`;
+}
+
+function durationShort(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours}sa${remainder ? ` ${remainder}dk` : ''}` : `${remainder}dk`;
+}
+
+function ActionButton({ label, icon, color, disabled, onPress, theme, accessibilityLabel }: {
+  label: string; icon: string; color: string; disabled: boolean; onPress: () => void; theme: Theme; accessibilityLabel: string;
+}) {
   return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.button, { backgroundColor: secondary ? theme.surface : theme.accent, borderColor: secondary ? theme.border : theme.accent, opacity: pressed ? 0.74 : 1 }]}
-    >
-      <Text style={{ color: secondary ? theme.foreground : theme.surface, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled}
+      onPress={onPress} style={({ pressed }) => [styles.actionCard, { backgroundColor: disabled ? theme.surface : color, borderColor: disabled ? theme.border : color, opacity: pressed ? 0.82 : 1 }]}>
+      <Text accessible={false} style={[styles.actionIcon, { color: disabled ? theme.muted : '#FFFFFF' }]}>{icon}</Text>
+      <Text style={[styles.actionLabel, { color: disabled ? theme.muted : '#FFFFFF' }]}>{label}</Text>
     </Pressable>
   );
 }
 
-function PlanCard({ plan, template, eyebrow, theme }: {
-  plan: PlannedShift;
-  template?: ShiftTemplate;
-  eyebrow: string;
-  theme: Theme;
+function MiniCell({ date, plan, template, status, record, selected, onPress, theme }: {
+  date: string; plan?: PlannedShift; template?: ShiftTemplate; status?: WorkDayStatus; record?: WorkRecordWithTimedBreaks;
+  selected: boolean; onPress: () => void; theme: Theme;
 }) {
-  const window = plan.kind === 'SHIFT' && template
-    ? getNominalShiftWindow(plan.localDate, template.startLocalTime, template.endLocalTime)
-    : null;
+  const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
+  const markerColor = record ? theme.success : status === 'NOT_WORKED' ? theme.danger : status || plan?.kind === 'LEAVE' ? theme.warning : theme.muted;
+  const marker = record ? '✓' : status === 'NOT_WORKED' ? '−' : status === 'SICK_REPORT' ? 'R' : status === 'LEAVE' || plan?.kind === 'LEAVE' ? 'İ' : plan?.kind === 'SHIFT' ? template?.code?.slice(0, 1) ?? 'V' : plan?.kind === 'OFF' ? 'O' : '';
+  const spokenStatus = record ? 'Çalışma tamamlandı' : status ? STATUS_LABELS[status] : plan?.kind === 'OFF' ? 'OFF' : plan?.kind === 'LEAVE' ? 'İzin planı' : plan?.kind === 'SHIFT' ? `${template?.name ?? 'Vardiya'} ${template?.startLocalTime ?? ''} ${template?.endLocalTime ?? ''}` : 'Plan yok';
   return (
-    <View style={[styles.planCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Text style={[styles.eyebrow, { color: theme.accent }]}>{eyebrow}</Text>
-      <Text accessibilityRole="header" style={[styles.date, { color: theme.foreground }]}>{formatLocalDate(plan.localDate)}</Text>
-      <ShiftKindBadge kind={plan.kind} template={template} />
-      {window ? (
-        <Text style={[styles.time, { color: theme.foreground }]}>
-          {window.startLocalTime}–{window.endLocalTime}{window.crossesMidnight ? ' · ertesi gün biter' : ''}
-        </Text>
-      ) : null}
-      {plan.source === 'OVERRIDE' ? <Text style={[styles.override, { color: theme.muted }]}>Bu gün tek seferlik değiştirildi.</Text> : null}
-    </View>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${formatLocalDate(date)}, ${spokenStatus}${difference === null ? '' : `, süre farkı ${difference > 0 ? '+' : ''}${durationLabel(Math.abs(difference))}`}`}
+      accessibilityState={{ selected }} hitSlop={{ top: 2, bottom: 2, left: 3, right: 3 }} onPress={onPress} style={({ pressed }) => [styles.dayCell, {
+      backgroundColor: record ? theme.successSurface : status === 'NOT_WORKED' ? theme.dangerSurface : status || plan?.kind === 'LEAVE' ? theme.warningSurface : theme.surface,
+        borderColor: selected ? theme.accent : theme.border, opacity: pressed ? 0.75 : 1,
+      }]}>
+      <Text style={[styles.dayNumber, { color: theme.foreground }]}>{Number(date.slice(-2))}</Text>
+      {marker ? <Text accessible={false} style={[styles.dayMarker, { color: markerColor }]}>{marker}</Text> : <View style={styles.markerSpacer} />}
+      {difference !== null && difference !== 0 ? <Text accessible={false} style={[styles.delta, { color: difference > 0 ? theme.success : theme.danger }]}>{difference > 0 ? '+' : '−'}{durationShort(Math.abs(difference))}</Text> : null}
+    </Pressable>
   );
 }
 
 export default function TodayScreen() {
   const database = useAppDatabase();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
-  const today = getLocalToday('Europe/Istanbul');
+  const { theme, mode, toggleMode } = useAppTheme();
+  const [now, setNow] = useState(() => new Date());
+  const [monthOffset, setMonthOffset] = useState(0);
   const [cycle, setCycle] = useState<ShiftCycle | null>(null);
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const [plans, setPlans] = useState<PlannedShift[]>([]);
+  const [records, setRecords] = useState<WorkRecordWithTimedBreaks[]>([]);
+  const [statuses, setStatuses] = useState<Map<string, WorkDayStatusEntry>>(new Map());
+  const [active, setActive] = useState<Awaited<ReturnType<typeof getActiveWorkSession>>>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState(() => localClock(new Date(), ZONE));
+  const [endTime, setEndTime] = useState(() => localClock(new Date(), ZONE));
+  const [endOccurrence, setEndOccurrence] = useState<'earlier' | 'later' | undefined>();
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [sheetStatus, setSheetStatus] = useState<WorkDayStatus | null>(null);
+  const [sheetNote, setSheetNote] = useState('');
+  const [sheetPlanKind, setSheetPlanKind] = useState<'SHIFT' | 'OFF' | 'LEAVE'>('SHIFT');
+  const [sheetTemplateId, setSheetTemplateId] = useState('');
+  const [menu, setMenu] = useState<'profile' | 'notifications' | null>(null);
+  const refreshRef = useRef<(() => Promise<void>) | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [cycles, savedTemplates] = await Promise.all([
-        listShiftCycles(database),
-        listShiftTemplates(database),
-      ]);
-      const active = cycles[0] ?? null;
-      setCycle(active);
-      setTemplates(savedTemplates);
-      if (!active) {
-        setPlans([]);
-        return;
-      }
-      setPlans(await getPlannedShiftsForRange(database, active.id, today, addLocalDays(today, 30)));
-    } catch {
-      setError('Bugünün vardiya planı yüklenemedi. Tekrar deneyin.');
-    } finally {
-      setLoading(false);
+  const viewTimezone = active?.timezone ?? cycle?.timezone ?? ZONE;
+  const today = getLocalToday(viewTimezone, now);
+  const month = shiftYearMonth(monthForLocalDate(today), monthOffset);
+  const weekStart = addLocalDays(today, -mondayFirstWeekdayOffset(today));
+  const weekEnd = addLocalDays(weekStart, 7);
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true); setError(null);
+      try {
+        const [cycles, savedTemplates, savedRecords, currentSession] = await Promise.all([
+          listShiftCycles(database), listShiftTemplates(database), listWorkRecordsWithTimedBreaks(database), getActiveWorkSession(database),
+        ]);
+        if (cancelled) return;
+        const selectedCycle = cycles[0] ?? null;
+        const focusTimezone = currentSession?.timezone ?? selectedCycle?.timezone ?? ZONE;
+        const focusedToday = getLocalToday(focusTimezone);
+        const focusedWeekStart = addLocalDays(focusedToday, -mondayFirstWeekdayOffset(focusedToday));
+        const focusedWeekEnd = addLocalDays(focusedWeekStart, 7);
+        const currentMonth = shiftYearMonth(monthForLocalDate(focusedToday), monthOffset);
+        const focusedMonthRange = monthRange(currentMonth);
+        const visibleStart = focusedWeekStart < focusedMonthRange.start ? focusedWeekStart : focusedMonthRange.start;
+        const visibleEnd = focusedWeekEnd > focusedMonthRange.end ? focusedWeekEnd : focusedMonthRange.end;
+        const [savedStatuses, projectedPlans] = await Promise.all([
+          listWorkDayStatuses(database, visibleStart, visibleEnd),
+          selectedCycle ? getPlannedShiftsForRange(database, selectedCycle.id, visibleStart, visibleEnd) : Promise.resolve([]),
+        ]);
+        if (cancelled) return;
+        setCycle(selectedCycle); setTemplates(savedTemplates); setRecords(savedRecords); setActive(currentSession);
+        if (currentSession) {
+          setStartTime(utcToLocalDateTime(currentSession.startedAtUtc, currentSession.timezone).slice(11));
+          setEndTime(localClock(new Date(), currentSession.timezone));
+        }
+        setStatuses(new Map(savedStatuses.map((item) => [item.localDate, item])));
+        setPlans(projectedPlans);
+      } catch {
+        if (!cancelled) setError('Ana ekran verileri yüklenemedi. Yerel verilerin korunuyor; tekrar deneyebilirsin.');
+      } finally { if (!cancelled) setLoading(false); }
+    };
+    refreshRef.current = load;
+    void load();
+    return () => { cancelled = true; if (refreshRef.current === load) refreshRef.current = null; };
+  }, [database, monthOffset]));
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const plansByDate = useMemo(() => new Map(plans.map((item) => [item.localDate, item])), [plans]);
+  const recordsByDate = useMemo(() => {
+    const grouped = new Map<string, WorkRecordWithTimedBreaks[]>();
+    for (const item of records) {
+      const date = localRecordDate(item);
+      grouped.set(date, [...(grouped.get(date) ?? []), item]);
     }
-  }, [database, today]);
+    return grouped;
+  }, [records]);
+  const templatesById = useMemo(() => new Map(templates.map((item) => [item.id, item])), [templates]);
+  const monthDays = Array.from({ length: daysInMonth(month) }, (_, index) => index + 1);
+  const weeklyPlans = Array.from({ length: 7 }, (_, index) => {
+    const date = addLocalDays(weekStart, index);
+    const plan = plansByDate.get(date);
+    const template = plan?.kind === 'SHIFT' ? templatesById.get(plan.templateId ?? '') : undefined;
+    return { date, plan, template };
+  });
+  const scheduledDays = weeklyPlans.filter(({ plan }) => plan?.kind === 'SHIFT').length;
+  const scheduledMinutes = weeklyPlans.reduce((sum, item) => sum + (item.template ? shiftMinutes(item.template) : 0), 0);
+  const selectedPlan = selectedDate ? plansByDate.get(selectedDate) : undefined;
+  const selectedTemplate = selectedPlan?.kind === 'SHIFT' ? templatesById.get(selectedPlan.templateId ?? '') : undefined;
+  const selectedRecords = selectedDate ? recordsByDate.get(selectedDate) ?? [] : [];
+  const cellCount = mondayFirstOffset(month);
+  const todayPlan = plansByDate.get(today);
+  const todayTemplate = todayPlan?.kind === 'SHIFT' ? templatesById.get(todayPlan.templateId ?? '') : undefined;
+  const activeStartLocal = active ? utcToLocalDateTime(active.startedAtUtc, active.timezone) : null;
+  const endCandidates = active ? (() => {
+    const current = currentDateTime(now, active.timezone);
+    let candidateDate = current.slice(0, 10);
+    const startTimeLocal = activeStartLocal?.slice(11) ?? '00:00';
+    if (candidateDate === active.startedLocalDate && endTime <= startTimeLocal) candidateDate = addLocalDays(candidateDate, 1);
+    const local = `${candidateDate}T${endTime}`;
+    try { return { local, candidates: getLocalDateTimeCandidates(local, active.timezone) }; }
+    catch { return { local, candidates: [] as string[] }; }
+  })() : null;
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  const startShift = async () => {
+    setError(null); setNotice(null); setSaving(true);
+    try {
+      const timezone = cycle?.timezone ?? ZONE;
+      const localDateTime = `${today}T${startTime}`;
+      const startedAtUtc = localDateTimeToUtc(localDateTime, timezone);
+      let planned: PlannedWorkSnapshot | null = null;
+      if (todayPlan?.kind === 'SHIFT' && todayTemplate && cycle) {
+        const window = getNominalShiftWindow(today, todayTemplate.startLocalTime, todayTemplate.endLocalTime);
+        planned = {
+          cycleId: cycle.id, localDate: today, templateId: todayTemplate.id, templateName: todayTemplate.name,
+          startLocalDateTime: `${window.startDate}T${window.startLocalTime}`,
+          endLocalDateTime: `${window.endDate}T${window.endLocalTime}`,
+        };
+      }
+      const localStartDate = currentDateTime(new Date(Date.parse(startedAtUtc)), timezone).slice(0, 10);
+      await startActiveWorkSession(database, { startedAtUtc, startedLocalDate: localStartDate, timezone, planned });
+      setNotice('Mesai başladı. Bitirme saati kaydedilince çalışma geçmişine eklenecek.');
+      await refreshRef.current?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Mesai başlatılamadı. Kayıtların değiştirilmedi.');
+    } finally { setSaving(false); }
+  };
 
-  const planByDate = useMemo(() => new Map(plans.map((plan) => [plan.localDate, plan])), [plans]);
-  const todayPlan = planByDate.get(today);
-  const upcoming = plans.filter((plan) => plan.localDate > today && plan.kind === 'SHIFT').slice(0, 3);
+  const finishShift = async () => {
+    if (!active || !endCandidates) return;
+    setError(null); setNotice(null); setSaving(true);
+    try {
+      if (!endCandidates.candidates.length) throw new Error('Bitiş saati bu zaman diliminde geçerli değil. Saati kontrol et.');
+      if (endCandidates.candidates.length > 1 && !endOccurrence) throw new Error('Bu saat iki kez yaşanmış. İlk veya ikinci oluşumu seç.');
+      const occurrence = endCandidates.candidates.length > 1 ? endOccurrence : undefined;
+      const endedAtUtc = localDateTimeToUtc(endCandidates.local, active.timezone, occurrence);
+      if (Date.parse(endedAtUtc) <= Date.parse(active.startedAtUtc)) throw new Error('Bitiş zamanı başlangıçtan sonra olmalı.');
+      const workRecord: WorkRecord = {
+        id: `clock-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        source: active.planned ? 'PLANNED' : 'MANUAL', startedAtUtc: active.startedAtUtc, endedAtUtc,
+        timezone: active.timezone, breakMinutes: 0, note: null, planned: active.planned,
+      };
+      await completeActiveWorkSessionWithRecord(database, workRecord);
+      setEndOccurrence(undefined); setNotice('Mesai tamamlandı ve çalışma geçmişine kaydedildi.');
+      await refreshRef.current?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Mesai tamamlanamadı. Açık başlangıç kaydı korundu.');
+    } finally { setSaving(false); }
+  };
 
-  const templateFor = (plan: PlannedShift) => plan.kind === 'SHIFT'
-    ? templates.find((template) => template.id === plan.templateId)
-    : undefined;
+  const openDaySheet = (date: string) => {
+    const plan = plansByDate.get(date);
+    const defaultTemplateId = templates[0]?.id ?? '';
+    setSelectedDate(date); setSheetStatus(statuses.get(date)?.status ?? null); setSheetNote(statuses.get(date)?.note ?? '');
+    setSheetPlanKind(plan?.kind === 'OFF' || plan?.kind === 'LEAVE' ? plan.kind : 'SHIFT');
+    setSheetTemplateId(plan?.kind === 'SHIFT' ? plan.templateId ?? defaultTemplateId : defaultTemplateId);
+    setError(null); setNotice(null);
+  };
+  const saveDayStatus = async () => {
+    if (!selectedDate) return;
+    setSaving(true); setError(null); setNotice(null);
+    try {
+      if (sheetStatus) await saveWorkDayStatus(database, { localDate: selectedDate, status: sheetStatus, note: sheetNote.trim() || null, updatedAtUtc: new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString() });
+      else await deleteWorkDayStatus(database, selectedDate);
+      setNotice('Gün bilgisi kaydedildi. Bu not mesai veya ücret hesabı kuralı oluşturmaz.');
+      await refreshRef.current?.();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Gün bilgisi kaydedilemedi.'); }
+    finally { setSaving(false); }
+  };
+
+  const saveDayPlan = async () => {
+    if (!selectedDate || !cycle) return;
+    if (sheetPlanKind === 'SHIFT' && !templatesById.has(sheetTemplateId)) {
+      setError('Bir vardiya şablonu seçmelisin.');
+      return;
+    }
+    setSaving(true); setError(null); setNotice(null);
+    try {
+      const existing = await getPlanOverride(database, cycle.id, selectedDate);
+      const override = sheetPlanKind === 'SHIFT'
+        ? { localDate: selectedDate, kind: 'SHIFT' as const, templateId: sheetTemplateId }
+        : { localDate: selectedDate, kind: sheetPlanKind };
+      if (existing) await updatePlanOverride(database, cycle.id, selectedDate, override);
+      else await createPlanOverride(database, cycle.id, override);
+      setNotice('Gün vardiya planı kaydedildi.');
+      await refreshRef.current?.();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Gün vardiya planı kaydedilemedi.'); }
+    finally { setSaving(false); }
+  };
+
+  const resetDayPlan = async () => {
+    if (!selectedDate || !cycle) return;
+    setSaving(true); setError(null); setNotice(null);
+    try {
+      await deletePlanOverride(database, cycle.id, selectedDate);
+      setNotice('Gün, vardiya düzenindeki plana döndürüldü.');
+      await refreshRef.current?.();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Düzen varsayılan plana döndürülemedi.'); }
+    finally { setSaving(false); }
+  };
+
+  const openAccountSettings = () => { setMenu(null); router.push('/earnings-settings'); };
+  const openAppSettings = () => { setMenu(null); router.push('/(tabs)/settings'); };
+  const exitApp = () => {
+    setMenu(null);
+    if (Platform.OS === 'android') BackHandler.exitApp();
+    else Alert.alert('Çıkış', 'Bu sürümde kullanıcı hesabı bulunmuyor. Uygulamadan cihazının ana ekranına dönerek çıkabilirsin.');
+  };
+
+  const statusForDate = (date: string) => recordsByDate.has(date) ? undefined : statuses.get(date)?.status;
+  const todayPlanLabel = todayPlan?.kind === 'SHIFT' && todayTemplate ? `${todayTemplate.name} · ${todayTemplate.startLocalTime}–${todayTemplate.endLocalTime}`
+    : todayPlan?.kind === 'OFF' ? 'OFF · planlı boş gün' : todayPlan?.kind === 'LEAVE' ? 'İzin' : 'Bu gün için plan yok';
 
   return (
-    <ScrollView contentContainerStyle={[styles.screen, { backgroundColor: theme.background }]}>
-      <Text style={[styles.eyebrow, { color: theme.accent }]}>VARDİYA PLANI</Text>
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.foreground }]}>Bugün</Text>
-      {loading ? (
-        <View accessibilityLiveRegion="polite" style={styles.loading}>
-          <ActivityIndicator color={theme.accent} />
-          <Text style={{ color: theme.muted }}>Planın yükleniyor…</Text>
-        </View>
-      ) : error ? (
-        <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text accessibilityRole="alert" style={[styles.body, { color: theme.foreground }]}>{error}</Text>
-          <Button label="Tekrar dene" onPress={() => void load()} theme={theme} />
-        </View>
-      ) : !cycle ? (
-        <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.foreground }]}>Vardiya planın hazır değil</Text>
-          <Text style={[styles.body, { color: theme.muted }]}>Bir düzen oluşturduğunda bugünkü ve yaklaşan vardiyalar burada görünür.</Text>
-          <Button label="Vardiya düzeni oluştur" onPress={() => router.push('/(tabs)/settings')} theme={theme} />
-        </View>
-      ) : todayPlan ? (
-        <>
-          <PlanCard plan={todayPlan} template={templateFor(todayPlan)} eyebrow="BUGÜNÜN PLANI" theme={theme} />
-          <View style={[styles.upcomingCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.rowBetween}>
-              <Text style={[styles.cardTitle, { color: theme.foreground }]}>Yaklaşan vardiyalar</Text>
-              <Pressable accessibilityLabel="Takvim sekmesini aç" accessibilityRole="button" onPress={() => router.push('/(tabs)/calendar')} style={styles.textButton}>
-                <Text style={{ color: theme.accent, fontSize: 14, fontWeight: '800' }}>Takvime git</Text>
-              </Pressable>
-            </View>
-            {upcoming.length ? upcoming.map((plan) => (
-              <View key={plan.localDate} style={[styles.upcomingRow, { borderTopColor: theme.border }]}>
-                <Text style={[styles.upcomingDate, { color: theme.foreground }]}>{formatLocalDate(plan.localDate, { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
-                <View style={styles.upcomingDetail}>
-                  <ShiftKindBadge compact kind="SHIFT" template={templateFor(plan)} />
-                  {templateFor(plan) ? <Text style={[styles.upcomingTime, { color: theme.muted }]}>{templateFor(plan)?.startLocalTime}–{templateFor(plan)?.endLocalTime}</Text> : null}
-                </View>
-              </View>
-            )) : (
-              <Text style={[styles.body, { color: theme.muted }]}>Önümüzdeki 30 günde planlanmış başka vardiya yok.</Text>
-            )}
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled" accessibilityElementsHidden={Boolean(selectedDate)} importantForAccessibility={selectedDate ? 'no-hide-descendants' : 'auto'}>
+        <View style={styles.topBar}>
+          <View style={styles.dateBlock}>
+            <Text style={[styles.topDate, { color: theme.foreground }]}>{formatLocalDate(today, { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+            <Text accessibilityLiveRegion="polite" style={[styles.topTime, { color: theme.muted }]}>{localClock(now, viewTimezone)} · {viewTimezone}</Text>
           </View>
-          <Text style={[styles.disclaimer, { color: theme.muted }]}>Bu yalnızca planlanan vardiyadır. Fiilî çalışma ve ücret hesabı içermez.</Text>
-        </>
-      ) : (
-        <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.foreground }]}>Bugünün planı bulunamadı</Text>
-          <Text style={[styles.body, { color: theme.muted }]}>Takvim aralığı bugünü içermedi. Yeniden yüklemeyi deneyin.</Text>
-          <Button label="Yeniden yükle" onPress={() => void load()} theme={theme} />
+          <View style={styles.topActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Bildirimler" onPress={() => setMenu(menu === 'notifications' ? null : 'notifications')} style={[styles.iconButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text accessible={false} style={[styles.iconText, { color: theme.foreground }]}>🔔</Text>
+            </Pressable>
+            <Pressable accessibilityRole="switch" accessibilityLabel="Koyu tema" accessibilityState={{ checked: mode === 'dark' }} onPress={() => void toggleMode().catch(() => setError('Tema tercihi kaydedilemedi. Yeniden deneyebilirsin.'))} style={[styles.iconButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text accessible={false} style={[styles.iconText, { color: theme.accent }]}>{mode === 'dark' ? '☾' : '☼'}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Profil menüsü" onPress={() => setMenu(menu === 'profile' ? null : 'profile')} style={[styles.avatarButton, { backgroundColor: theme.accentSurface, borderColor: theme.border }]}>
+              <Text accessible={false} style={[styles.avatarText, { color: theme.accent }]}>👤</Text>
+            </Pressable>
+          </View>
         </View>
-      )}
-      {cycle && todayPlan?.kind === 'SHIFT' ? (
-        <Button
-          label="Planlı vardiyadan kayıt ekle"
-          onPress={() => router.push({ pathname: '/work-records', params: { action: 'planned', cycleId: cycle.id, localDate: today } })}
-          theme={theme}
-        />
-      ) : null}
-      <Button label="Plansız çalışma kaydı ekle" onPress={() => router.push({ pathname: '/work-records', params: { action: 'manual', localDate: today } })} theme={theme} secondary />
-      <Button label="Çalışma geçmişi" onPress={() => router.push('/work-records')} theme={theme} secondary />
-    </ScrollView>
+
+        <View style={[styles.weekCard, { backgroundColor: mode === 'dark' ? '#1B2B49' : '#1B3260', borderColor: mode === 'dark' ? '#34496D' : '#1B3260' }]}>
+          <View style={styles.weekHeadingRow}>
+            <View style={styles.flex}>
+              <Text style={styles.cardEyebrow}>BU HAFTA</Text>
+              <Text accessibilityRole="header" style={styles.weekTitle}>Vardiya planın</Text>
+              <Text style={styles.weekRange}>{shortDate(weekStart)} – {shortDate(addLocalDays(weekEnd, -1))}</Text>
+            </View>
+            <Text accessible={false} style={styles.weekIcon}>◷</Text>
+          </View>
+          <View style={styles.weekStrip}>
+            {weeklyPlans.map(({ date, plan, template }, index) => {
+              const isShift = plan?.kind === 'SHIFT';
+              return <View key={date} accessible accessibilityLabel={`${formatLocalDate(date, { weekday: 'long' })}, ${isShift && template ? `${template.name}, ${template.startLocalTime}–${template.endLocalTime}` : plan?.kind === 'LEAVE' ? 'izin' : plan?.kind === 'OFF' ? 'OFF, planlı boş gün' : 'plan yok'}`} style={[styles.weekDay, date === today && styles.weekDayToday]}>
+                <Text style={[styles.weekDayName, date === today && styles.weekDayTodayText]}>{WEEKDAYS[index]}</Text>
+                <Text style={[styles.weekDayCode, date === today && styles.weekDayTodayText]}>{isShift ? template?.code ?? 'V' : plan?.kind === 'LEAVE' ? 'İ' : plan?.kind === 'OFF' ? '·' : '—'}</Text>
+              </View>;
+            })}
+          </View>
+          <View style={styles.weekSummary}>
+            <Text style={styles.weekSummaryText}>{scheduledDays} vardiya · {durationLabel(scheduledMinutes)} planlı</Text>
+            <Text style={styles.todayShiftLabel}>Bugün · {todayPlanLabel}</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionSection}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.flex}>
+              <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Mesai</Text>
+              <Text style={[styles.sectionCaption, { color: theme.muted }]}>{active ? 'Mesain açık' : 'Başlangıç ve bitiş saatini kontrol et'}</Text>
+            </View>
+            {active ? <View style={[styles.livePill, { backgroundColor: theme.successSurface }]}><View style={[styles.liveDot, { backgroundColor: theme.success }]} /><Text style={{ color: theme.success, fontWeight: '800' }}>DEVAM EDİYOR</Text></View> : null}
+          </View>
+          <View style={styles.actionsRow}>
+            <View style={[styles.actionColumn, styles.flex]}>
+              <Text style={[styles.timeLabel, { color: theme.muted }]}>Başlangıç</Text>
+              <TextInput accessibilityLabel="Mesai başlangıç saati" editable={!active && !saving} value={startTime} onChangeText={setStartTime} placeholder="09:00" keyboardType="numbers-and-punctuation" maxLength={5} style={[styles.timeInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
+              <ActionButton accessibilityLabel={active ? 'Mesai zaten başladı' : 'Mesaiye başla'} label="Mesaiye Başla" icon="▶" color={theme.success} disabled={Boolean(active) || saving} onPress={() => void startShift()} theme={theme} />
+            </View>
+            <View style={[styles.actionColumn, styles.flex]}>
+              <Text style={[styles.timeLabel, { color: theme.muted }]}>Bitiş</Text>
+              <TextInput accessibilityLabel="Mesai bitiş saati" editable={Boolean(active) && !saving} value={endTime} onChangeText={(value) => { setEndTime(value); setEndOccurrence(undefined); }} placeholder="17:00" keyboardType="numbers-and-punctuation" maxLength={5} style={[styles.timeInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
+              <ActionButton accessibilityLabel={active ? 'Mesaiyi bitir' : 'Mesai başlamadan bitirme kapalı'} label="Mesaiyi Bitir" icon="■" color={theme.danger} disabled={!active || saving} onPress={() => void finishShift()} theme={theme} />
+            </View>
+          </View>
+          {active && activeStartLocal ? <Text style={[styles.clockCaption, { color: theme.muted }]}>Başlangıç kaydı {shortDate(active.startedLocalDate)} · {activeStartLocal.slice(11)} · {active.timezone}</Text> : null}
+          {endCandidates && endCandidates.candidates.length > 1 ? <View style={styles.choicesRow}>
+            {(['earlier', 'later'] as const).map((choice, index) => <Pressable key={choice} accessibilityRole="radio" accessibilityState={{ selected: endOccurrence === choice }} onPress={() => setEndOccurrence(choice)} style={[styles.choice, { backgroundColor: endOccurrence === choice ? theme.accentSurface : theme.surface, borderColor: endOccurrence === choice ? theme.accent : theme.border }]}>
+              <Text style={{ color: theme.foreground, fontWeight: '700' }}>{index === 0 ? 'İlk' : 'İkinci'} oluşum</Text>
+            </Pressable>)}
+          </View> : null}
+          {error ? <Text accessibilityRole="alert" style={[styles.feedback, { color: theme.danger }]}>{error}</Text> : null}
+          {notice ? <Text accessibilityLiveRegion="polite" style={[styles.feedback, { color: theme.success }]}>{notice}</Text> : null}
+          {saving ? <View accessibilityLiveRegion="polite" style={styles.saving}><ActivityIndicator color={theme.accent} /><Text style={{ color: theme.muted }}>Kaydediliyor…</Text></View> : null}
+        </View>
+
+        <View style={styles.calendarHeader}>
+          <View style={styles.flex}>
+            <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Takvim</Text>
+            <Text style={[styles.sectionCaption, { color: theme.muted }]}>Güne dokunarak ayrıntıları aç</Text>
+          </View>
+          <View style={styles.monthControls}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Önceki ay" onPress={() => setMonthOffset((value) => value - 1)} style={[styles.monthButton, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={{ color: theme.foreground, fontSize: 20 }}>‹</Text></Pressable>
+            <Text accessibilityRole="header" style={[styles.monthTitle, { color: theme.foreground }]}>{formatMonthTitle(month)}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Sonraki ay" onPress={() => setMonthOffset((value) => value + 1)} style={[styles.monthButton, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={{ color: theme.foreground, fontSize: 20 }}>›</Text></Pressable>
+          </View>
+        </View>
+
+        {loading ? <View accessibilityLiveRegion="polite" style={styles.loading}><ActivityIndicator color={theme.accent} /><Text style={{ color: theme.muted }}>Takvim yükleniyor…</Text></View> : !cycle ? (
+          <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text accessibilityRole="header" style={[styles.cardTitle, { color: theme.foreground }]}>Vardiya düzenin hazır değil</Text>
+            <Text style={[styles.sectionCaption, { color: theme.muted }]}>Bir düzen oluşturduğunda haftalık plan ve takvim burada görünür.</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/settings')} style={[styles.linkButton, { backgroundColor: theme.accent }]}><Text style={styles.linkButtonText}>Vardiya düzeni oluştur</Text></Pressable>
+          </View>
+        ) : (
+          <View style={[styles.calendarCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={styles.calendarGrid}>
+              {WEEKDAYS.map((day) => <Text key={day} style={[styles.weekday, { color: theme.muted }]}>{day}</Text>)}
+              {Array.from({ length: cellCount }, (_, index) => <View key={`blank-${index}`} style={styles.dayCell} />)}
+              {monthDays.map((dayNumber) => {
+                const date = localDateForMonthDay(month, dayNumber);
+                const plan = plansByDate.get(date);
+                const template = plan?.kind === 'SHIFT' ? templatesById.get(plan.templateId ?? '') : undefined;
+                return <MiniCell key={date} date={date} plan={plan} template={template} status={statusForDate(date)} record={recordsByDate.get(date)?.[0]}
+                  selected={date === selectedDate} onPress={() => openDaySheet(date)} theme={theme} />;
+              })}
+            </View>
+            <View style={styles.legend}>
+              <Legend color={theme.success} label="Çalışıldı" theme={theme} /><Legend color={theme.warning} label="İzin / rapor" theme={theme} /><Legend color={theme.danger} label="Gidilmedi" theme={theme} />
+            </View>
+          </View>
+        )}
+
+        <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/calendar')} style={[styles.secondaryLink, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+          <Text style={[styles.sectionCaption, { color: theme.foreground }]}>Takvim ve çalışma geçmişini aç</Text><Text style={{ color: theme.accent, fontSize: 18 }}>›</Text>
+        </Pressable>
+      </ScrollView>
+
+      {selectedDate ? <View style={styles.sheetOverlay}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Gün ayrıntılarını kapat" onPress={() => setSelectedDate(null)} style={styles.sheetScrim} />
+        <View accessibilityViewIsModal={Boolean(selectedDate)} style={[styles.sheet, { backgroundColor: theme.background, borderColor: theme.border }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <View style={styles.flex}>
+              <Text accessibilityRole="header" style={[styles.sheetTitle, { color: theme.foreground }]}>{formatLocalDate(selectedDate, { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+              <Text style={[styles.sectionCaption, { color: theme.muted }]}>{selectedPlan?.kind === 'SHIFT' && selectedTemplate ? `${selectedTemplate.name} · ${selectedTemplate.startLocalTime}–${selectedTemplate.endLocalTime}` : selectedPlan?.kind === 'OFF' ? 'OFF · planlı boş gün' : selectedPlan?.kind === 'LEAVE' ? 'Planlı izin' : 'Planlı vardiya yok'}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Gün panelini kapat" onPress={() => setSelectedDate(null)} style={[styles.closeButton, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={{ color: theme.foreground }}>×</Text></Pressable>
+          </View>
+          <ScrollView style={styles.sheetBody} contentContainerStyle={styles.sheetBodyContent} keyboardShouldPersistTaps="handled">
+          {selectedRecords.length ? <View style={[styles.recordList, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            {selectedRecords.map((item) => {
+              const start = utcToLocalDateTime(item.record.startedAtUtc, item.record.timezone).slice(11);
+              const end = utcToLocalDateTime(item.record.endedAtUtc, item.record.timezone);
+              const difference = getRecordRangeDifferenceMinutes(item.record);
+              return <View key={item.record.id} style={styles.recordRow}>
+                <View style={styles.flex}><Text style={[styles.recordTime, { color: theme.foreground }]}>{start}–{end.slice(11)}{end.slice(0, 10) !== selectedDate ? ' · ertesi gün' : ''}</Text><Text style={[styles.sectionCaption, { color: theme.muted }]}>{item.timedBreaks.length ? `${item.timedBreaks.length} zamanlı mola` : item.record.breakMinutes ? `${item.record.breakMinutes} dk · saati belirtilmemiş mola` : 'Mola yok'}</Text></View>
+                {difference !== null ? <Text style={{ color: difference >= 0 ? theme.success : theme.danger, fontWeight: '800' }}>{difference >= 0 ? '+' : '−'}{durationLabel(Math.abs(difference))}</Text> : null}
+                <Pressable accessibilityRole="button" accessibilityLabel="Çalışma kaydını düzenle" onPress={() => { setSelectedDate(null); router.push({ pathname: '/work-records', params: { recordId: item.record.id } }); }} style={styles.editLink}><Text style={{ color: theme.accent, fontWeight: '800' }}>Düzenle</Text></Pressable>
+              </View>;
+            })}
+          </View> : <Text style={[styles.sectionCaption, { color: theme.muted }]}>Bu gün için tamamlanmış çalışma kaydı yok.</Text>}
+          <Text style={[styles.sheetLabel, { color: theme.muted }]}>Vardiya tipi</Text>
+          <View style={styles.choicesRow}>
+            {(['SHIFT', 'OFF', 'LEAVE'] as const).map((kind) => {
+              const label = kind === 'SHIFT' ? 'Vardiya' : kind === 'OFF' ? 'OFF' : 'İzin';
+              return <Pressable key={kind} accessibilityRole="button" accessibilityState={{ selected: sheetPlanKind === kind }} onPress={() => setSheetPlanKind(kind)} style={[styles.choice, { backgroundColor: sheetPlanKind === kind ? theme.accentSurface : theme.surface, borderColor: sheetPlanKind === kind ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{label}</Text></Pressable>;
+            })}
+          </View>
+          {sheetPlanKind === 'SHIFT' ? <>
+            <Text style={[styles.sheetLabel, { color: theme.muted }]}>Vardiya şablonu · başlangıç ve bitiş saati</Text>
+            <View style={styles.choicesRow}>
+              {templates.length ? templates.map((template) => <Pressable key={template.id} accessibilityRole="button" accessibilityLabel={`${template.name}, ${template.startLocalTime}–${template.endLocalTime}`} accessibilityState={{ selected: sheetTemplateId === template.id }} onPress={() => setSheetTemplateId(template.id)} style={[styles.choice, { backgroundColor: sheetTemplateId === template.id ? theme.accentSurface : theme.surface, borderColor: sheetTemplateId === template.id ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{template.name} · {template.startLocalTime}–{template.endLocalTime}</Text></Pressable>) : <Text style={[styles.sectionCaption, { color: theme.muted }]}>Önce uygulama ayarlarından vardiya şablonu oluştur.</Text>}
+            </View>
+          </> : null}
+          <View style={styles.sheetActions}>
+            <Pressable accessibilityRole="button" disabled={saving || !cycle} onPress={() => void saveDayPlan()} style={[styles.sheetAction, { borderColor: theme.accent, backgroundColor: theme.accent }]}><Text style={[styles.sheetActionText, styles.whiteText]}>{saving ? 'Kaydediliyor…' : 'Vardiya planını kaydet'}</Text></Pressable>
+            {cycle && plansByDate.has(selectedDate) ? <Pressable accessibilityRole="button" disabled={saving} onPress={() => void resetDayPlan()} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Düzeni kullan</Text></Pressable> : null}
+          </View>
+          <Text style={[styles.sheetLabel, { color: theme.muted }]}>Gün durumu · çalışma/ücret hesabı kuralı değildir</Text>
+          <View style={styles.choicesRow}>
+            {(['LEAVE', 'SICK_REPORT', 'NOT_WORKED'] as const).map((status) => <Pressable key={status} accessibilityRole="button" accessibilityState={{ selected: sheetStatus === status }} onPress={() => setSheetStatus(sheetStatus === status ? null : status)} style={[styles.choice, { backgroundColor: sheetStatus === status ? (status === 'NOT_WORKED' ? theme.dangerSurface : theme.warningSurface) : theme.surface, borderColor: sheetStatus === status ? (status === 'NOT_WORKED' ? theme.danger : theme.warning) : theme.border }]}>
+              <Text style={{ color: theme.foreground, fontWeight: '700' }}>{STATUS_LABELS[status]}</Text>
+            </Pressable>)}
+            {selectedRecords.length ? <View style={[styles.choice, { backgroundColor: theme.successSurface, borderColor: theme.success }]}><Text style={{ color: theme.success, fontWeight: '800' }}>✓ Çalışıldı</Text></View> : null}
+          </View>
+          <TextInput accessibilityLabel="Gün notu" value={sheetNote} onChangeText={setSheetNote} maxLength={2000} placeholder="Kısa not (isteğe bağlı)" placeholderTextColor={theme.muted} style={[styles.noteInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
+          <View style={styles.sheetActions}>
+            <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setSelectedDate(null); router.push({ pathname: '/(tabs)/calendar', params: { initialDate: selectedDate } }); }} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Vardiya planını düzenle</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveDayStatus()} style={[styles.sheetAction, { borderColor: theme.accent, backgroundColor: theme.accent }]}><Text style={[styles.sheetActionText, styles.whiteText]}>{saving ? 'Kaydediliyor…' : 'Gün bilgisini kaydet'}</Text></Pressable>
+          </View>
+          {error ? <Text accessibilityRole="alert" style={{ color: theme.danger }}>{error}</Text> : null}
+          </ScrollView>
+        </View>
+      </View> : null}
+
+      {menu ? <View style={styles.menuOverlay}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Menüyü kapat" onPress={() => setMenu(null)} style={styles.menuScrim} />
+        <View style={[styles.menuCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          {menu === 'notifications' ? <>
+            <Text accessibilityRole="header" style={[styles.menuTitle, { color: theme.foreground }]}>Bildirimler</Text>
+            <Text style={{ color: theme.muted, lineHeight: 21 }}>Henüz bildirimin yok.</Text>
+            <MenuRow label="Kapat" onPress={() => setMenu(null)} theme={theme} />
+          </> : <>
+            <Text accessibilityRole="header" style={[styles.menuTitle, { color: theme.foreground }]}>Yerel profil</Text>
+            <MenuRow label="Ücret ve işyeri ayarları" onPress={openAccountSettings} theme={theme} />
+            <MenuRow label="Uygulama Ayarları" onPress={openAppSettings} theme={theme} />
+            <MenuRow label="Çıkış" onPress={exitApp} theme={theme} destructive />
+          </>}
+        </View>
+      </View> : null}
+    </View>
   );
 }
 
+function Legend({ color, label, theme }: { color: string; label: string; theme: Theme }) {
+  return <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: color }]} /><Text style={{ color: theme.muted, fontSize: 11 }}>{label}</Text></View>;
+}
+
+function MenuRow({ label, onPress, theme, destructive = false }: { label: string; onPress: () => void; theme: Theme; destructive?: boolean }) {
+  return <Pressable accessibilityRole="button" onPress={onPress} style={[styles.menuRow, { borderColor: theme.border }]}><Text style={{ color: destructive ? theme.danger : theme.foreground, fontWeight: '700' }}>{label}</Text><Text accessible={false} style={{ color: theme.muted }}>›</Text></Pressable>;
+}
+
 const styles = StyleSheet.create({
-  screen: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 26, paddingBottom: 32, gap: 16 },
-  eyebrow: { marginTop: 8, fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
-  title: { marginTop: -10, fontSize: 32, fontWeight: '800' },
-  planCard: { borderWidth: 1, borderRadius: 20, padding: 18, gap: 12 },
-  emptyCard: { borderWidth: 1, borderRadius: 20, padding: 18, gap: 14, marginTop: 12 },
-  upcomingCard: { borderWidth: 1, borderRadius: 20, padding: 16, gap: 12 },
-  cardTitle: { fontSize: 18, fontWeight: '800' },
-  date: { fontSize: 22, lineHeight: 29, fontWeight: '800', textTransform: 'capitalize' },
-  time: { fontSize: 20, fontWeight: '800' },
-  override: { fontSize: 13, lineHeight: 19 },
-  body: { fontSize: 15, lineHeight: 22 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  textButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  upcomingRow: { borderTopWidth: 1, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
-  upcomingDate: { fontSize: 15, fontWeight: '700', textTransform: 'capitalize' },
-  upcomingDetail: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  upcomingTime: { fontSize: 13, fontWeight: '600' },
-  disclaimer: { fontSize: 12, lineHeight: 18 },
-  loading: { flex: 1, minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  button: { minHeight: 48, paddingHorizontal: 16, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1 }, screen: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 24, gap: 18 },
+  flex: { flex: 1 }, topBar: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  dateBlock: { flex: 1, gap: 3 }, topDate: { fontSize: 18, fontWeight: '800', textTransform: 'capitalize' }, topTime: { fontSize: 13 }, topActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  iconButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, iconText: { fontSize: 21, fontWeight: '700' }, avatarButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 17 },
+  weekCard: { borderWidth: 1, borderRadius: 24, padding: 18, gap: 14 }, weekHeadingRow: { flexDirection: 'row', alignItems: 'flex-start' }, cardEyebrow: { color: '#B9CBFF', fontSize: 11, letterSpacing: 1.4, fontWeight: '800' }, weekTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', marginTop: 3 }, weekRange: { color: '#D4DEFA', fontSize: 13, textTransform: 'capitalize', marginTop: 3 }, weekIcon: { color: '#C7D5FF', fontSize: 36, padding: 5 },
+  weekStrip: { flexDirection: 'row', gap: 6 }, weekDay: { flex: 1, minHeight: 53, borderRadius: 13, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF1A' }, weekDayToday: { backgroundColor: '#FFFFFF' }, weekDayName: { color: '#D4DEFA', fontSize: 11, fontWeight: '700' }, weekDayCode: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' }, weekDayTodayText: { color: '#233A72' }, weekSummary: { borderTopWidth: 1, borderTopColor: '#FFFFFF2A', paddingTop: 12, gap: 4 }, weekSummaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 }, todayShiftLabel: { color: '#D4DEFA', fontSize: 13, lineHeight: 19 },
+  actionSection: { gap: 12 }, sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sectionTitle: { fontSize: 21, fontWeight: '800' }, sectionCaption: { fontSize: 13, lineHeight: 19 }, livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, fontSize: 10 }, liveDot: { width: 7, height: 7, borderRadius: 4 }, actionsRow: { flexDirection: 'row', gap: 10 }, actionColumn: { gap: 8, minWidth: 0 }, timeLabel: { fontSize: 12, fontWeight: '700' }, timeInput: { minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 11, fontSize: 16, textAlign: 'center' }, actionCard: { minHeight: 96, borderWidth: 1, borderRadius: 18, justifyContent: 'center', alignItems: 'center', padding: 11, gap: 7 }, actionIcon: { fontSize: 19, fontWeight: '900' }, actionLabel: { fontSize: 14, fontWeight: '800', textAlign: 'center' }, clockCaption: { fontSize: 12, lineHeight: 18 }, saving: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 6 }, feedback: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  choicesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, choice: { minHeight: 44, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, justifyContent: 'center' },
+  calendarHeader: { gap: 10 }, monthControls: { flexDirection: 'row', alignItems: 'center', gap: 7 }, monthButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, monthTitle: { flex: 1, minWidth: 94, fontSize: 15, fontWeight: '800', textAlign: 'center', textTransform: 'capitalize' }, calendarCard: { borderWidth: 1, borderRadius: 20, padding: 10, gap: 9 }, calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.2857%', textAlign: 'center', fontSize: 11, fontWeight: '700', paddingVertical: 6 }, dayCell: { width: '14.2857%', minHeight: 53, alignItems: 'center', justifyContent: 'flex-start', paddingVertical: 4, gap: 1, borderWidth: 1, borderColor: 'transparent', borderRadius: 10 }, dayNumber: { fontSize: 13, fontWeight: '700' }, dayMarker: { fontSize: 13, fontWeight: '900', lineHeight: 16 }, markerSpacer: { height: 16 }, delta: { fontSize: 9, fontWeight: '800' }, legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 5 }, legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 }, legendDot: { width: 8, height: 8, borderRadius: 4 },
+  loading: { minHeight: 140, alignItems: 'center', justifyContent: 'center', gap: 10 }, emptyCard: { borderWidth: 1, borderRadius: 18, padding: 17, gap: 10 }, cardTitle: { fontSize: 17, fontWeight: '800' }, linkButton: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 }, linkButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' }, secondaryLink: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
+  sheetOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 20 }, sheetScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F66' }, sheet: { minHeight: '54%', maxHeight: '84%', borderTopLeftRadius: 25, borderTopRightRadius: 25, borderWidth: 1, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16, gap: 12 }, sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: '#8A98AC', alignSelf: 'center', marginBottom: 3 }, sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sheetBody: { flexShrink: 1 }, sheetBodyContent: { gap: 12, paddingBottom: 5 }, sheetTitle: { fontSize: 19, fontWeight: '800', textTransform: 'capitalize' }, closeButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, recordList: { borderWidth: 1, borderRadius: 14, padding: 11, gap: 9, maxHeight: 130 }, recordRow: { flexDirection: 'row', alignItems: 'center', gap: 9, flexWrap: 'wrap' }, recordTime: { fontSize: 15, fontWeight: '800' }, editLink: { paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }, sheetLabel: { fontSize: 12, fontWeight: '700' }, noteInput: { minHeight: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 15 }, sheetActions: { flexDirection: 'row', gap: 8 }, sheetAction: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }, sheetActionText: { fontSize: 13, fontWeight: '800', textAlign: 'center' }, whiteText: { color: '#FFFFFF' },
+  menuOverlay: { ...StyleSheet.absoluteFill, zIndex: 30 }, menuScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F33' }, menuCard: { position: 'absolute', top: 68, right: 14, width: 232, borderWidth: 1, borderRadius: 18, padding: 12, gap: 4, shadowColor: '#0B1730', shadowOpacity: 0.14, shadowRadius: 18, elevation: 6 }, menuTitle: { fontSize: 16, fontWeight: '800', padding: 7 }, menuRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, borderTopWidth: StyleSheet.hairlineWidth },
 });
