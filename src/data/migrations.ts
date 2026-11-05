@@ -114,6 +114,80 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX plan_overrides_template_id_idx ON plan_overrides(template_id);
     `,
   },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE work_records (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        record_source TEXT NOT NULL CHECK (record_source IN ('MANUAL', 'PLANNED')),
+        started_at_utc TEXT NOT NULL
+          CHECK (length(started_at_utc) = 24 AND substr(started_at_utc, -1) = 'Z' AND julianday(started_at_utc) IS NOT NULL),
+        ended_at_utc TEXT NOT NULL
+          CHECK (length(ended_at_utc) = 24 AND substr(ended_at_utc, -1) = 'Z' AND julianday(ended_at_utc) IS NOT NULL),
+        timezone TEXT NOT NULL CHECK (length(trim(timezone)) > 0),
+        break_minutes INTEGER NOT NULL CHECK (typeof(break_minutes) = 'integer' AND break_minutes >= 0),
+        note TEXT CHECK (note IS NULL OR length(note) <= 2000),
+        planned_cycle_id TEXT,
+        planned_local_date TEXT,
+        planned_template_id TEXT,
+        planned_template_name TEXT,
+        planned_start_local_datetime TEXT,
+        planned_end_local_datetime TEXT,
+        CHECK (julianday(ended_at_utc) > julianday(started_at_utc)),
+        CHECK (
+          (record_source = 'MANUAL'
+            AND planned_local_date IS NULL
+            AND planned_template_id IS NULL
+            AND planned_template_name IS NULL
+            AND planned_start_local_datetime IS NULL
+            AND planned_end_local_datetime IS NULL)
+          OR
+          (record_source = 'PLANNED'
+            AND planned_local_date IS NOT NULL
+            AND planned_template_name IS NOT NULL
+            AND planned_start_local_datetime IS NOT NULL
+            AND planned_end_local_datetime IS NOT NULL
+            AND length(planned_start_local_datetime) = 16
+            AND length(planned_end_local_datetime) = 16
+            AND substr(planned_start_local_datetime, 11, 1) = 'T'
+            AND substr(planned_end_local_datetime, 11, 1) = 'T')
+        ),
+        CHECK (
+          (planned_start_local_datetime IS NULL AND planned_end_local_datetime IS NULL)
+          OR
+          (planned_start_local_datetime IS NOT NULL AND planned_end_local_datetime IS NOT NULL
+            AND length(planned_start_local_datetime) = 16
+            AND length(planned_end_local_datetime) = 16)
+        ),
+        CHECK (
+          planned_start_local_datetime IS NULL OR
+          (substr(planned_start_local_datetime, 11, 1) = 'T'
+            AND substr(planned_start_local_datetime, 12, 2) GLOB '[0-2][0-9]'
+            AND CAST(substr(planned_start_local_datetime, 12, 2) AS INTEGER) < 24
+            AND substr(planned_start_local_datetime, 14, 1) = ':'
+            AND substr(planned_start_local_datetime, 15, 2) GLOB '[0-5][0-9]')
+        ),
+        CHECK (
+          planned_end_local_datetime IS NULL OR
+          (substr(planned_end_local_datetime, 11, 1) = 'T'
+            AND substr(planned_end_local_datetime, 12, 2) GLOB '[0-2][0-9]'
+            AND CAST(substr(planned_end_local_datetime, 12, 2) AS INTEGER) < 24
+            AND substr(planned_end_local_datetime, 14, 1) = ':'
+            AND substr(planned_end_local_datetime, 15, 2) GLOB '[0-5][0-9]')
+        ),
+        CHECK (
+          planned_local_date IS NULL OR
+          (length(planned_local_date) = 10
+            AND planned_local_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
+        ),
+        FOREIGN KEY (planned_cycle_id) REFERENCES shift_cycles(id) ON DELETE SET NULL,
+        FOREIGN KEY (planned_template_id) REFERENCES shift_templates(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX work_records_started_at_utc_idx ON work_records(started_at_utc DESC, id);
+      CREATE INDEX work_records_planned_day_idx ON work_records(planned_cycle_id, planned_local_date);
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;

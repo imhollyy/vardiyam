@@ -16,15 +16,15 @@ import { colors } from '@/src/theme/tokens';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 
-function Button({ label, onPress, theme }: { label: string; onPress: () => void; theme: Theme }) {
+function Button({ label, onPress, theme, secondary = false }: { label: string; onPress: () => void; theme: Theme; secondary?: boolean }) {
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.button, { backgroundColor: theme.accent, borderColor: theme.accent, opacity: pressed ? 0.74 : 1 }]}
+      style={({ pressed }) => [styles.button, { backgroundColor: secondary ? theme.surface : theme.accent, borderColor: secondary ? theme.border : theme.accent, opacity: pressed ? 0.74 : 1 }]}
     >
-      <Text style={{ color: theme.surface, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
+      <Text style={{ color: secondary ? theme.foreground : theme.surface, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
     </Pressable>
   );
 }
@@ -149,6 +149,15 @@ export default function TodayScreen() {
           <Button label="Yeniden yükle" onPress={() => void load()} theme={theme} />
         </View>
       )}
+      {cycle && todayPlan?.kind === 'SHIFT' ? (
+        <Button
+          label="Planlı vardiyadan kayıt ekle"
+          onPress={() => router.push({ pathname: '/work-records', params: { action: 'planned', cycleId: cycle.id, localDate: today } })}
+          theme={theme}
+        />
+      ) : null}
+      <Button label="Plansız çalışma kaydı ekle" onPress={() => router.push({ pathname: '/work-records', params: { action: 'manual', localDate: today } })} theme={theme} secondary />
+      <Button label="Çalışma geçmişi" onPress={() => router.push('/work-records')} theme={theme} secondary />
     </ScrollView>
   );
 }

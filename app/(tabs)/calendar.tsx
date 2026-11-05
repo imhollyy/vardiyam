@@ -364,6 +364,15 @@ export default function CalendarScreen() {
                 </>
               ) : null}
               <Button label={selectedPlan?.source === 'OVERRIDE' ? 'Gün istisnasını düzenle' : 'Bu günü değiştir'} onPress={() => void openOverrideEditor()} theme={theme} />
+              {selectedPlan?.kind === 'SHIFT' && cycle ? (
+                <Button
+                  label="Planlı vardiyadan kayıt ekle"
+                  onPress={() => router.push({ pathname: '/work-records', params: { action: 'planned', cycleId: cycle.id, localDate: selectedDate } })}
+                  theme={theme}
+                />
+              ) : null}
+              <Button label="Plansız çalışma kaydı ekle" onPress={() => router.push({ pathname: '/work-records', params: { action: 'manual', localDate: selectedDate } })} theme={theme} secondary />
+              <Button label="Çalışma geçmişi" onPress={() => router.push('/work-records')} theme={theme} secondary />
             </View>
           </>
         )}

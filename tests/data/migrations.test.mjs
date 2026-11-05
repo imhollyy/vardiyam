@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-import { CURRENT_SCHEMA_VERSION } from '../../src/data/migrations.ts';
+import { CURRENT_SCHEMA_VERSION, migrations } from '../../src/data/migrations.ts';
 import { initializeDatabase } from '../../src/data/database.ts';
 
 function createExpoSqliteAdapter(database) {
@@ -46,7 +46,7 @@ test('initial migration creates only additive app metadata and sets schema versi
     );
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
     assert.equal(sqlite.prepare('PRAGMA foreign_keys;').get().foreign_keys, 1);
-    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides']) {
+    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records']) {
       assert.equal(
         sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name=?;").get(table).count,
         1,
@@ -126,4 +126,48 @@ test('failed v2 migration rolls back partial DDL and preserves v1 rows', async (
   } finally {
     sqlite.close();
   }
+});
+
+test('v2 to v3 adds work records and preserves existing shift configuration and overrides', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of migrations.filter(({ version }) => version <= 2)) sqlite.exec(migration.sql);
+    sqlite.exec('PRAGMA user_version = 2;');
+    sqlite.exec(`
+      INSERT INTO shift_templates (id, code, name, start_local_time, end_local_time)
+      VALUES ('day', 'D', 'Day', '08:00', '16:00');
+      INSERT INTO shift_cycles (id, name, timezone, anchor_local_date, start_index, entry_count)
+      VALUES ('cycle', 'Synthetic', 'Europe/Istanbul', '2026-01-01', 0, 1);
+      INSERT INTO cycle_entries (cycle_id, position, kind, template_id) VALUES ('cycle', 0, 'SHIFT', 'day');
+      INSERT INTO plan_overrides (cycle_id, local_date, kind, template_id) VALUES ('cycle', '2026-01-02', 'OFF', NULL);
+      INSERT INTO app_metadata (key, value) VALUES ('keep', 'v2-data');
+      PRAGMA user_version = 2;
+    `);
+
+    await initializeDatabase(createExpoSqliteAdapter(sqlite));
+    await initializeDatabase(createExpoSqliteAdapter(sqlite));
+
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 3);
+    assert.deepEqual({ ...sqlite.prepare('SELECT id, name FROM shift_cycles;').get() }, { id: 'cycle', name: 'Synthetic' });
+    assert.deepEqual({ ...sqlite.prepare('SELECT * FROM cycle_entries;').get() }, {
+      cycle_id: 'cycle', position: 0, kind: 'SHIFT', template_id: 'day',
+    });
+    assert.equal(sqlite.prepare('SELECT kind FROM plan_overrides WHERE cycle_id = ?;').get('cycle').kind, 'OFF');
+    assert.equal(sqlite.prepare('SELECT value FROM app_metadata WHERE key = ?;').get('keep').value, 'v2-data');
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM work_records;').get().count, 0);
+  } finally { sqlite.close(); }
+});
+
+test('failed v3 DDL leaves a v2 database and its rows intact', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of migrations.filter(({ version }) => version <= 2)) sqlite.exec(migration.sql);
+    sqlite.exec("INSERT INTO app_metadata (key, value) VALUES ('rollback', 'preserved'); CREATE TABLE work_records (sentinel TEXT); PRAGMA user_version = 2;");
+    await assert.rejects(initializeDatabase(createExpoSqliteAdapter(sqlite)));
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 2);
+    assert.equal(sqlite.prepare('SELECT value FROM app_metadata WHERE key = ?;').get('rollback').value, 'preserved');
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM pragma_table_info('work_records') WHERE name = 'sentinel';").get().count, 1);
+  } finally { sqlite.close(); }
 });
