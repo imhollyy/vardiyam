@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-006 — Bordro neti ve gerçek ödeme takibi
-- **Durum:** IMPLEMENTED / R3 REVIEW APPROVED; branch `feat/vdy-006-net-payments-reconciliation`, başlangıç PR #20 head `42002fc4a4ac84c9a559847e6a79230db529662b`. v6 migration, mutabakat repository/domain ve ödeme UI tamamlandı; stacked draft PR hazırlığı/CI kapanışı sürüyor. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged korundu.
+- **Durum:** DONE / R3 REVIEW APPROVED / CI PASS; branch `feat/vdy-006-net-payments-reconciliation`, commit `a8216ecd342c0fddc24ce05de0ea274e907ce32a`. Taslak PR [#22](https://github.com/imhollyy/vardiyam/pull/22) açık/unmerged, PR #20 HEAD `42002fc4a4ac84c9a559847e6a79230db529662b` üzerine stacked. GitHub Actions run #29 `42041568683` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged korundu.
 - **Aktif branch:** feat/vdy-006-net-payments-reconciliation
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
@@ -22,21 +22,22 @@
 
 ## NEXT ACTION
 
-1. VDY-006 teslimini taslak PR #20 üstüne çıkar ve GitHub CI kanıtını kaydet; ardından MVP uçtan uca kullanıcı kabulü ve ürün önceliklendirmesi. Merge/release yok.
+1. MVP'nin uçtan uca kullanıcı kabulü ve eksik ürün özelliklerinin önceliklendirilmesi. PR/main merge ve release yok.
 
 ## OLAY GÜNLÜĞÜ
 
-### 2026-11-05 — VDY-006 — IMPLEMENTED / R3 REVIEW APPROVED / FINAL CI PENDING
+### 2026-11-05 — VDY-006 — DONE / R3 REVIEW APPROVED / PR #22 CI PASS
 
 - **Kaynak/branch:** Issue #21 okundu. PR #20 güncel ve yerel HEAD `42002fc4a4ac84c9a559847e6a79230db529662b`, open/draft/unmerged/mergeable. `feat/vdy-006-net-payments-reconciliation` bu SHA'dan açıldı. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişmeden unstaged.
 - **Uygulama:** Additive transactional SQLite v6: immutable sınır/tz period kimliği, append-only bordro net revizyonları, gerçek net ödeme, dönem allocations ve append-only ledger events. SQL triggers payment amount/allocations toplamı üst sınırını INSERT/UPDATE yarışlarında uygular; repository tüm mutasyonları `withDatabaseTransaction` + mevcut per-DB queue üzerinden yazar. Payment tarihinden dönem atanmaz. Onaylı v1–v5 gross snapshot ve mevcut vardiya/çalışma kayıtları korunur.
 - **Ekran:** Kazanç sekmesine brüt tahminden ayrı Net Ödeme Takibi eklendi; bordro neti bilinmiyorsa fark NULL/bilinmiyor. Ayrı yönetim akışı Türkçe tutar/tarih, banka/elden/diğer, ödeme edit/confirm soft-delete, bir ödemeyi dönemlere bölme, ödeme geçmişi/bakiye ve bordro neti revision geçmişi sağlar. NET_ONLY/SKIP'te bölüm açık; brüt UI eski mode gate'te kalır. Tema tokenları, durum metinleri ve erişilebilir etiketler kullanıldı.
 - **Beceriler:** `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-pay-calculation`, `vardiyam-ui-quality`, `vardiyam-test-gate` okundu/uygulandı. UI Skills CLI `npx --no-install ui-skills categories` çağrısı sonuç vermeyip beklediği için iptal edildi; harici UI becerisi iddia edilmiyor. Kullanılan Expo/SQLite API'leri mevcut SDK58 repository pattern'iyle aynı.
 - **Ajanlar:** `vdy006_specialist`, net/bordro/ödeme semantiği ve ledger risklerine (hukuk mütalaası değildir) danışmanlık verdi. Gerçek bağımsız `vdy006_independent_reviewer` R3 final **APPROVE**, P0–P2 yok; ilk P2 `35.000` tam TL girişi gruplu formatını reddetmeyle ilgiliydi, parser ve regressions düzeltildi. Delta review da immutable period trigger'ları, net tarihçesi UI ve kuruş formatting değişikliklerini onayladı.
-- **Doğrulama:** Son kod/dokümantasyon adayı: `npm test` PASS **210/210** (önceki 197 korundu); `npm run typecheck` PASS; `npm run lint` PASS; `npx expo-doctor --verbose` erişimli PASS **20/20**; Android JS export PASS (1203 modül, 3 MB Hermes, kısa repo TEMP ile); `git diff --check` exit 0. Export/TEMP artefaktları temizlendi. Draft PR/CI henüz oluşturulmadı.
+- **Doğrulama:** `npm test` PASS **210/210** (önceki 197 korundu); `npm run typecheck` PASS; `npm run lint` PASS; `npx expo-doctor --verbose` PASS **20/20**; Android JS export PASS (1203 modül, 3 MB Hermes, kısa repo TEMP ile); `git diff --check` PASS. GitHub Actions run #29 `42041568683` on PR #22 head `a8216ecd...`: **SUCCESS** (install, typecheck, lint, unit tests, Expo dependency health). Export/TEMP artifacts cleaned.
 - **Cihaz / Windows:** Yeni cihaz smoke NOT RUN (kapsam dışı); Android bundle cihaz kabul testi sayılmaz. Windows/ADB/firewall işine dönülmedi.
 - **Açık risk:** R08, R13, Ethernet Private profile/policy blocker ve yayın öncesi Türk iş hukuku uzman incelemesi ayrı/açık; ödeme UI/migration kapsamı için blokaj değil.
-- **NEXT ACTION:** VDY-006 draft PR'ı PR #20'ye stacked aç, final CI durumunu kaydet; sonra uçtan uca MVP kabul ve ürün önceliklendirme.
+- **PR/koruma:** Draft PR [#22](https://github.com/imhollyy/vardiyam/pull/22), PR #20 dalına stacked; open/draft/unmerged, mergeable. No PR/main merged, no release. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged kaldı.
+- **NEXT ACTION:** MVP'nin uçtan uca kullanıcı kabulü ve eksik ürün özelliklerinin önceliklendirilmesi.
 
 ### 2026-11-05 — VDY-005C2 — IMPLEMENTED / R3 APPROVED / PR #20 CI PASS
 

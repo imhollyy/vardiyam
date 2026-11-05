@@ -167,6 +167,7 @@ Gerçek doğrulama sonuçları VDY-005C1 kapanış kaydında `docs/progress/PROG
 | PAY11 | TR para girişi / kuruş / overflow | `35.000,50` ve `35000.50` aynı integer kuruşa; belirsiz format, negatif ve unsafe değer reddedilir | `payments.test.mjs` |
 | PAY12 | NET_ONLY / SKIP | Net bordro ve ödeme bölümü kullanılabilir; tahmini brüt kart/tutar yok | `earningsPresentation.test.mjs` + ekran koşulu |
 | PAY13 | SQLite cold reopen | Bordro, ödeme, dağıtım ve fark korunur | `paymentRepository.test.mjs` (sentetik file DB) |
+| PAY14 | GitHub PR CI | Locked install, typecheck, lint, unit test, Expo dependency health | PR #22 Actions run #29 `42041568683` SUCCESS |
 
 VDY-006 son gerçek komut ve PR/CI/reviewer kanıtları kapanışta `docs/progress/PROGRESS.md` içindeki görev kaydına eklenecek. Cihaz smoke bu görevde yapılmayacak.
 
