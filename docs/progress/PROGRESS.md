@@ -529,13 +529,14 @@ NEXT ACTION:
 - Draft PR #25 created against PR #22 base `feat/vdy-006-net-payments-reconciliation`: https://github.com/imhollyy/vardiyam/pull/25; open/draft/unmerged. GitHub CI run #32 (`42054634246`) PASS: Typecheck, Lint, Unit tests, Expo dependency health.
 - **NEXT ACTION:** Güncel uygulama için tek uçtan uca Android kabulü, onboarding/erişilebilirlik eksikleri ve güvenli merge hazırlığı.
 
-### 2026-11-05 — VDY-008A — IMPLEMENTED / R3 REVIEW APPROVED / CI PENDING
+### 2026-11-05 — VDY-008A — IMPLEMENTED / R3 REVIEW APPROVED / GITHUB PR REF CI PENDING
 
-- **Issue/branch:** Issue #26; PR #25 branch `feat/vdy-008-backup-restore-data-wipe`, starting local HEAD `8eb3346fceb4008ccc1f1644adf38510248acad1`. No merge/rebase/force-push/release.
+- **Issue/branch:** Issue #26; PR #25 branch `feat/vdy-008-backup-restore-data-wipe`, starting local HEAD `8eb3346fceb4008ccc1f1644adf38510248acad1`; fix commit `7b5140264f9a7429074e34727d1bb3488d75536e` was pushed by fast-forward. No merge/rebase/force-push/release.
 - **Finding:** Confirmed code-review risk: old `committed` startup recovery could delete rollback based on live-file existence without validating the candidate against its own expected integrity/digest. This is a potential risk, not a reported device data-loss incident.
 - **Fix:** Journal v2 stores independent candidate and rollback serialization SHA-256 digests and row counts. The candidate validates against integrity/FK/canonical schema/protection checks/count/digest before COMMITTED; startup repeats checks before cleanup. On invalid candidate, verified rollback is copied to live and retained until copied DB validates. Marker/rollback survive errors; corrupt/missing state blocks provider DB open. Restore and wipe share this path. Encrypted backup format and v1–v6 migration history unchanged.
 - **Tests:** Real Node SQLite v6 files + temporary filesystem cover committed candidate cleanup, corrupt live rollback, missing/corrupt rollback fail-closed, empty-v6 wipe, malformed marker, cleanup failure, stop after rollback copy and idempotent second recovery. `npm test` 248/248 PASS (243 baseline + 5 new); typecheck PASS; lint PASS; diff-check PASS.
 - **Other gates:** Expo Doctor PASS 20/20; Android JS export PASS 1,252 modules. Native Expo filesystem/Android cold restart NOT RUN; no emulator/device. No Android Studio/ADB/Windows network changes.
 - **Agents/skills:** `vardiyam-task-flow` v1.0 and `vardiyam-data-safety` v1.0 applied. Independent R3 reviewer APPROVE, no P0/P1/P2. SQLite recovery specialist independently confirmed candidate/rollback separation and crash-order requirements.
+- **PR/CI:** PR #25 body updated with VDY-008A findings and evidence. Branch API shows the fix commit, but GitHub Pull API `refs/pull/25/head` still reports old `8eb3346`; no Actions run exists for `7b51402`. Record CI as PENDING/NOT STARTED, not PASS. The initial push was refused once by a server ref-rule error; an authorized non-force retry succeeded. A no-op API ref update was rejected, and no force or PR-ref bypass was attempted.
 - **Protected local files:** `docs/tasks/VDY-004.md`, `docs/tasks/VDY-007.md`, `expo-env.d.ts` remain uncommitted/untouched by staging. R08/R13/Ethernet/Turkish labor-law review stay OPEN.
-- **NEXT ACTION:** Commit/push the narrow recovery fix to PR #25 and record the resulting CI; then proceed to VDY-009 Android user acceptance.
+- **NEXT ACTION:** VDY-009 — real Android device user acceptance; follow the PR #25 ref/CI synchronization separately.
