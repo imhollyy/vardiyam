@@ -6,25 +6,37 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-003C — Gerçek Vardiya Takvimi ve Bugün Ekranı
-- **Durum:** VDY-003C implementation/review/GitHub CI PASS; draft PR #11 open on `feat/vdy-003c-shift-calendar-ui`, based on VDY-003B HEAD `58b9091`; previous Android evidence retained; R08/R13 and Ethernet policy issue remain separately OPEN; main merge/release yok
-- **Aktif branch:** feat/vdy-003c-shift-calendar-ui
+- **Aktif aşama:** VDY-004 — Fiilî Çalışma ve Mesai Kayıtları
+- **Durum:** VDY-004 implementation/local verification/review PASS; PR/CI remote verification pending on `feat/vdy-004-work-records`, based on PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`. PR #4/#6/#7/#9/#11 remain open and unmerged.
+- **Aktif branch:** feat/vdy-004-work-records
 - **Ana depo:** `imhollyy/vardiyam`
-- **Ürün kodu:** VDY-003C ile gerçek vardiya düzeni oluşturma, Bugün ve Takvim akışları eklendi
+- **Ürün kodu:** VDY-003C schedules/calendar/Today complete; VDY-004 work-record implementation in progress
 - **Expo/SQLite scaffold:** READY_FOR_PR
 - **Gerçek alt ajan çağrısı:** Implementer + bağımsız reviewer önceki preflight'te; R2 reviewer son diff'i ayrıca inceledi ve düzeltmelerden sonra bulgu bırakmadı. Uzman ajan denemesi repo erişimi olmadığı için sayılmadı; R2 sınıfında uzman zorunlu değil.
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / unit test / Expo Doctor:** VDY-003C PASS: typecheck, lint, 83/83 tests, Expo Doctor 20/20, Android bundle export, diff check. GitHub CI awaits draft PR head. R13 remains OPEN.
+- **Typecheck / lint / unit test / Expo Doctor:** VDY-004 local PASS: typecheck, lint, 103/103 tests, Expo Doctor 20/20, Android export, diff check. GitHub CI will be checked after branch push. R13 remains OPEN.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. Review draft PR #11; then proceed to VDY-004 when ready. Do not merge without separate authorization.
+1. Commit only VDY-004 files (exclude local `expo-env.d.ts`), push feature branch, open draft PR against PR #11, and verify its GitHub CI. Do not merge.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-004 — LOCAL VERIFY / R2 APPROVED
+
+- **Başlangıç ve koruma:** Branch `feat/vdy-004-work-records` PR #11 current head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489` üzerinden açıldı. PR #4/#6/#7/#9/#11 açık ve merge edilmemiş durumda. `expo-env.d.ts` yerel un-staged durumda bırakıldı; task başlangıç SHA içeriğiyle eşleşiyor, explicit stage listesine alınmayacak. Main merge/release yok.
+- **Uygulama:** Additive SQLite v3 `work_records` tablosu; UTC gerçek zamanlar/IANA zone, mola, not ve plan snapshot alanları. Repository CRUD/list/delete, aynı bağlantı işlem kuyruğu/transaction içinde yarı açık aralık çakışma reddi. Plan değişiklikleri fiilî kaydı değiştirmiyor; plansız kayıt destekli. Bugün/Takvim/form/history bağlantıları, edit ve silme onayı eklendi. Ücret/bordro/yasal mesai hesabı yok.
+- **Otomatik kapsam:** v1/v2 koruma ve v3 rollback; manual/planned CRUD; soğuk SQLite reopen; plansız gün; cycle/template/override silme/değiştirmede plan snapshot; concurrency overlap; overnight; mola limitleri; DST boşluk/fold ve süre farkı regresyonları.
+- **Yerel kanıt:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (103/103); `npx expo-doctor --verbose` PASS (20/20, ağ izinli tekrar); Android `npx expo export --platform android --output-dir .expo\vdy-004-export` PASS; `git diff --check` PASS (yalnız CRLF normalizasyon uyarıları). İlk Expo Doctor çevrimdışı 18/20 ve ilk Hermes export geçici dizin yazma izninden FAIL oldu; yeniden denemeler 20/20 ve bundle PASS verdi.
+- **Bağımsız R2 inceleme:** İlk read-only review iki P2 buldu: DST geçişlerinde yanlış plan farkı ve normalize edilen imkânsız UTC tarihlerinin kabulü. İkisi düzeltildi; kullanıcıya özgü plan saatleri gerçek instant adaylarıyla kıyaslanıyor (DST gap/fold belirsizliğinde fark gösterilmez), UTC ISO değeri `toISOString()` round-trip ile doğrulanıyor. Reviewer follow-up **APPROVE**, bulgu yok; 9/9 odak test ve 103/103 tüm test geçti.
+- **Cihaz:** VDY-004 Android/iOS cihaz UI kabul testi ve ekran görüntüsü NOT RUN; kapsam dışı/önkoşul değil. VDY-003C cihaz smoke kapsamı hakkında yeni iddia yok.
+- **Ayrı riskler:** R08 iOS/device coverage, R13 npm audit moderate bulguları ve Ethernet ağ profili konusu açık ve ayrı takipte; bu görevde değişiklik yok.
+- **QA matrisi:** `docs/QA_TEST_MATRIX.md` içine WR01–WR09 otomatik senaryoları ve kanıt dosyaları eklendi. PR/CI head durumu push sonrasında kaydedilecek.
+- **NEXT ACTION:** VDY-004 dosyalarını açık path listesiyle commit et (expo-env.d.ts hariç), branch'i push et, PR #11'i hedefleyen draft PR aç ve GitHub CI sonucunu kaydet; merge/release yapma.
 
 ### 2026-11-05 — G1 / VDY-002 — START
 
@@ -340,3 +352,13 @@ NEXT ACTION:
 - **Files:** Today/Calendar/Settings routes; repository atomic schedule-save API; pure schedule/date helpers; shared shift-kind badge; schedule/repository/date test coverage; QA matrix and task record. Prior Android screenshots under `docs/progress/evidence/android-2026-11-05/` preserved.
 - **Separate open risks:** R08 iOS/device coverage remains OPEN; R13 12 moderate npm audit findings remain OPEN; Ethernet index 11 still Private because Network List Manager policy blocked Public restoration; no firewall broadening. No APK build, main merge, release, or PR merge in VDY-003C.
 - **NEXT ACTION:** Review draft PR #11; then proceed to VDY-004 when ready. Do not merge without separate authorization.
+
+### 2026-11-05 — VDY-004 — START
+
+- **PR chain:** GitHub PRs #4, #6, #7, #9 and #11 all read as open/unmerged; PR #11 is draft. Current verified PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489` has GitHub `Verify Expo scaffold` PASS. GitHub Issue #12 lookup returned 404; VDY-004 scope comes from the user's explicit task.
+- **Branch/source:** Opened `feat/vdy-004-work-records` directly from PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`. Local pre-existing `expo-env.d.ts` worktree flag is preserved; its content SHA equals the base blob (`e6394b247e71f08454a02a1ef1f42bbd0d945d35`), and it will not be staged or modified.
+- **Risk/scope:** R2 local personal work/time data plus additive SQLite migration. No wage, payroll, overtime classification/calculation, legal leave interpretation, cloud, IAP, production data, merge/release, or required device smoke.
+- **Decisions:** Reject overlapping work intervals inside the repository write transaction with a clear validation error; half-open intervals allow exact adjacency. Keep UTC actual instants plus input/display IANA timezone. Reject nonexistent/ambiguous local wall times rather than silently normalize. Store break duration as integer minutes and snapshot optional plan link/window so plan edits cannot rewrite the record. When a linked cycle is deleted, `ON DELETE SET NULL` clears only the reference; the historical local date/window and work record remain.
+- **Skills/docs:** `vardiyam-task-flow` v1.0, `vardiyam-data-safety` v1.0, `vardiyam-test-gate` v1.0, `vardiyam-ui-quality` v1.0 and `find-docs` read/applied. Context7 `/expo/expo/expo_58.0.0` verified Expo SQLite transaction queue/rollback, parameter binding, and SDK58 API use.
+- **Plan:** v3 additive migration and domain/time conversion; transaction-safe repository; Today/Calendar entry points and record form/history/edit/confirm-delete; synthetic migration/CRUD/overnight/break/overlap/plan-stability/manual tests; typecheck/lint/tests/Expo Doctor/CI and independent R2 review; draft PR based on PR #11 only.
+- **NEXT ACTION:** Implement the v3 migration and typed work-record domain/repository with synthetic migration and overlap tests.

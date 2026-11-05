@@ -1,6 +1,22 @@
 # Vardiyam — Hesap ve Cihaz Test Matrisi v0.1
 
-> Bu liste **planlanan testlerdir**, hiçbir test henüz çalıştırılmadı. Her vaka fixture, beklenen sonuç, kullanılan ruleVersion ve kaynak notuyla kodlanacak.
+## VDY-004 — Fiilî çalışma kayıtları (otomatik test kanıtı)
+
+| ID | Senaryo | Beklenen | Otomatik kanıt |
+|---|---|---|---|
+| WR01 | Temiz SQLite ve v2 veritabanına v3 migration | `work_records` eklenir; v1/v2 şema ve satırlar korunur; başarısız migration rollback olur | `tests/data/migrations.test.mjs` |
+| WR02 | Plansız kayıt oluştur, oku, düzenle ve sil | UTC anlar, IANA zone, mola ve not kalıcı CRUD yapar | `tests/data/workRecordRepository.test.mjs` |
+| WR03 | SQLite kapat/aç | kayıt soğuk yeniden açılışta korunur | `tests/data/workRecordRepository.test.mjs` |
+| WR04 | Gece yarısı/yıl sınırı | yerel başlangıç ve ertesi gün bitiş doğru UTC anlarına dönüşür | `tests/domain/work-record.test.mjs` |
+| WR05 | Mola 0, süreye eşit, negatif, kesirli veya süreden uzun | geçerli sınır kabul; geçersiz değerler reddedilir | domain/repository work-record testleri |
+| WR06 | Aynı kullanıcıda çakışan ve bitişik aralık | çakışma açıkça reddedilir; sınırda bitişiklik kabul edilir; eşzamanlı yazımda da tek kayıt kalır | `tests/data/workRecordRepository.test.mjs` |
+| WR07 | Planlı kayıt; sonra override/cycle/template değişikliği veya silme | kayıt ile plan anlık görüntüsü korunur; plan değişikliği fiilî kaydı yeniden yazmaz | `tests/data/workRecordRepository.test.mjs` |
+| WR08 | Vardiya planı olmayan gün | plan bağlantısı olmadan çalışma kaydı saklanır | `tests/data/workRecordRepository.test.mjs` |
+| WR09 | DST boşluğu/tekrarlanan yerel saat | boşluk reddedilir; tekrarlanan saat kullanıcı seçimi olmadan kaydedilmez | `tests/domain/work-record.test.mjs` |
+
+Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir. Android/iOS özellik kabul cihaz testi bu görev için zorunlu değildir; yapılmadıysa ayrıca NOT RUN olarak kalır.
+
+> Aşağıdaki VDY-004 satırları uygulanmış otomatik senaryoları ve dosya kanıtlarını listeler. Diğer hesap ve cihaz satırları planlanan kapsamdır; her görev kendi gerçek PASS/FAIL/SKIP sonucunu `docs/progress/PROGRESS.md` içinde kaydeder.
 
 ## Zaman ve vardiya
 
