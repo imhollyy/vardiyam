@@ -36,6 +36,7 @@ function ThemedRouter() {
         <Stack.Screen name="net-payments" />
         <Stack.Screen name="backup" />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="account" />
       </Stack>
     </>
   );

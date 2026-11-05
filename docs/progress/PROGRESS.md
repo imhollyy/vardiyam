@@ -4,11 +4,11 @@
 
 ## CURRENT STATE
 
-- **Tarih:** 2026-11-05
+- **Tarih:** 2026-11-06
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-008 — çevrimdışı yedekleme/geri yükleme ve veri silme
-- **Durum:** IN PROGRESS / R3. PR #22 head `6de08ec4bc5a474445d338f44c14f932c1ba53ca` doğrulandı; `feat/vdy-008-backup-restore-data-wipe` dalı oluşturuldu. Mevcut VDY-007 docs ile kullanıcıya ait `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri korundu. Expo SDK 58 SQLite serialization/backup API'leri ve riskli file/provider lifecycle değerlendiriliyor; gerçek doğrulama tamamlanmadan restore/silme güvenli sayılmayacak.
-- **Aktif branch:** feat/vdy-008-backup-restore-data-wipe
+- **Aktif aşama:** VDY-010C hesap ekranı ve sınırlı kod temizliği
+- **Durum:** REVIEWED / R2. `feat/vdy-account-entry-cleanup`, PR #31 head `36e3f0f9032569a66fc52c71b80e83ad15fccfc0` tabanında. E-posta/Google/Apple seçenekleri yalnız UI; gerçek auth servisi yok ve yerel kullanım girişsiz sürüyor.
+- **Aktif branch:** feat/vdy-account-entry-cleanup
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,7 +22,16 @@
 
 ## NEXT ACTION
 
-1. VDY-008 — çevrimdışı yedekleme/geri yükleme ve tüm kullanıcı verisini silme; round-trip/veri bütünlüğü testleri. PR/main merge ve release yok.
+1. Auth sağlayıcısı ve OAuth/e-posta, uygulama kimliği, veri eşitleme/gizlilik kararları kurucu tarafından belirlendikten sonra gerçek hesap altyapısını ayrı görevde bağla. Bu dal için merge/release yapılmadı.
+
+## GÜNCEL DURUM — 2026-11-06
+
+- **VDY-010C account entry:** İsteğe bağlı e-posta giriş/kayıt ekranı, Google/Apple sağlayıcı CTA'ları ve yerel kullanıma devam yolu eklendi. Gerçek auth olmadığı UI'da açıkça belirtiliyor; hiçbir ağ isteği veya credential persistence yok.
+- **Kod taraması:** Today, Calendar, WorkRecords yerel butonları ortak `ActionButton` kullanıyor. Debug `console.log`, `console.debug`, `debugger`, TODO/FIXME işareti bulunmadı. Uygulama ekranlarında doğrudan SQLite query çağrısı bulunmadı; DB erişimi repository'lerde. Ana ekran/takvim/çalışma kayıt ekranları sırasıyla 573/521/653 satır; daha kapsamlı bölme ayrı, düşük riskli bakım işi olarak kalıyor. Bugün ekran saati 30 saniyede bir güncelleniyor; agresif saniyelik timer bulunmadı.
+- **Doğrulama:** typecheck PASS; lint PASS; testler PASS 278/278 (account form doğrulaması için 2 yeni test); `git diff --check` PASS. İlk deneme node_modules eksik olduğu için araç/test hatası verdi; kilit dosyasından `npm ci --ignore-scripts --prefer-offline` ile kurulum tamamlandı. Expo Doctor, Android/iOS export, gerçek cihaz ve GitHub CI bu UI-only görevde çalıştırılmadı.
+- **Bağımlılık durumu:** `npm ci` mevcut R13 takibiyle aynı 12 moderate advisory bildirdi; manifest ve lockfile değiştirilmedi.
+- **Bağımsız R2 UI/a11y review:** APPROVE; düzeltmeler sonrası P0/P1/P2 bulgusu yok. Cihaz görseli/TalkBack/VoiceOver testleri NOT RUN.
+- **Dosya ayrıntısı ve kurucu ayar listesi:** `docs/tasks/VDY-010C-ACCOUNT.md`.
 
 ## OLAY GÜNLÜĞÜ
 
