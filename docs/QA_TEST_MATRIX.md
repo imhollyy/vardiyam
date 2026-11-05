@@ -16,6 +16,21 @@
 
 Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir. Android/iOS özellik kabul cihaz testi bu görev için zorunlu değildir; yapılmadıysa ayrıca NOT RUN olarak kalır.
 
+## VDY-005A — UTC çalışma segmentasyonu
+
+| ID | Senaryo | Beklenen | Otomatik kanıt |
+|---|---|---|---|
+| WS01 | 08:00–16:00, bilinen 30 dk mola 12:00–12:30 | mola dilimleri çıkarılır; toplam 450 çalışılan dk korunur | `tests/domain/work-segmentation.test.mjs` |
+| WS02 | 22:00–06:00, yalnız toplam mola 30 dk | gece yarısı iki yerel güne bölünür; toplam net 450 dk bilinir, segment `workedMinutes` null ve 30 dk atanmamış | aynı |
+| WS03 | 28 Ekim 10:00–18:00, kaynak penceresi yerel 13:00'te başlıyor | tam 13:00 UTC kesimi/işaretçisi; hukuk/ücret sınıfı motor tarafından çıkarılmaz | aynı |
+| WS04 | 31 Aralık 22:00–1 Ocak 06:00 | yerel gün/ay/yıl anahtarları değişir, süre çift sayılmaz | aynı |
+| WS05 | Pazar 23:00–Pazartesi 07:00 | yapılandırılmış Pazartesi hafta başlangıcında böler; yasal hafta tatili alanı üretilmez | aynı |
+| WS06 | Bordro başlangıç günü 15, 14'ünden 15'ine gece vardiyası | `payrollPeriodStartDate` doğru değişir | aynı |
+| WS07 | DST ilkbahar/sonbahar ve yerel gece yarısındaki DST gap | dakika gerçek UTC elapsed süresidir; IANA yerel tarih kesimi doğru bulunur | aynı |
+| WS08 | Çakışan/taşan molalar; bitişik molalar | çakışma/taşma reddedilir; bitişik aralık kabul edilir | aynı |
+| WS09 | Çakışan tatil/kural boundary pencereleri | parçalar atomik ve çakışmasız; her gerçek dakika bir kez sayılır, tüm aktif kaynak kimlikleri eklenir | aynı |
+| WS10 | Zamanlı mola toplamı WorkRecord `breakMinutes` ile uyuşmuyor | açık tutarlılık hatası; sessiz normalizasyon yok | aynı |
+
 > Aşağıdaki VDY-004 satırları uygulanmış otomatik senaryoları ve dosya kanıtlarını listeler. Diğer hesap ve cihaz satırları planlanan kapsamdır; her görev kendi gerçek PASS/FAIL/SKIP sonucunu `docs/progress/PROGRESS.md` içinde kaydeder.
 
 ## Zaman ve vardiya
