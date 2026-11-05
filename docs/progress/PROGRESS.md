@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. Commit/push the reviewed VDY-003C changes, open the draft PR targeting VDY-003B, and record GitHub CI checks; do not merge.
+1. Read and record PR #11 GitHub CI completion; then leave the draft PR open for human review. Do not merge.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -332,11 +332,11 @@ NEXT ACTION:
 
 ### 2026-11-05 — VDY-003C — IMPLEMENTATION / VERIFY / R2 REVIEW APPROVED
 
-- **Source/branch:** GitHub Issue #10; `feat/vdy-003c-shift-calendar-ui` created from local VDY-003B head `58b9091abacebbc1223e7c085d9ca3f8b96660c1`. PR #4/#6/#7/#9, main and release remain untouched. Previous Android four-tab screenshots and SQLite v0→v2/v1→v2 evidence were preserved.
+- **Source/branch:** GitHub Issue #10; `feat/vdy-003c-shift-calendar-ui` created from local VDY-003B head `58b9091abacebbc1223e7c085d9ca3f8b96660c1`. Implementation commit `f9e174ae5e25ae9cf1b3da1e257ebcbdaad1a541`; draft PR #11 targets `feat/vdy-003b-sqlite-storage`: https://github.com/imhollyy/vardiyam/pull/11. PR #4/#6/#7/#9, main and release remain untouched. Previous Android four-tab screenshots and SQLite v0→v2/v1→v2 evidence were preserved.
 - **Skills:** `vardiyam-task-flow` v1.0, `vardiyam-ui-quality` v1.0, `vardiyam-data-safety` v1.0, `vardiyam-test-gate` v1.0 and `find-docs` applied; Expo SDK 58 SQLite/Router APIs verified using current documentation. Native UI skill guidance fetched from UI Skills CLI.
 - **Implementation:** Settings creates/edits shift templates and fixed/weekly-three/2+2+2/4+2/6+1/custom cycle schedules, IANA timezone, anchor date and start shift. `saveShiftSchedule` writes template/cycle/entries atomically through existing repository queue/transaction. Calendar queries actual planned shifts by month and supports selected-day SHIFT/OFF/LEAVE override. Today shows today's plan and upcoming shifts. Existing domain cycle engine/projection is reused. Prior overrides survive schedule edits; OFF is not called legal rest.
 - **Reviewer findings/fixes:** Independent R2 reviewer initially found P1 saved cycle phase could drift and P2 touch target/timezone gaps. Exact stored `startIndex` is now retained for unchanged start selection, with builder and SQLite round-trip regressions. IANA zone is editable and validated by the existing domain validator. Settings controls meet 44 dp; calendar day cells add 6 dp horizontal hit area. Reviewer final **APPROVE**, no remaining P0/P1/P2; independently ran tests (83/83 PASS).
-- **Verification:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (83/83); `npx expo-doctor --verbose` PASS (20/20; initial offline DNS failure, successful connected retry); `npx expo export --platform android --output-dir .expo\vdy-003c-export` PASS (Android bundle, 1,190 modules, 2.7 MB Hermes); `git diff --check` PASS. No VDY-003C device smoke was required or performed. GitHub CI pending draft PR publication.
+- **Verification:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (83/83); `npx expo-doctor --verbose` PASS (20/20; initial offline DNS failure, successful connected retry); `npx expo export --platform android --output-dir .expo\vdy-003c-export` PASS (Android bundle, 1,190 modules, 2.7 MB Hermes); `git diff --check` PASS. No VDY-003C device smoke was required or performed. PR #11 GitHub Actions CI run 41997473336 is IN_PROGRESS; combined status had no individual status checks at first poll.
 - **Files:** Today/Calendar/Settings routes; repository atomic schedule-save API; pure schedule/date helpers; shared shift-kind badge; schedule/repository/date test coverage; QA matrix and task record. Prior Android screenshots under `docs/progress/evidence/android-2026-11-05/` preserved.
 - **Separate open risks:** R08 iOS/device coverage remains OPEN; R13 12 moderate npm audit findings remain OPEN; Ethernet index 11 still Private because Network List Manager policy blocked Public restoration; no firewall broadening. No APK build, main merge, release, or PR merge in VDY-003C.
-- **NEXT ACTION:** Commit/push VDY-003C and create its draft PR against `feat/vdy-003b-sqlite-storage`; then record PR URL/head and GitHub CI outcome. Do not merge.
+- **NEXT ACTION:** Read and record PR #11 GitHub CI completion; then leave the draft PR open for human review. Do not merge.
