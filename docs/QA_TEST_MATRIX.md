@@ -390,7 +390,7 @@ GitHub: draft PR #29 (eat/vdy-010a-home-ui → PR #25 head dalı), commit 39e3
 | Expo Doctor | PASS | `npx.cmd expo-doctor`, 20/20 |
 | Diff whitespace | PASS | `git diff --check` |
 | iPhone/Android visual, screen reader, large font, small-screen acceptance/screenshots | NOT RUN | No device acceptance performed in this task |
-| GitHub Actions | PENDING | No PR exists yet; run after stacked draft PR creation |
+| GitHub Actions | PASS | Draft PR #31 run #42 (`42129795159`), Verify Expo scaffold job success |
 | Independent R2 UI/accessibility review | PASS | APPROVE; initial P1 and P2 findings fixed; re-review found no remaining static P0–P2 |
 
 No SQLite schema/migrations, recovery/backup flow, financial calculations, or payment reconciliation rules were changed.
