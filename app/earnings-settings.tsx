@@ -9,6 +9,7 @@ import type { EarningsRule, GrossPayMode } from '@/src/domain/earnings';
 import { colors } from '@/src/theme/tokens';
 import { getLocalDateTimeCandidates } from '@/src/domain/work-record';
 import { addCalendarDays, type LocalDate } from '@/src/domain/shift-cycle';
+import { getLocalToday } from '@/src/features/shifts/dates';
 
 const MODES: { id: GrossPayMode; label: string }[] = [
   { id: 'MONTHLY_GROSS', label: 'Aylık brüt' }, { id: 'HOURLY_GROSS', label: 'Saatlik brüt' },
@@ -73,6 +74,8 @@ export default function EarningsSettingsScreen() {
   const [restDates, setRestDates] = useState('');
   const [workplaceHolidayDates, setWorkplaceHolidayDates] = useState('');
   const [rates, setRates] = useState<Record<string, string>>({});
+  const [payEffectiveFrom, setPayEffectiveFrom] = useState(() => getLocalToday('Europe/Istanbul'));
+  const [rulesEffectiveFrom, setRulesEffectiveFrom] = useState(() => getLocalToday('Europe/Istanbul'));
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -84,6 +87,8 @@ export default function EarningsSettingsScreen() {
         if (current && isEarningsSettings(current.profile)) {
           setSettings(current.profile);
           setRules(current.rules);
+          setPayEffectiveFrom(localDateForInstant(current.profile.payEffectiveFromUtc, current.profile.timezone));
+          setRulesEffectiveFrom(localDateForInstant(current.profile.rulesEffectiveFromUtc, current.profile.timezone));
           setMonthly(current.profile.monthlyGrossMinor === null ? '' : (current.profile.monthlyGrossMinor / 100).toFixed(2));
           setHourly(current.profile.hourlyGrossMinor === null ? '' : (current.profile.hourlyGrossMinor / 100).toFixed(2));
           setDivider(String(current.profile.monthlyDividerMinutes / 60));
@@ -98,6 +103,7 @@ export default function EarningsSettingsScreen() {
           setRates(Object.fromEntries(current.rules.map((rule) => [rule.kind, String((rule.multiplierBasisPoints / 10000 - 1) * 100)])));
         } else {
           const defaults = createDefaultSettings(); setSettings(defaults); setRules(createDefaultRules(defaults.mode));
+          setPayEffectiveFrom(getLocalToday(defaults.timezone)); setRulesEffectiveFrom(getLocalToday(defaults.timezone));
         }
       } catch {
         if (active) setLoadError('Yerel ücret profili okunamadı. Yeniden yükleyip doğrulamadan ayar kaydedilemez.');
@@ -120,6 +126,16 @@ export default function EarningsSettingsScreen() {
     }
     if (settings.mode === 'MONTHLY_GROSS' && monthlyMinor === null || settings.mode === 'HOURLY_GROSS' && hourlyMinor === null) {
       Alert.alert('Ücret bilgisi gerekli', 'Seçtiğin brüt ücret türü için bir tutar gir.'); return;
+    }
+    const validLocalDate = (value: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+      const candidates = getLocalDateTimeCandidates(`${value}T00:00`, settings.timezone);
+      return candidates.length === 1 ? candidates[0] : null;
+    };
+    const payEffectiveFromUtc = validLocalDate(payEffectiveFrom);
+    const rulesEffectiveFromUtc = validLocalDate(rulesEffectiveFrom);
+    if (!payEffectiveFromUtc || !rulesEffectiveFromUtc) {
+      Alert.alert('Geçerlilik tarihi geçersiz', 'Ücret ve kural geçerlilik başlangıcını geçerli yerel gün olarak gir.'); return;
     }
     const holidayWindows: EarningsSettings['holidayWindows'] = [];
     const localDayWindows = (text: string, prefix: string) => text.split(/\r?\n/).map((value) => value.trim()).filter(Boolean).map((dateValue, index) => {
@@ -164,6 +180,7 @@ export default function EarningsSettingsScreen() {
     }
     const next: EarningsSettings = {
       ...settings, monthlyGrossMinor: monthlyMinor, hourlyGrossMinor: hourlyMinor,
+      payEffectiveFromUtc, rulesEffectiveFromUtc,
       monthlyDividerMinutes: Math.round(dividerHours * 60), weeklyMinutes: Math.round(weeklyHours * 60), payrollPeriodStartDay: day,
       holidaySource, holidayVersion,
       holidayCoveredFromUtc: coverageFromUtc,
@@ -179,7 +196,7 @@ export default function EarningsSettingsScreen() {
       const rate = rates[rule.kind] ?? String((rule.multiplierBasisPoints / 100 - 100).toFixed(2));
       return { ...rule, multiplierBasisPoints: parseRateBasisPoints(rate)!,
         amountBasis: rule.kind === 'NORMAL' && next.mode === 'MONTHLY_GROSS' ? 'INCLUDED_IN_BASE' as const : rule.amountBasis,
-        effectiveFromUtc: '2000-01-01T00:00:00.000Z' };
+        effectiveFromUtc: rulesEffectiveFromUtc };
     });
     setSaving(true);
     try {
@@ -211,7 +228,10 @@ export default function EarningsSettingsScreen() {
     {settings.mode === 'HOURLY_GROSS' ? field('Saatlik brüt', hourly, setHourly, 'TL') : null}
     {settings.mode === 'MONTHLY_GROSS' ? <>{field('Saat böleni önerisi', divider, setDivider, 'saat')}{toggle('225 saat önerisini bu hesap ayarı için açıkça onaylıyorum', settings.monthlyDividerConfirmed, () => update({ monthlyDividerConfirmed: !settings.monthlyDividerConfirmed }))}{toggle('Normal çalışma tutarı aylık brüt baza dahildir', settings.basePolicyConfirmed, () => update({ basePolicyConfirmed: !settings.basePolicyConfirmed }))}</> : null}
     <Text style={[styles.section, { color: theme.foreground }]}>Dönem ve sözleşme</Text>
+    {field('Ücret profilinin geçerli olduğu gün', payEffectiveFrom, setPayEffectiveFrom, 'YYYY-AA-GG', 'default')}
+    {field('İşyeri kurallarının geçerli olduğu gün', rulesEffectiveFrom, setRulesEffectiveFrom, 'YYYY-AA-GG', 'default')}
     {field('Haftalık sözleşme süresi', weekly, setWeekly, 'saat')}{field('Bordro döneminin başladığı gün', periodDay, setPeriodDay, 'gün', 'number-pad')}
+    <Text style={[styles.body, { color: theme.muted }]}>Varsayılan başlangıç bugün. Geçmişe uygulamak istersen geçerlilik gününü açıkça değiştir; önceki dönemlerdeki ücret belirsiz kalırsa hesap bekletilir.</Text>
     {toggle('Denkleştirme veya haftalık hesaplama belirsizliği yok; bu işyeri bilgisini doğruladım', !settings.averagingOrEqualizationUnclear, () => update({ averagingOrEqualizationUnclear: !settings.averagingOrEqualizationUnclear }))}
     <Text style={[styles.section, { color: theme.foreground }]}>Bağımsız işyeri ek oranları</Text>
     {RULES.map(({ kind, label }) => field(label, rates[kind] ?? String((rules.find((rule) => rule.kind === kind)?.multiplierBasisPoints ?? 10_000) / 100 - 100), (value) => setRates((current) => ({ ...current, [kind]: value })), '% ek'))}

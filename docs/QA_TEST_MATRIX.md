@@ -48,7 +48,7 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 
 ## VDY-005C2 — Kalıcı ücret ayarları ve Kazanç
 
-**Çalıştırma sonucu (2026-11-05):** `npm test` PASS 196/196; typecheck/lint/diff-check PASS; Expo Doctor PASS 20/20; Android bundle PASS (Hermes 2.9 MB); bağımsız R3 reviewer APPROVE (P0–P2 yok); GitHub Actions run #25 (`42035205541`) SUCCESS. Gerçek Android/iOS cihaz testi NOT RUN (görev önkoşulu değil).
+**Çalıştırma sonucu (2026-11-05):** `npm test` PASS 197/197; typecheck/lint/diff-check PASS; Expo Doctor PASS 20/20; Android bundle PASS (Hermes 2.9 MB); bağımsız R3 reviewer APPROVE (P0–P2 yok); GitHub Actions run #25 (`42035205541`) SUCCESS on implementation commit `1312e36`. Gerçek Android/iOS cihaz testi NOT RUN (görev önkoşulu değil).
 
 | ID | Senaryo | Beklenen | Kanıt |
 |---|---|---|---|
@@ -67,6 +67,7 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 | EC213 | Gerçek plan/fiilî karşılaştırma | plan süresi yalnız linkli kayıt snapshot'ları için etiketlenir; bilinmeyen dönem sınırı molası net sürede belirsiz kalır | `app/(tabs)/earnings.tsx` |
 | EC214 | 15–14 dönem ve tüm hafta sorgusu | döneme kesişen tam haftalar sorgulanır, dönem satırları motorun `payrollPeriodStartDate` ile filtrelenir | `app/(tabs)/earnings.tsx`; C1 segmentasyon testleri |
 | EC215 | Tema/erişilebilirlik/yükleme/hata/boş | light/dark token, checkbox/radio/button rolleri, erişilebilir adlar ve boş/yükleme/hata metinleri mevcut | kod incelemesi; gerçek cihaz NOT TESTED |
+| EC216 | Ücret/kural geçerlilik tarihi | varsayılan bugün ve yerel IANA gece yarısı; seçili dönem ücret profilinden önceyse veya kaynak çalışma ücretten eskiyse kesin tutar onaylanmaz | `src/features/earnings/profile.ts`; `tests/domain/earningsPresentation.test.mjs`; `app/earnings-settings.tsx` |
 
 > Aşağıdaki VDY-004 satırları uygulanmış otomatik senaryoları ve dosya kanıtlarını listeler. Diğer hesap ve cihaz satırları planlanan kapsamdır; her görev kendi gerçek PASS/FAIL/SKIP sonucunu `docs/progress/PROGRESS.md` içinde kaydeder.
 

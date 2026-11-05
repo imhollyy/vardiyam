@@ -9,6 +9,8 @@ import {
 
 export type EarningsSettings = {
   mode: GrossPayMode;
+  payEffectiveFromUtc: string;
+  rulesEffectiveFromUtc: string;
   monthlyGrossMinor: number | null;
   hourlyGrossMinor: number | null;
   monthlyDividerMinutes: number;
@@ -35,7 +37,7 @@ export const DEFAULT_PROFILE_ID = 'default';
 
 export function createDefaultSettings(): EarningsSettings {
   return {
-    mode: 'SKIP', monthlyGrossMinor: null, hourlyGrossMinor: null,
+    mode: 'SKIP', payEffectiveFromUtc: '', rulesEffectiveFromUtc: '', monthlyGrossMinor: null, hourlyGrossMinor: null,
     monthlyDividerMinutes: 225 * 60, monthlyDividerConfirmed: false,
     weeklyMinutes: 45 * 60, timezone: 'Europe/Istanbul', weekStartsOn: 1, payrollPeriodStartDay: 1,
     basePolicyConfirmed: false, averagingOrEqualizationUnclear: true,
@@ -87,6 +89,7 @@ export function isEarningsSettings(value: unknown): value is EarningsSettings {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<EarningsSettings>;
   return ['MONTHLY_GROSS', 'HOURLY_GROSS', 'NET_ONLY', 'SKIP'].includes(item.mode ?? '') &&
+    typeof item.payEffectiveFromUtc === 'string' && typeof item.rulesEffectiveFromUtc === 'string' &&
     typeof item.weeklyMinutes === 'number' && typeof item.timezone === 'string' &&
     typeof item.payrollPeriodStartDay === 'number' && Array.isArray(item.completeWeekStarts);
 }
@@ -108,6 +111,8 @@ export function makeCalculationInput(args: {
     records: args.records,
     completeWeekStarts: args.completeWeekStarts,
     unresolvedPolicyReasons: [
+      ...(args.records.some((record) => Date.parse(record.startedAtUtc) < Date.parse(args.settings.payEffectiveFromUtc))
+        ? ['Fiilî kayıt ücret profilinin geçerlilik başlangıcından önce; bu hesap dönemi için ücret bazı doğrulanmadı.'] : []),
       ...(args.settings.averagingOrEqualizationUnclear ? ['Denkleştirme/haftalık hesap politikası bu işyeri için doğrulanmadı.'] : []),
       ...(!args.settings.workplaceWindowCoverageConfirmed ? ['İşyeri hafta tatili ve özel gün sınıflaması açıkça doğrulanmadı.'] : []),
     ],

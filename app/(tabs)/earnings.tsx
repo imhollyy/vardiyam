@@ -110,10 +110,14 @@ export default function EarningsScreen() {
         calculatedAtUtc: now.toISOString() });
       const sourceRangeStartUtc = toUtcMidnight(weekChoices[0], settings.timezone);
       const sourceRangeEndUtc = toUtcMidnight(addCalendarDays(weekChoices.at(-1)!, 7), settings.timezone);
+      const selectedPeriodStartUtc = toUtcMidnight(periodStart, settings.timezone);
+      const payEffectiveInput = Date.parse(settings.payEffectiveFromUtc) > Date.parse(selectedPeriodStartUtc)
+        ? { ...input, unresolvedPolicyReasons: [...(input.unresolvedPolicyReasons ?? []), 'Seçili bordro dönemi ücret profilinin geçerlilik başlangıcından önce başlıyor; dönem bazı doğrulanmadı.'] }
+        : input;
       // The UI requires the user to attest to every local week included in this preview.
       const checked = weekChoices.every((week) => weekChoicesChecked.includes(week));
-      const result = calculateGrossEarnings({ ...input, completeWeekStarts: checked ? weekChoices : [] });
-      setPreview({ input: { ...input, completeWeekStarts: checked ? weekChoices : [], sourceRangeStartUtc, sourceRangeEndUtc }, result, periodStart, periodEnd, version });
+      const result = calculateGrossEarnings({ ...payEffectiveInput, completeWeekStarts: checked ? weekChoices : [] });
+      setPreview({ input: { ...payEffectiveInput, completeWeekStarts: checked ? weekChoices : [], sourceRangeStartUtc, sourceRangeEndUtc }, result, periodStart, periodEnd, version });
     } catch (cause) {
       Alert.alert('Önizleme oluşturulamadı', cause instanceof Error ? cause.message : 'Dönem hesaplaması yapılamadı.');
     } finally { setCalculating(false); }
