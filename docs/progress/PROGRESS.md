@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-005B — Zamanlı Mola Kayıtları ve SQLite v4
-- **Durum:** VDY-005B implementation, local checks, Android bundle export, and independent R2 review PASS. Stacked draft PR/CI evidence pending on `feat/vdy-005b-timed-breaks`, based on verified PR #14 HEAD `5b6c1fc848a263095c34198379aaa411ed0bce20`. Existing local `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain unstaged and untouched.
+- **Durum:** VDY-005B READY_FOR_REVIEW; stacked draft PR #16 open/unmerged; local checks, Android bundle export, independent R2 review, and GitHub CI run #20 PASS on implementation commit `5353f032236ac02b6fa0db70fa72dc6871f097ca`. PR #16 targets PR #14 at `5b6c1fc848a263095c34198379aaa411ed0bce20`. Existing local `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain unstaged and untouched.
 - **Aktif branch:** feat/vdy-005b-timed-breaks
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. Push the verified VDY-005B branch, open a stacked draft PR against PR #14, and verify GitHub CI. Do not merge or release.
+1. VDY-005C — design and implement the explainable overtime-multiplier/gross-entitlement engine on the reviewed VDY-005B stack; keep expert/legal classification boundaries separate and do not merge/release without explicit approval.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -38,6 +38,15 @@
 - **Skills and tools:** `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-test-gate`, `vardiyam-ui-quality`, and targeted React Native best-practices CLI skill applied. Context7 `/expo/expo/expo_58.0.0` verified transaction rollback/serialization rules. Graphify local no-LLM AST scan: 78 files, 792 nodes, 1474 edges; generated output removed. Playwright/browser test not used because this is a native React Native + SQLite route; device smoke was explicitly not a prerequisite.
 - **Open independent risks:** R08 iOS acceptance, R13 npm audit findings, and Ethernet profile remain separate/open; Windows, ADB, firewall and Expo SDK were not changed.
 - **NEXT ACTION:** Push the verified branch, open a stacked draft PR against PR #14, and verify GitHub CI. No merge/release.
+
+### 2026-11-05 — VDY-005B — PR #16 / GITHUB CI PASS
+
+- **Branch/commit:** `feat/vdy-005b-timed-breaks`, implementation commit `5353f032236ac02b6fa0db70fa72dc6871f097ca`, based exactly on PR #14 head `5b6c1fc848a263095c34198379aaa411ed0bce20`.
+- **Draft PR:** [#16](https://github.com/imhollyy/vardiyam/pull/16), open/unmerged, base `feat/vdy-005a-work-segmentation`, head `feat/vdy-005b-timed-breaks`; GitHub reports mergeable and PR remains draft.
+- **Remote CI:** run `42022932598` (#20) completed `success` on implementation head. No merge/release.
+- **Final preservation check:** only the pre-existing local `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain modified and unstaged; neither is in the VDY-005B commit.
+- **Separate open risks:** R08 iOS acceptance, R13 dependency audit and Ethernet network profile remain unchanged/open.
+- **NEXT ACTION:** VDY-005C — explainable overtime multipliers and gross-entitlement engine; no main/PR merge or release.
 
 ### 2026-11-05 — VDY-005B — START / BRANCH VERIFIED
 
