@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-005C1 — Mesai ve brüt kazanç hesaplama motoru
-- **Durum:** READY_FOR_REVIEW; taslak PR #18 açık, PR #16'nın güncel başlangıç head'i `f3184a349d0dd2d34fae2d41c0a45275b4d0bb68` üzerine stack edildi. Kod commit `ef3694b1df3615c62eef88e049cf104b4f5b7c58`; GitHub CI run #22 `42029068508` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri unstaged ve korunuyor.
+- **Durum:** READY_FOR_REVIEW; taslak PR #18 açık, PR #16'nın güncel başlangıç head'i `f3184a349d0dd2d34fae2d41c0a45275b4d0bb68` üzerine stack edildi. Kod commit `ef3694b1df3615c62eef88e049cf104b4f5b7c58`; code CI run #22 `42029068508` ve docs-closure head `af0cee9297f9a296caed0e1a2ea5d47b39b367ee` CI run #23 `42029467408` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri unstaged ve korunuyor.
 - **Aktif branch:** feat/vdy-005c1-earnings-engine
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
@@ -16,7 +16,7 @@
 - **Repo skill kullanımı:** VDY-005C1 için `vardiyam-task-flow`, `vardiyam-pay-calculation`, `vardiyam-test-gate`; MDN JavaScript `BigInt`/`Number.isSafeInteger` Context7 kaynağıyla doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **VDY-005C1 doğrulama:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS 184/184 (57 yeni domain testi, 40 sayı fixture'ı); focused earnings 57/57; `npx expo-doctor --verbose` PASS 20/20 (network retry); `git diff --check` PASS; GitHub CI run #22 PASS. R08, R13 and Ethernet profile remain separate/open.
+- **VDY-005C1 doğrulama:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS 184/184 (57 yeni domain testi, 40 sayı fixture'ı); focused earnings 57/57; `npx expo-doctor --verbose` PASS 20/20 (network retry); `git diff --check` PASS; GitHub CI run #22 code PASS and run #23 docs closure PASS. R08, R13 and Ethernet profile remain separate/open.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
@@ -35,7 +35,7 @@
 - **R3 reviewer:** `r3_earnings_reviewer` ara incelemede amount-basis tutarsızlığı ve overflow eksikliği yakaladı; ödeme semantiği, safe coefficient, satır/aggregate overflow ve regressions eklendi. `r3_final_reviewer` güncel kodu/focused 56 senaryoyu inceledi; **APPROVE**, P0/P1/P2 yok. Sonradan sadece bir ek +%75 özel tatil testi eklendi; üretim kodu değişmedi ve tüm testler tekrar PASS.
 - **Uzman ajan:** `r3_pay_expert` sözleşme haftası, eksik veri, OFF/weekend ayrımı, holiday provenance ve belirsizlik için sınırlar önerdi. Gerçek Türk iş hukuku mütalaası alınmadı; constitution'daki pre-release hukuk incelemesi açık risk olarak kalır.
 - **Beceriler/kaynak:** `vardiyam-task-flow`, `vardiyam-pay-calculation`, `vardiyam-test-gate`; Context7 `/mdn/content` ile BigInt precision ve `Number.isSafeInteger` doğrulandı. Graphify bu oturumda kurulu/tool olarak mevcut değildi; kod grafiği çalıştırılmadı. Playwright kullanılmadı; değişiklik tarayıcı/UI değil.
-- **PR/CI:** Taslak PR [#18](https://github.com/imhollyy/vardiyam/pull/18), base `feat/vdy-005b-timed-breaks` / PR #16 başlangıç head `f3184a3`, açık ve unmerged. GitHub Actions run #22 `42029068508`, source commit `ef3694b...`, SUCCESS. Merge/release yok.
+- **PR/CI:** Taslak PR [#18](https://github.com/imhollyy/vardiyam/pull/18), base `feat/vdy-005b-timed-breaks` / PR #16 başlangıç head `f3184a3`, açık ve unmerged. GitHub Actions run #22 `42029068508` on source commit `ef3694b...` SUCCESS; docs-closure head `af0cee9...` run #23 `42029467408` SUCCESS. Merge/release yok.
 - **Değişiklik koruması:** `docs/tasks/VDY-004.md` ve `expo-env.d.ts` başlangıçtaki unstaged değişiklikleriyle bırakıldı; stage/commit edilmedi.
 - **Açık riskler:** Resmî hukuk uzmanı yayın öncesi incelemesi, R08 iOS kabulü, R13 audit ve Ethernet network profile ayrı/açık kalır. R08/R13/Ethernet bu domain task'ının blokajı değildir.
 - **NEXT ACTION:** VDY-005C2 — ücret ayarları, sürümlü hesap kayıtları ve gerçek Kazanç ekranı; PR #18 founder/reviewer kararından sonra.
