@@ -9,7 +9,7 @@ import { createPlanOverride, deletePlanOverride, getPlanOverride, getPlannedShif
 import { completeActiveWorkSessionWithRecord, listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
 import { getLocalDateTimeCandidates, getRecordRangeDifferenceMinutes, localDateTimeToUtc, utcToLocalDateTime, type PlannedWorkSnapshot, type WorkRecord } from '@/src/domain/work-record';
 import { getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTemplate } from '@/src/domain/shift-cycle';
-import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalToday, localDateForMonthDay, monthForLocalDate, monthRange, mondayFirstOffset, shiftYearMonth } from '@/src/features/shifts/dates';
+import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalToday, localDateForMonthDay, monthForLocalDate, monthRange, mondayFirstOffset, mondayFirstWeekdayOffset, shiftYearMonth } from '@/src/features/shifts/dates';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { colors } from '@/src/theme/tokens';
 
@@ -123,7 +123,7 @@ export default function TodayScreen() {
   const viewTimezone = active?.timezone ?? cycle?.timezone ?? ZONE;
   const today = getLocalToday(viewTimezone, now);
   const month = shiftYearMonth(monthForLocalDate(today), monthOffset);
-  const weekStart = addLocalDays(today, -mondayFirstOffset(today));
+  const weekStart = addLocalDays(today, -mondayFirstWeekdayOffset(today));
   const weekEnd = addLocalDays(weekStart, 7);
   useFocusEffect(useCallback(() => {
     let cancelled = false;
@@ -137,7 +137,7 @@ export default function TodayScreen() {
         const selectedCycle = cycles[0] ?? null;
         const focusTimezone = currentSession?.timezone ?? selectedCycle?.timezone ?? ZONE;
         const focusedToday = getLocalToday(focusTimezone);
-        const focusedWeekStart = addLocalDays(focusedToday, -mondayFirstOffset(focusedToday));
+        const focusedWeekStart = addLocalDays(focusedToday, -mondayFirstWeekdayOffset(focusedToday));
         const focusedWeekEnd = addLocalDays(focusedWeekStart, 7);
         const currentMonth = shiftYearMonth(monthForLocalDate(focusedToday), monthOffset);
         const focusedMonthRange = monthRange(currentMonth);
