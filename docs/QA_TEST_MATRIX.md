@@ -301,6 +301,6 @@ Independent R3 data-security reviewer: **APPROVE; no P0/P1**. P2 evidence bounda
 | Expo Doctor | PASS | `npx expo-doctor --verbose` 20/20. |
 | Android JS export | PASS | `npx expo export --platform android`; 1,252 modules. Not device acceptance. |
 | Native Expo filesystem cold restart / real Android UI | NOT RUN | No Android emulator/device in active environment; Node SQLite-file recovery tests are not native platform evidence. |
-| GitHub CI | PENDING / NOT STARTED | Branch API head is `7b51402`, while `refs/pull/25/head` remains at `8eb3346`; no Actions run exists for the fix SHA. No CI PASS is claimed. |
+| GitHub CI | PASS | Actions run #34 (`42061990118`) passed for PR head `186aa8da8b3df03d239a89bd5d4581f7f70680f0`. |
 
 Independent R3 data-security review: **APPROVE; no P0/P1/P2**. Candidate and rollback have separate digest/count expectations. Recovery copy is retained until the copied live DB passes the same integrity, FK, canonical schema, protections, count and digest checks.

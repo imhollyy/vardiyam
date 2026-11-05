@@ -1,6 +1,6 @@
 # VDY-008A — Veritabanı Kurtarma Güvenliği Düzeltmesi
 
-**Durum:** IMPLEMENTED / R3 APPROVED / GITHUB CI PENDING — 2026-11-05
+**Durum:** IMPLEMENTED / R3 APPROVED / GITHUB CI PASS — 2026-11-05
 
 **Issue:** [#26](https://github.com/imhollyy/vardiyam/issues/26)
 
@@ -24,7 +24,7 @@
 
 - Gerçek Node SQLite dosyaları ve geçici dosya sistemiyle sentetik v6 DB recovery integration testleri eklendi: valid commit cleanup, corrupt live + valid rollback, missing/corrupt rollback fail-closed, wipe boş v6, cleanup kesintisi, rollback kopyasından sonra kesinti/tekrar açılış, corrupt marker.
 - `npm run typecheck`: PASS; `npm run lint`: PASS; `npm test`: PASS 248/248 (önceki 243 korunmuş, 5 test eklendi); Expo Doctor: PASS 20/20; Android JS export: PASS 1,252 modül; diff check: PASS.
-- PR #25 açıklaması VDY-008A düzeltme/test/reviewer kanıtıyla güncellendi. Branch API HEAD `7b5140264f9a7429074e34727d1bb3488d75536e`; ancak GitHub Pull API `refs/pull/25/head` hâlâ `8eb3346fceb4008ccc1f1644adf38510248acad1` gösteriyor ve yeni SHA için henüz Actions run yok. CI sonucu **PENDING / NOT STARTED**; PASS iddiası yok.
+- PR #25 açıklaması VDY-008A düzeltme/test/reviewer kanıtıyla güncellendi. Güncel PR HEAD `186aa8da8b3df03d239a89bd5d4581f7f70680f0`; GitHub Actions CI run #34 (`42061990118`) **PASS**.
 - Bağımsız R3 security reviewer: **APPROVE; P0/P1/P2 yok**. Uzman SQLite recovery incelemesi candidate/rollback hash ayrımı, rollback saklama ve idempotent recovery sırasını destekledi.
 - Gerçek Expo native dosya sistemi/cihaz cold-restart: NOT RUN; dosya tabanlı Node SQLite testleri cihaz kabulü olarak gösterilmiyor.
 
