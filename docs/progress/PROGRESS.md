@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-005A — Çalışma Zamanı Segmentasyon Motoru
-- **Durum:** VDY-005A local implementation, verification and R2 review PASS; stacked PR/CI pending on `feat/vdy-005a-work-segmentation`, based on PR #12 final head `f3d5bc571058120334d0355287bbcaafea31edc5`. PR #12 and all earlier PRs remain unmerged. Local user changes and `expo-env.d.ts` are preserved and unstaged.
+- **Durum:** VDY-005A READY_FOR_REVIEW; draft PR #14 open, CI PASS, R2 APPROVE. PR #14 head `42a0fe3d6ab38ba05d1f597b80d69521e5a3b766`, stacked on PR #12 at `f3d5bc571058120334d0355287bbcaafea31edc5`. PR #14 and all earlier PRs remain unmerged. Local user changes and `expo-env.d.ts` are preserved and unstaged.
 - **Aktif branch:** feat/vdy-005a-work-segmentation
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records complete; VDY-005A pure UTC/IANA segmentation in progress
@@ -16,13 +16,13 @@
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / unit test / Expo Doctor:** VDY-005A `npm run typecheck` PASS, `npm run lint` PASS, `npm test` PASS 114/114, `npx expo-doctor --verbose` PASS 20/20, `git diff --check` PASS. GitHub CI will be checked after PR push. R13 remains OPEN.
+- **Typecheck / lint / unit test / Expo Doctor:** VDY-005A `npm run typecheck` PASS, `npm run lint` PASS, `npm test` PASS 114/114, `npx expo-doctor --verbose` PASS 20/20, `git diff --check` PASS. GitHub CI run `42016969104` (run #17) PASS on PR #14 head. R08, R13 and Ethernet profile remain separate/open.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. Commit only VDY-005A code/tests/task/QA/progress files, push branch and open stacked draft PR against `feat/vdy-004-work-records`; verify GitHub CI. Do not merge or release.
+1. Await founder/reviewer decision on draft PR #14; separately authorize any merge. Next coding target: VDY-005B timed-break data model. Do not merge or release.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -39,6 +39,13 @@
 - **Independent reviewer:** actual R2 reviewer found P2 one-bucket aggregate break allocation; implementation now leaves all aggregate-only break minutes unallocated. Follow-up **APPROVE**, no remaining finding; focused tests 11/11 and full suite 114/114.
 - **Graphify/Context7:** local Graphify AST, `--no-cluster` (no LLM) produced 764 nodes/1380 edges from 75 source files; `work-segmentation.ts` imports only `addCalendarDays` from domain and its own test imports it. Generated output removed and not staged. Context7 `/mdn/content` confirms explicit IANA `timeZone` and `formatToParts` use. Playwright/UI Skills skipped because no browser/UI surface is in scope. One independent reviewer agent only; no task implementation delegation.
 - **NEXT ACTION:** Commit/push VDY-005A files only (leave existing `docs/tasks/VDY-004.md` and `expo-env.d.ts` unstaged), open draft PR against `feat/vdy-004-work-records`, verify CI. After PR review, the smallest safe coding next task is **VDY-005B: timed-break data model**. No merge/release.
+
+### 2026-11-05 — VDY-005A — DRAFT PR / CI PASS
+
+- **PR:** [#14](https://github.com/imhollyy/vardiyam/pull/14), open + draft + unmerged, mergeable; base `feat/vdy-004-work-records` at `f3d5bc571058120334d0355287bbcaafea31edc5`, head `feat/vdy-005a-work-segmentation` at `42a0fe3d6ab38ba05d1f597b80d69521e5a3b766`.
+- **Remote CI:** Actions run `42016969104` (#17), completed `success` on exact PR head.
+- **Final local state:** branch tracks origin with no task files pending; pre-existing `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain modified and unstaged, not in the VDY-005A commit. No PR merge or release.
+- **NEXT ACTION:** Founder/reviewer decision on PR #14; next coding target VDY-005B timed-break data model. R08/R13/Ethernet remain separate, and device acceptance was not run.
 
 ### 2026-11-05 — PR #12 REVIEW / VDY-005 PLAN
 
