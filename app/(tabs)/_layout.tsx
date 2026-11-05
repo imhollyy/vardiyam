@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
-import { Text, useColorScheme } from 'react-native';
+import { Text } from 'react-native';
 
-import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 const destinations = [
   { name: 'index', title: 'Bugün', glyph: '◷', label: 'Bugün sekmesi' },
@@ -11,8 +11,7 @@ const destinations = [
 ] as const;
 
 export default function TabLayout() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
 
   return (
     <Tabs

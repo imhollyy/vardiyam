@@ -304,3 +304,27 @@ Independent R3 data-security reviewer: **APPROVE; no P0/P1**. P2 evidence bounda
 | GitHub CI | PASS | Actions run #34 (`42061990118`) passed for PR head `186aa8da8b3df03d239a89bd5d4581f7f70680f0`. |
 
 Independent R3 data-security review: **APPROVE; no P0/P1/P2**. Candidate and rollback have separate digest/count expectations. Recovery copy is retained until the copied live DB passes the same integrity, FK, canonical schema, protections, count and digest checks.
+
+### VDY-010A — Ana ekran UI/UX (2026-11-05)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Light theme default and persistent local theme preference | PASS (repository) | `tests/data/migrations.test.mjs`; `app_metadata` preference uses the existing DB queue; default is light and dark/light values survive reads. |
+| SQLite v6→v7 migration preserves existing data | PASS | `tests/data/migrations.test.mjs`; seeded v6 theme and shift template remain after additive migration. |
+| Start session, persist, atomically finish into WorkRecord | PASS | `tests/data/workSessionRepository.test.mjs`; real in-memory SQLite via Node adapter. |
+| Planned session completes after cycle/template deletion | PASS | Real SQLite regression: saved planned time/name remain; deleted foreign IDs become null; active session clears only with WorkRecord completion. |
+| Daily status annotations remain separate from WorkRecord/earnings | PASS | Repository tests and source review; `LEAVE`/`SICK_REPORT`/`NOT_WORKED` stored separately and not consumed by earnings engine. |
+| Typecheck / lint / full unit suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` 256/256. |
+| Expo Doctor | PARTIAL (18/20) | Two remote checks could not complete because Expo/RN metadata endpoints returned DNS/service errors; other 18 local/package checks passed. |
+| Android JS export | PASS, reduced mode | `npx expo export --platform android --no-bytecode --output-dir .expo/vdy010a-home-export`; 1,255 modules. Normal Hermes bytecode step exited 6; cause unresolved. |
+| `git diff --check` | PASS | No whitespace errors; Git reports Windows LF→CRLF conversion notices. |
+| Android/iOS visual acceptance, screenshots, large text, TalkBack, theme reopen | NOT RUN | No device-level proof captured for this task. |
+| GitHub CI | NOT RUN | Branch is local/uncommitted; no task PR/CI run was created. |
+
+Independent R2 data-safety review: **APPROVE; no remaining P0/P1/P2**. The initial P1 stranded-session case was fixed and covered by SQLite integration test; the initial P2 date-validation note was fixed with exact Gregorian day bounds. Dashboard acceptance remains required for small screens, large text, TalkBack, day-panel navigation and persisted theme behavior.
+
+Independent UI/accessibility static review: **no remaining P0–P2 findings** after inline plan editing, truthful settings naming, platform-aware exit guidance and clearer icons. Device rendering and screen-reader behavior remain NOT RUN.
+
+VDY-010A kapanış güncellemesi: Android export bu turda bytecode açık biçimde PASS (1.255 modül; `.hbc` 3.3 MB); kök nedeni bilinmeyen önceki exit 6 tekrarlanmadı. Typecheck/lint PASS, test 256/256 PASS, Expo Doctor 20/20 PASS, diff check PASS. Önceki uzak metadata 18/20 sonucu artık tekrarlanmadı. Web önizleme SQLite web kurulumu yüzünden açılmadı; gerçek cihaz/screenshot NOT RUN. Beş panel kullanıcıya sunulan görsel gerçek ekran görüntüsü değil, açıkça etiketlenmiş MOCKUP'tır. UI statik reviewer onayı mevcut; TalkBack, büyük yazı ve native ekran kabulü NOT RUN. Draft PR CI yeni commit için bekliyor.
+
+Final UI/a11y review: bağımsız reviewer APPROVE; statik P0/P1/P2 yok. 44 dp dokunma alanları, takvim hitSlop, panel ekran okuyucu izolasyonu ve haftalık tam vardiya saat etiketleri düzeltildi. Gerçek TalkBack/VoiceOver, küçük ekran, büyük yazı, tema görüntüsü ve alt tab görünürlüğü NOT RUN.

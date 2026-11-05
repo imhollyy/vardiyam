@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -10,6 +10,7 @@ import { payrollPeriodForMonth } from '@/src/features/payments/period';
 import { isEarningsSettings } from '@/src/features/earnings/profile';
 import { getLocalToday, shiftYearMonth } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: 'BANK', label: 'Banka' }, { id: 'CASH', label: 'Elden' }, { id: 'OTHER', label: 'Diğer' },
@@ -26,8 +27,7 @@ export default function NetPaymentsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
   const params = useLocalSearchParams<{ periodMonth?: string }>();
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
   const [periodMonth, setPeriodMonth] = useState(params.periodMonth ?? getLocalToday('Europe/Istanbul').slice(0, 7));
   const [period, setPeriod] = useState<PayrollPeriod | null>(null);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);

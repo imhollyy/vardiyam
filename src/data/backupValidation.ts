@@ -17,6 +17,7 @@ const TABLES_BY_VERSION: Record<number, readonly string[]> = {
   4: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals'],
   5: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots'],
   6: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events'],
+  7: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses'],
 };
 
 const CRITICAL_V6_TRIGGERS = [
@@ -97,7 +98,7 @@ async function verifyRequiredSchema(
     );
     if (!found) throw new Error('Yedekte gerekli tablolar eksik.');
   }
-  if (version === CURRENT_SCHEMA_VERSION) {
+  if (version >= 6) {
     for (const trigger of CRITICAL_V6_TRIGGERS) {
       const found = await database.getFirstAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?;",

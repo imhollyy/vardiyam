@@ -9,7 +9,6 @@ import {
   Text,
   TextInput,
   View,
-  useColorScheme,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
@@ -39,6 +38,7 @@ import {
 import { getNominalShiftWindow } from '@/src/domain/shift-cycle';
 import { getLocalToday } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 type FormDraft = {
@@ -206,13 +206,13 @@ function OccurrenceChoices({ label, value, timezone, selected, onSelect, theme }
 export default function WorkRecordsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
-  const params = useLocalSearchParams<{ action?: string | string[]; cycleId?: string | string[]; localDate?: string | string[]; }>();
+  const params = useLocalSearchParams<{ action?: string | string[]; cycleId?: string | string[]; localDate?: string | string[]; recordId?: string | string[]; }>();
   const action = routeValue(params.action);
   const cycleIdParam = routeValue(params.cycleId);
   const localDateParam = routeValue(params.localDate);
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
-  const errorColor = scheme === 'dark' ? '#FFB4A8' : '#A12B20';
+  const recordIdParam = routeValue(params.recordId);
+  const { theme } = useAppTheme();
+  const errorColor = theme.danger;
 
   const [records, setRecords] = useState<WorkRecordWithTimedBreaks[]>([]);
   const [loading, setLoading] = useState(true);
@@ -349,9 +349,10 @@ export default function WorkRecordsScreen() {
     void loadHistory();
     if (routeInitialized.current) return;
     routeInitialized.current = true;
-    if (action === 'manual') openManualForm(localDateParam);
+    if (recordIdParam) void openEditForm(recordIdParam);
+    else if (action === 'manual') openManualForm(localDateParam);
     else if (action === 'planned' && cycleIdParam && localDateParam) void openPlannedForm(cycleIdParam, localDateParam);
-  }, [action, cycleIdParam, loadHistory, localDateParam, openManualForm, openPlannedForm, routeInitialized]));
+  }, [action, cycleIdParam, loadHistory, localDateParam, openEditForm, openManualForm, openPlannedForm, recordIdParam, routeInitialized]));
 
   const elapsedMinutes = useMemo(() => {
     try {

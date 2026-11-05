@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { appendEarningsProfileVersion, getLatestEarningsProfile } from '@/src/data/earningsRepository';
 import { createDefaultRules, createDefaultSettings, isEarningsSettings, type EarningsSettings } from '@/src/features/earnings/profile';
 import type { EarningsRule, GrossPayMode } from '@/src/domain/earnings';
-import { colors } from '@/src/theme/tokens';
+import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { getLocalDateTimeCandidates } from '@/src/domain/work-record';
 import { addCalendarDays, type LocalDate } from '@/src/domain/shift-cycle';
 import { getLocalToday } from '@/src/features/shifts/dates';
@@ -54,8 +54,7 @@ function parseRateBasisPoints(value: string): number | null {
 export default function EarningsSettingsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useAppTheme();
   const [settings, setSettings] = useState<EarningsSettings>(createDefaultSettings());
   const [rules, setRules] = useState<EarningsRule[]>(createDefaultRules());
   const [loading, setLoading] = useState(true);
