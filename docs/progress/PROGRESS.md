@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
-- **Durum:** VDY-001 DONE; VDY-002 DRAFT_PR_OPEN (#4; local + remote CI PASS; main merge/release yok)
+- **Durum:** VDY-001 DONE; VDY-002 DRAFT_PR_OPEN (#4; local + remote CI PASS; final Android/iOS device validation BLOCKED; main merge/release yok)
 - **Aktif branch:** `feat/vdy-002-expo-scaffold`
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. Draft PR #4'ün kurucu/reviewer incelemesini bekle; merge için ayrıca açık kurucu onayı gerekir.
+1. SDK 58 uyumlu Android cihaz/emülatör ortamında VDY-002 cihaz kabul kriterlerini çalıştır; sonra desteklenen iOS simülatör/cihaz yolunda doğrula ve kanıtları ekle. Merge/release yok.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -257,3 +257,14 @@ NEXT ACTION:
 - **Kod/scaffold:** Değişmedi; Expo scaffold başlatılmadı.
 - **Doğrulama:** `git diff --check -- PRODUCT_SPEC.md docs/DECISIONS.md docs/QA_TEST_MATRIX.md` temiz (PASS). Uygulama testleri/typecheck/lint SKIP; kod yok ve bu belge görevi için çalıştırılmadı.
 - **Review:** Bağımsız R2 reviewer, yalnız üç dosyanın diff'i ve talep kriterleriyle başlatıldı; sonuç bekleniyor.
+### 2026-11-05 — G1 / VDY-002 — FINAL DEVICE VALIDATION BLOCKED
+
+- **Görev/kapsam:** PR #4 için yalnız eksik cihaz kanıtları; yeni scaffold veya ürün değişikliği yapılmadı. Anayasa v1.1 §8/§10/§12, docs/RISKS.md R13 ve docs/QA_TEST_MATRIX.md D04–D07 esas alındı. vardiyam-task-flow, vardiyam-ui-quality, vardiyam-test-gate repo skills okundu/uygulandı.
+- **Branch/çalışma ağacı:** feat/vdy-002-expo-scaffold, HEAD 66d6066 (docs: record VDY-002 CI success); elevated read-only git status --short --branch → clean, origin/feat/vdy-002-expo-scaffold ile eşit. Ürün kodu ve branch değişmedi; yalnız bu progress kaydı eklendi.
+- **Android ortamı:** Node v24.20.0 / npm 11.19.0 PASS; node_modules mevcut. ANDROID_HOME ve ANDROID_SDK_ROOT unset; yaygın C:\Users\emrey\AppData\Local\Android\Sdk, C:\Android\Sdk ve Android Studio dizinleri yok; adb ve emulator PATH'te bulunmadı; bağlı cihaz/AVD listesi alınamadı. SDK 58 uyumlu Android test ortamı doğrulanamadı. Uygulama başlatılmadı.
+- **Cihaz kabul kriterleri:** SQLite migration'ın uygulama başlangıcında gerçek cihazda çalışması, Bugün/Takvim/Kazanç/Ayarlar tabları, tema, küçük ekran, tab geçişi, cold restart ve konsol/logcat hataları NOT RUN / BLOCKED. Ekran görüntüsü alınmadı; bundle export ve önceki unit testler cihaz kanıtı yerine sayılmadı. D04–D07 PASS değildir.
+- **iOS yolu:** Resmî Expo yönergesine göre iOS Simulator Xcode ile macOS üzerinde çalışır; Windows/Linux için fiziksel iOS cihazı veya Expo Simulators uzak simülatörü desteklenen yoldur. Bu oturumda gerçek iOS cihaz/simülatör erişimi olmadığından SDK 58 iOS smoke testi NOT RUN; D07'nin iOS kriteri ertelendi. Kaynak: https://docs.expo.dev/workflow/ios-simulator/ .
+- **Bağımsız review:** R2 reviewer sonucu BLOCKED_FOR_MISSING_RUNTIME_EVIDENCE; uygulama kabulü PASS olamaz. Reviewer cihaz kanıtı eksikliğini ve ertelenen kriterleri doğruladı; kod onayı vermedi.
+- **Risk:** R08 OPEN; R13 OPEN (npm audit orta seviye Expo CLI/fingerprint zinciri). Downgrade/override yok.
+- **Güvenlik:** Gerçek maaş verisi, secret, .env veya production erişimi kullanılmadı. Main merge/release yapılmadı.
+- **NEXT ACTION:** SDK 58 Android emulator/cihazı olan ortamda gerçek cihaz smoke testlerini ve ekran görüntülerini üret; ardından iOS destekli ortamda D07 iOS kriterini çalıştır.
