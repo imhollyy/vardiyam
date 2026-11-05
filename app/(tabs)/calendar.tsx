@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -36,6 +37,7 @@ import {
   formatLocalDate,
   formatMonthTitle,
   getLocalToday,
+  addLocalDays,
   localDateForMonthDay,
   monthForLocalDate,
   monthRange,
@@ -44,6 +46,11 @@ import {
 } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
+import { listWorkDayStatuses, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
+import { getRecordRangeDifferenceMinutes } from '@/src/domain/work-record';
+import { calendarMarker } from '@/src/features/shifts/presentation';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 type OverrideKind = PlanOverride['kind'];
@@ -103,38 +110,46 @@ function Cell({
   date,
   item,
   template,
+  record,
+  status,
   selected,
   isToday,
   theme,
   onPress,
 }: {
   date: string;
-  item: PlannedShift;
+  item?: PlannedShift;
   template?: ShiftTemplate;
+  record?: WorkRecordWithTimedBreaks;
+  status?: WorkDayStatusEntry;
   selected: boolean;
   isToday: boolean;
   theme: Theme;
   onPress: () => void;
 }) {
   const dayNumber = Number(date.slice(-2));
-  const shiftLabel = item.kind === 'SHIFT'
+  const shiftLabel = item?.kind === 'SHIFT'
     ? `${template?.name ?? 'Vardiya'} ${template?.startLocalTime ?? ''} ${template?.endLocalTime ?? ''}`.trim()
-    : item.kind === 'OFF' ? 'OFF, planlı boş gün' : 'İzin';
+    : status?.status === 'LEAVE' ? 'İzin' : status?.status === 'SICK_REPORT' ? 'Rapor' : status?.status === 'NOT_WORKED' ? 'Gidilmedi' : item?.kind === 'OFF' ? 'OFF, planlı boş gün' : item?.kind === 'LEAVE' ? 'İzin' : 'Plan yok';
+  const marker = calendarMarker({ planKind: item?.kind, startLocalTime: template?.startLocalTime, status: status?.status, completed: Boolean(record) });
+  const semanticColor = theme[marker.tone];
+  const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
   return (
     <Pressable
-      accessibilityLabel={`${formatLocalDate(date)}, ${shiftLabel}`}
+      accessibilityLabel={`${formatLocalDate(date)}, ${record ? 'Çalışma tamamlandı, ' : ''}${shiftLabel}${difference === null || difference === 0 ? '' : `, süre farkı ${difference > 0 ? 'artı ' : 'eksi '}${Math.abs(difference)} dakika`}`}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       hitSlop={{ left: 3, right: 3 }}
       onPress={onPress}
       style={({ pressed }) => [styles.dayCell, {
-        backgroundColor: selected ? theme.accentSurface : theme.surface,
+      backgroundColor: selected ? theme.accentSurface : record ? theme.successSurface : status?.status === 'NOT_WORKED' ? theme.dangerSurface : status?.status || item?.kind === 'LEAVE' ? theme.warningSurface : theme.surface,
         borderColor: selected ? theme.accent : isToday ? theme.muted : theme.border,
         opacity: pressed ? 0.72 : 1,
       }]}
     >
       <Text style={[styles.dayNumber, { color: theme.foreground }, isToday && { color: theme.accent, fontWeight: '900' }]}>{dayNumber}</Text>
-      <ShiftKindBadge compact kind={item.kind} template={template} />
+      <Ionicons accessible={false} name={marker.icon} size={16} color={semanticColor} />
+      {difference !== null && difference !== 0 ? <Text style={{ fontSize: 8, fontWeight: '900', color: difference > 0 ? theme.success : theme.danger }}>{difference > 0 ? '+' : '−'}{Math.round(Math.abs(difference) / 60 * 10) / 10}s</Text> : null}
     </Pressable>
   );
 }
@@ -151,6 +166,8 @@ export default function CalendarScreen() {
   const [cycle, setCycle] = useState<ShiftCycle | null>(null);
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const [days, setDays] = useState<PlannedShift[]>([]);
+  const [records, setRecords] = useState<WorkRecordWithTimedBreaks[]>([]);
+  const [statuses, setStatuses] = useState<WorkDayStatusEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,18 +196,23 @@ export default function CalendarScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [cycles, savedTemplates] = await Promise.all([
+      const [cycles, savedTemplates, savedRecords] = await Promise.all([
         listShiftCycles(database),
         listShiftTemplates(database),
+        listWorkRecordsWithTimedBreaks(database),
       ]);
       setTemplates(savedTemplates);
+      setRecords(savedRecords);
       const active = cycles[0] ?? null;
       setCycle(active);
+      const range = monthRange(month);
+      const endExclusive = addLocalDays(range.end, 1);
+      const savedStatuses = await listWorkDayStatuses(database, range.start, endExclusive);
+      setStatuses(savedStatuses);
       if (!active) {
         setDays([]);
         return;
       }
-      const range = monthRange(month);
       setDays(await getPlannedShiftsForRange(database, active.id, range.start, range.end));
     } catch {
       setError('Takvim bilgileri yüklenemedi. Tekrar deneyin.');
@@ -208,6 +230,19 @@ export default function CalendarScreen() {
     : undefined;
   const blankCells = useMemo(() => Array.from({ length: mondayFirstOffset(month) }, (_, index) => `blank-${index}`), [month]);
   const monthDays = useMemo(() => Array.from({ length: daysInMonth(month) }, (_, index) => index + 1), [month]);
+  const recordsByDate = useMemo(() => {
+    const grouped = new Map<string, WorkRecordWithTimedBreaks[]>();
+    for (const item of records) {
+      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: item.record.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(item.record.startedAtUtc));
+      const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
+      const date = `${get('year')}-${get('month')}-${get('day')}`;
+      if (date >= monthRange(month).start && date <= monthRange(month).end) grouped.set(date, [...(grouped.get(date) ?? []), item]);
+    }
+    return grouped;
+  }, [records, month]);
+  const statusesByDate = useMemo(() => new Map(statuses.map((item) => [item.localDate, item])), [statuses]);
+  const selectedRecords = recordsByDate.get(selectedDate) ?? [];
+  const selectedStatus = statusesByDate.get(selectedDate);
 
   const openOverrideEditor = async () => {
     if (!cycle) return;
@@ -299,8 +334,7 @@ export default function CalendarScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.eyebrow, { color: theme.accent }]}>PLANLANAN VARDİYALAR</Text>
-        <Text accessibilityRole="header" style={[styles.title, { color: theme.foreground }]}>Takvim</Text>
+        <PageHeading eyebrow="PLANLANAN VARDİYALAR" title="Takvim" subtitle="Plan, fiilî çalışma ve gün durumları" />
 
         <View style={styles.monthBar}>
           <Pressable accessibilityLabel="Önceki ay" accessibilityRole="button" hitSlop={8} onPress={() => switchMonth(-1)} style={[styles.monthArrow, { borderColor: theme.border, backgroundColor: theme.surface }]}>
@@ -322,7 +356,7 @@ export default function CalendarScreen() {
             <Text accessibilityRole="alert" style={[styles.body, { color: theme.foreground }]}>{error}</Text>
             <Button label="Tekrar dene" onPress={() => void load()} theme={theme} />
           </View>
-        ) : !cycle ? (
+        ) : !cycle && !records.length && !statuses.length ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.cardTitle, { color: theme.foreground }]}>Henüz vardiya düzeni yok</Text>
             <Text style={[styles.body, { color: theme.muted }]}>Takvimini görmek için önce vardiya şablonlarını ve döngünü oluştur.</Text>
@@ -344,14 +378,18 @@ export default function CalendarScreen() {
                 {monthDays.map((dayNumber) => {
                   const date = localDateForMonthDay(month, dayNumber);
                   const item = daysByDate.get(date);
-                  if (!item) return <View key={date} style={styles.blankCell} />;
-                  const template = item.kind === 'SHIFT' ? templates.find((candidate) => candidate.id === item.templateId) : undefined;
+                  const record = recordsByDate.get(date)?.[0];
+                  const status = statusesByDate.get(date);
+                  if (!item && !record && !status) return <View key={date} style={styles.blankCell} />;
+                  const template = item?.kind === 'SHIFT' ? templates.find((candidate) => candidate.id === item.templateId) : undefined;
                   return (
                     <Cell
                       key={date}
                       date={date}
                       item={item}
                       template={template}
+                      record={record}
+                      status={status}
                       selected={selectedDate === date}
                       isToday={today === date}
                       theme={theme}
@@ -379,7 +417,9 @@ export default function CalendarScreen() {
                   {selectedPlan.source === 'OVERRIDE' ? <Text style={[styles.overrideHint, { color: theme.accent }]}>Tek günlük istisna · diğer döngü günleri değişmez</Text> : null}
                 </>
               ) : null}
-              <Button label={selectedPlan?.source === 'OVERRIDE' ? 'Gün istisnasını düzenle' : 'Bu günü değiştir'} onPress={() => void openOverrideEditor()} theme={theme} />
+              {selectedRecords.length ? <View style={[styles.actualRecords, { borderTopColor: theme.border }]}><Text style={[styles.fieldLabel, { color: theme.success }]}>Fiilî çalışma</Text>{selectedRecords.map((entry) => <Pressable key={entry.record.id} accessibilityRole="button" accessibilityLabel="Çalışma kaydını düzenle" onPress={() => router.push({ pathname: '/work-records', params: { recordId: entry.record.id } })} style={styles.actualRecord}><Ionicons name="checkmark-circle" size={17} color={theme.success} /><Text style={[styles.body, { color: theme.foreground }]}>{new Intl.DateTimeFormat('tr-TR', { timeZone: entry.record.timezone, hour: '2-digit', minute: '2-digit' }).format(new Date(entry.record.startedAtUtc))}–{new Intl.DateTimeFormat('tr-TR', { timeZone: entry.record.timezone, hour: '2-digit', minute: '2-digit' }).format(new Date(entry.record.endedAtUtc))} · {entry.record.breakMinutes} dk mola</Text><Ionicons name="chevron-forward" size={16} color={theme.muted} /></Pressable>)}</View> : null}
+              {selectedStatus ? <Text style={[styles.overrideHint, { color: theme.warning }]}>{selectedStatus.status === 'LEAVE' ? 'İzin' : selectedStatus.status === 'SICK_REPORT' ? 'Rapor' : 'Gidilmedi'}{selectedStatus.note ? ` · ${selectedStatus.note}` : ''}</Text> : null}
+              {cycle ? <Button label={selectedPlan?.source === 'OVERRIDE' ? 'Gün istisnasını düzenle' : 'Bu günü değiştir'} onPress={() => void openOverrideEditor()} theme={theme} /> : null}
               {selectedPlan?.kind === 'SHIFT' && cycle ? (
                 <Button
                   label="Planlı vardiyadan kayıt ekle"
@@ -483,5 +523,7 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   fieldLabel: { fontSize: 13, fontWeight: '700' },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 16 },
+  actualRecords: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 8 },
+  actualRecord: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
   flex: { flex: 1 },
 });

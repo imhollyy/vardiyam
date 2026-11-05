@@ -5,11 +5,16 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "vardiyam",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
-    "plugins": ["expo-router", "expo-sqlite"],
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ],
     "experiments": {
       "typedRoutes": true
     }

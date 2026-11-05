@@ -11,6 +11,7 @@ import { isEarningsSettings } from '@/src/features/earnings/profile';
 import { getLocalToday, shiftYearMonth } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 
 const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: 'BANK', label: 'Banka' }, { id: 'CASH', label: 'Elden' }, { id: 'OTHER', label: 'Diğer' },
@@ -122,7 +123,7 @@ export default function NetPaymentsScreen() {
   if (loading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator color={theme.accent} /><Text style={{ color: theme.muted }}>Net ödeme kayıtları yükleniyor</Text></View>;
   return <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={{ color: theme.accent, fontWeight: '700' }}>‹ Kazanç ekranına dön</Text></Pressable>
-    <Text style={[styles.title, { color: theme.foreground }]}>Net ödeme takibi</Text>
+    <PageHeading eyebrow="BORDRO VE ÖDEMELER" title="Net ödeme takibi" subtitle="Bordro neti ve gerçekten alınan ödeme ayrı kaydedilir." />
     {error ? <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.body, { color: theme.foreground }]}>{error}</Text><Pressable onPress={() => void reload()}><Text style={{ color: theme.accent }}>Yeniden dene</Text></Pressable></View> : null}
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
       <Text style={[styles.heading, { color: theme.foreground }]}>Bordro dönemi</Text>

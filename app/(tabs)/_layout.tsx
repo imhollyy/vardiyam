@@ -1,13 +1,14 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 const destinations = [
-  { name: 'index', title: 'Bugün', glyph: '◷', label: 'Bugün sekmesi' },
-  { name: 'calendar', title: 'Takvim', glyph: '▦', label: 'Takvim sekmesi' },
-  { name: 'earnings', title: 'Kazanç', glyph: '₺', label: 'Kazanç sekmesi' },
-  { name: 'settings', title: 'Ayarlar', glyph: '⚙', label: 'Ayarlar sekmesi' },
+  { name: 'index', title: 'Bugün', glyph: 'home-outline', label: 'Bugün sekmesi' },
+  { name: 'calendar', title: 'Takvim', glyph: 'calendar-outline', label: 'Takvim sekmesi' },
+  { name: 'earnings', title: 'Kazanç', glyph: 'wallet-outline', label: 'Kazanç sekmesi' },
+  { name: 'reports', title: 'Raporlar', glyph: 'stats-chart-outline', label: 'Raporlar sekmesi' },
+  { name: 'settings', title: 'Ayarlar', glyph: 'settings-outline', label: 'Ayarlar sekmesi' },
 ] as const;
 
 export default function TabLayout() {
@@ -27,6 +28,8 @@ export default function TabLayout() {
           paddingBottom: 6,
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarIconStyle: { marginTop: 1 },
       }}
     >
       {destinations.map(({ name, title, glyph, label }) => (
@@ -36,11 +39,7 @@ export default function TabLayout() {
           options={{
             title,
             tabBarAccessibilityLabel: label,
-            tabBarIcon: ({ color, size }) => (
-              <Text accessible={false} style={{ color, fontSize: size }}>
-                {glyph}
-              </Text>
-            ),
+            tabBarIcon: ({ color, size }) => <Ionicons accessible={false} name={glyph as React.ComponentProps<typeof Ionicons>['name']} size={size} color={String(color)} />,
           }}
         />
       ))}

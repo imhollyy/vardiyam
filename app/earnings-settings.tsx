@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -10,6 +11,7 @@ import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { getLocalDateTimeCandidates } from '@/src/domain/work-record';
 import { addCalendarDays, type LocalDate } from '@/src/domain/shift-cycle';
 import { getLocalToday } from '@/src/features/shifts/dates';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 
 const MODES: { id: GrossPayMode; label: string }[] = [
   { id: 'MONTHLY_GROSS', label: 'Aylık brüt' }, { id: 'HOURLY_GROSS', label: 'Saatlik brüt' },
@@ -214,11 +216,11 @@ export default function EarningsSettingsScreen() {
     <View style={[styles.fieldRow, { borderColor: theme.border }]}><View style={styles.flex}><Text style={[styles.label, { color: theme.muted }]}>{label}</Text><TextInput accessibilityLabel={label} keyboardType={keyboardType} value={value} onChangeText={onChangeText} style={[styles.input, { color: theme.foreground }]} /></View>{suffix ? <Text style={{ color: theme.muted }}>{suffix}</Text> : null}</View>
   );
   const toggle = (label: string, value: boolean, onPress: () => void) => (
-    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={onPress} style={[styles.toggle, { borderColor: theme.border }]}><Text style={{ color: value ? theme.accent : theme.muted, fontWeight: '700' }}>{value ? '✓' : '○'}</Text><Text style={[styles.body, { color: theme.foreground }]}>{label}</Text></Pressable>
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={onPress} style={[styles.toggle, { borderColor: theme.border }]}><Ionicons name={value ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={value ? theme.accent : theme.muted} /><Text style={[styles.body, { color: theme.foreground }]}>{label}</Text></Pressable>
   );
   return <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.container}>
     <Pressable accessibilityRole="button" accessibilityLabel="Kazanç ekranına dön" onPress={() => router.back()}><Text style={[styles.back, { color: theme.accent }]}>‹  Kazanç</Text></Pressable>
-    <Text style={[styles.title, { color: theme.foreground }]}>Ücret ve işyeri kuralları</Text>
+    <PageHeading eyebrow="İŞYERİ VE ÜCRET" title="Kazanç ayarları" subtitle="Bu ayarlar sürümlenir; işyeri başlangıç değerleri yasal hak iddiası değildir." />
     <Text style={[styles.body, { color: theme.muted }]}>Ayar değişikliği yeni bir sürüm oluşturur. Önceki onaylı hesaplar sabit kalır. Bu değerler işyeri tahminidir; kesin yasal hakediş değildir.</Text>
     {loadError ? <View style={[styles.dateList, { borderColor: theme.border }]}><Text style={[styles.body, { color: theme.foreground }]}>{loadError}</Text><Pressable onPress={() => router.replace('/earnings-settings' as never)}><Text style={{ color: theme.accent, fontWeight: '700' }}>Yeniden yükle</Text></Pressable></View> : null}
     <Text style={[styles.section, { color: theme.foreground }]}>Ücret tercihi</Text>

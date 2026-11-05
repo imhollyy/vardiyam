@@ -33,6 +33,8 @@ import {
 } from '@/src/features/shifts/schedule';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { saveOnboardingState } from '@/src/data/appPreferencesRepository';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 
 const PATTERNS: { id: ShiftPattern; title: string; hint: string }[] = [
   { id: 'fixed', title: 'Sabit', hint: 'Her gün seçilen vardiya' },
@@ -384,14 +386,21 @@ export default function SettingsScreen() {
       contentContainerStyle={[styles.screen, { backgroundColor: theme.background }]}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={[styles.eyebrow, { color: theme.accent }]}>TERCİHLER</Text>
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.foreground }]}>Vardiya düzenin</Text>
-      <Text style={[styles.intro, { color: theme.muted }]}>Planın cihazında saklanır. Kaydetmeden önce örneğini kontrol edebilirsin.</Text>
+      <PageHeading eyebrow="TERCİHLER" title="Ayarlar" subtitle="Vardiya düzenin cihazında saklanır. Kaydetmeden önce örneğini kontrol edebilirsin." />
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Veri güvenliği</Text>
         <Text style={[styles.body, { color: theme.muted }]}>Şifreli yedeklerini dışa aktar, eski yedeğini geri yükle veya cihazındaki verileri kaldır.</Text>
         <Action label="Yedekleme ve veri silme" onPress={() => router.push('/backup' as never)} theme={theme} />
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.foreground }]}>İlk kurulum</Text>
+        <Text style={[styles.body, { color: theme.muted }]}>Vardiya, işyeri ve isteğe bağlı ücret adımlarını daha sonra yeniden gözden geçirebilirsin.</Text>
+        <Action label="Kurulum adımlarını yeniden aç" onPress={() => {
+          void saveOnboardingState(database, { step: 0, completed: false }).then(() => router.push('/onboarding' as never))
+            .catch(() => Alert.alert('Kurulum açılamadı', 'Yerel ayarlar korunuyor. Biraz sonra yeniden deneyin.'));
+        }} theme={theme} />
       </View>
 
       {loading ? (

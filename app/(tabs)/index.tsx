@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { deleteWorkDayStatus, getActiveWorkSession, listWorkDayStatuses, saveWorkDayStatus, startActiveWorkSession, type WorkDayStatus, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
@@ -12,6 +14,7 @@ import { getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTe
 import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalToday, localDateForMonthDay, monthForLocalDate, monthRange, mondayFirstOffset, mondayFirstWeekdayOffset, shiftYearMonth } from '@/src/features/shifts/dates';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { colors } from '@/src/theme/tokens';
+import { calendarMarker } from '@/src/features/shifts/presentation';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 const ZONE = 'Europe/Istanbul';
@@ -32,6 +35,17 @@ function currentDateTime(date: Date, timezone: string): string {
 
 function shortDate(date: string): string {
   return formatLocalDate(date, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function dateForTime(value: string): Date {
+  const [hour = '0', minute = '0'] = value.split(':');
+  const date = new Date();
+  date.setHours(Number(hour), Number(minute), 0, 0);
+  return date;
+}
+
+function timeFromDate(value: Date): string {
+  return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
 }
 
 function localRecordDate(item: WorkRecordWithTimedBreaks): string {
@@ -61,12 +75,12 @@ function durationShort(minutes: number): string {
 }
 
 function ActionButton({ label, icon, color, disabled, onPress, theme, accessibilityLabel }: {
-  label: string; icon: string; color: string; disabled: boolean; onPress: () => void; theme: Theme; accessibilityLabel: string;
+  label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; disabled: boolean; onPress: () => void; theme: Theme; accessibilityLabel: string;
 }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled}
       onPress={onPress} style={({ pressed }) => [styles.actionCard, { backgroundColor: disabled ? theme.surface : color, borderColor: disabled ? theme.border : color, opacity: pressed ? 0.82 : 1 }]}>
-      <Text accessible={false} style={[styles.actionIcon, { color: disabled ? theme.muted : '#FFFFFF' }]}>{icon}</Text>
+      <Ionicons accessible={false} name={icon} size={20} color={disabled ? theme.muted : '#FFFFFF'} />
       <Text style={[styles.actionLabel, { color: disabled ? theme.muted : '#FFFFFF' }]}>{label}</Text>
     </Pressable>
   );
@@ -77,17 +91,17 @@ function MiniCell({ date, plan, template, status, record, selected, onPress, the
   selected: boolean; onPress: () => void; theme: Theme;
 }) {
   const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
-  const markerColor = record ? theme.success : status === 'NOT_WORKED' ? theme.danger : status || plan?.kind === 'LEAVE' ? theme.warning : theme.muted;
-  const marker = record ? '✓' : status === 'NOT_WORKED' ? '−' : status === 'SICK_REPORT' ? 'R' : status === 'LEAVE' || plan?.kind === 'LEAVE' ? 'İ' : plan?.kind === 'SHIFT' ? template?.code?.slice(0, 1) ?? 'V' : plan?.kind === 'OFF' ? 'O' : '';
+  const markerPresentation = calendarMarker({ planKind: plan?.kind, startLocalTime: template?.startLocalTime, status, completed: Boolean(record) });
+  const markerColor = theme[markerPresentation.tone];
   const spokenStatus = record ? 'Çalışma tamamlandı' : status ? STATUS_LABELS[status] : plan?.kind === 'OFF' ? 'OFF' : plan?.kind === 'LEAVE' ? 'İzin planı' : plan?.kind === 'SHIFT' ? `${template?.name ?? 'Vardiya'} ${template?.startLocalTime ?? ''} ${template?.endLocalTime ?? ''}` : 'Plan yok';
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${formatLocalDate(date)}, ${spokenStatus}${difference === null ? '' : `, süre farkı ${difference > 0 ? '+' : ''}${durationLabel(Math.abs(difference))}`}`}
+    <Pressable accessibilityRole="button" accessibilityLabel={`${formatLocalDate(date)}, ${spokenStatus}${difference === null ? '' : `, süre farkı ${difference > 0 ? '+' : difference < 0 ? 'eksi ' : ''}${durationLabel(Math.abs(difference))}`}`}
       accessibilityState={{ selected }} hitSlop={{ top: 2, bottom: 2, left: 3, right: 3 }} onPress={onPress} style={({ pressed }) => [styles.dayCell, {
       backgroundColor: record ? theme.successSurface : status === 'NOT_WORKED' ? theme.dangerSurface : status || plan?.kind === 'LEAVE' ? theme.warningSurface : theme.surface,
         borderColor: selected ? theme.accent : theme.border, opacity: pressed ? 0.75 : 1,
       }]}>
       <Text style={[styles.dayNumber, { color: theme.foreground }]}>{Number(date.slice(-2))}</Text>
-      {marker ? <Text accessible={false} style={[styles.dayMarker, { color: markerColor }]}>{marker}</Text> : <View style={styles.markerSpacer} />}
+      {markerPresentation.icon !== 'remove-outline' ? <Ionicons accessible={false} name={markerPresentation.icon} size={15} color={markerColor} /> : <View style={styles.markerSpacer} />}
       {difference !== null && difference !== 0 ? <Text accessible={false} style={[styles.delta, { color: difference > 0 ? theme.success : theme.danger }]}>{difference > 0 ? '+' : '−'}{durationShort(Math.abs(difference))}</Text> : null}
     </Pressable>
   );
@@ -111,6 +125,8 @@ export default function TodayScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [startTime, setStartTime] = useState(() => localClock(new Date(), ZONE));
   const [endTime, setEndTime] = useState(() => localClock(new Date(), ZONE));
+  const [startTimeEdited, setStartTimeEdited] = useState(false);
+  const [endTimeEdited, setEndTimeEdited] = useState(false);
   const [endOccurrence, setEndOccurrence] = useState<'earlier' | 'later' | undefined>();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [sheetStatus, setSheetStatus] = useState<WorkDayStatus | null>(null);
@@ -118,6 +134,8 @@ export default function TodayScreen() {
   const [sheetPlanKind, setSheetPlanKind] = useState<'SHIFT' | 'OFF' | 'LEAVE'>('SHIFT');
   const [sheetTemplateId, setSheetTemplateId] = useState('');
   const [menu, setMenu] = useState<'profile' | 'notifications' | null>(null);
+  const [editingTime, setEditingTime] = useState<'start' | 'end' | null>(null);
+  const [draftTime, setDraftTime] = useState(() => dateForTime(localClock(new Date(), ZONE)));
   const refreshRef = useRef<(() => Promise<void>) | null>(null);
 
   const viewTimezone = active?.timezone ?? cycle?.timezone ?? ZONE;
@@ -152,6 +170,7 @@ export default function TodayScreen() {
         if (currentSession) {
           setStartTime(utcToLocalDateTime(currentSession.startedAtUtc, currentSession.timezone).slice(11));
           setEndTime(localClock(new Date(), currentSession.timezone));
+          setEndTimeEdited(false);
         }
         setStatuses(new Map(savedStatuses.map((item) => [item.localDate, item])));
         setPlans(projectedPlans);
@@ -167,6 +186,8 @@ export default function TodayScreen() {
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, []);
+  const visibleStartTime = !active && !startTimeEdited ? localClock(now, cycle?.timezone ?? ZONE) : startTime;
+  const visibleEndTime = active && !endTimeEdited ? localClock(now, active.timezone) : endTime;
 
   const plansByDate = useMemo(() => new Map(plans.map((item) => [item.localDate, item])), [plans]);
   const recordsByDate = useMemo(() => {
@@ -198,8 +219,8 @@ export default function TodayScreen() {
     const current = currentDateTime(now, active.timezone);
     let candidateDate = current.slice(0, 10);
     const startTimeLocal = activeStartLocal?.slice(11) ?? '00:00';
-    if (candidateDate === active.startedLocalDate && endTime <= startTimeLocal) candidateDate = addLocalDays(candidateDate, 1);
-    const local = `${candidateDate}T${endTime}`;
+    if (candidateDate === active.startedLocalDate && visibleEndTime <= startTimeLocal) candidateDate = addLocalDays(candidateDate, 1);
+    const local = `${candidateDate}T${visibleEndTime}`;
     try { return { local, candidates: getLocalDateTimeCandidates(local, active.timezone) }; }
     catch { return { local, candidates: [] as string[] }; }
   })() : null;
@@ -208,7 +229,7 @@ export default function TodayScreen() {
     setError(null); setNotice(null); setSaving(true);
     try {
       const timezone = cycle?.timezone ?? ZONE;
-      const localDateTime = `${today}T${startTime}`;
+      const localDateTime = `${today}T${visibleStartTime}`;
       const startedAtUtc = localDateTimeToUtc(localDateTime, timezone);
       let planned: PlannedWorkSnapshot | null = null;
       if (todayPlan?.kind === 'SHIFT' && todayTemplate && cycle) {
@@ -243,6 +264,7 @@ export default function TodayScreen() {
         timezone: active.timezone, breakMinutes: 0, note: null, planned: active.planned,
       };
       await completeActiveWorkSessionWithRecord(database, workRecord);
+      setStartTime(localClock(new Date(), active.timezone)); setStartTimeEdited(false); setEndTimeEdited(false);
       setEndOccurrence(undefined); setNotice('Mesai tamamlandı ve çalışma geçmişine kaydedildi.');
       await refreshRef.current?.();
     } catch (cause) {
@@ -310,6 +332,24 @@ export default function TodayScreen() {
   };
 
   const statusForDate = (date: string) => recordsByDate.has(date) ? undefined : statuses.get(date)?.status;
+  const openTimePicker = (field: 'start' | 'end') => {
+    if ((field === 'start' && (Boolean(active) || saving)) || (field === 'end' && (!active || saving))) return;
+    const selected = dateForTime(field === 'start' ? visibleStartTime : visibleEndTime);
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: selected, mode: 'time', is24Hour: true, timeZoneName: ZONE, display: 'clock',
+        onValueChange: (_event, picked) => {
+          if (!picked) return;
+          if (field === 'start') { setStartTime(timeFromDate(picked)); setStartTimeEdited(true); }
+          else { setEndTime(timeFromDate(picked)); setEndTimeEdited(true); setEndOccurrence(undefined); }
+        },
+        onError: () => setError('Saat seçici açılamadı. Daha sonra yeniden deneyin.'),
+      });
+    } else {
+      setDraftTime(selected);
+      setEditingTime(field);
+    }
+  };
   const todayPlanLabel = todayPlan?.kind === 'SHIFT' && todayTemplate ? `${todayTemplate.name} · ${todayTemplate.startLocalTime}–${todayTemplate.endLocalTime}`
     : todayPlan?.kind === 'OFF' ? 'OFF · planlı boş gün' : todayPlan?.kind === 'LEAVE' ? 'İzin' : 'Bu gün için plan yok';
 
@@ -323,13 +363,13 @@ export default function TodayScreen() {
           </View>
           <View style={styles.topActions}>
             <Pressable accessibilityRole="button" accessibilityLabel="Bildirimler" onPress={() => setMenu(menu === 'notifications' ? null : 'notifications')} style={[styles.iconButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text accessible={false} style={[styles.iconText, { color: theme.foreground }]}>🔔</Text>
+              <Ionicons accessible={false} name="notifications-outline" size={19} color={theme.foreground} />
             </Pressable>
             <Pressable accessibilityRole="switch" accessibilityLabel="Koyu tema" accessibilityState={{ checked: mode === 'dark' }} onPress={() => void toggleMode().catch(() => setError('Tema tercihi kaydedilemedi. Yeniden deneyebilirsin.'))} style={[styles.iconButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text accessible={false} style={[styles.iconText, { color: theme.accent }]}>{mode === 'dark' ? '☾' : '☼'}</Text>
+              <Ionicons accessible={false} name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={20} color={theme.accent} />
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Profil menüsü" onPress={() => setMenu(menu === 'profile' ? null : 'profile')} style={[styles.avatarButton, { backgroundColor: theme.accentSurface, borderColor: theme.border }]}>
-              <Text accessible={false} style={[styles.avatarText, { color: theme.accent }]}>👤</Text>
+              <Ionicons accessible={false} name="person-outline" size={19} color={theme.accent} />
             </Pressable>
           </View>
         </View>
@@ -341,14 +381,16 @@ export default function TodayScreen() {
               <Text accessibilityRole="header" style={styles.weekTitle}>Vardiya planın</Text>
               <Text style={styles.weekRange}>{shortDate(weekStart)} – {shortDate(addLocalDays(weekEnd, -1))}</Text>
             </View>
-            <Text accessible={false} style={styles.weekIcon}>◷</Text>
+            <Ionicons accessible={false} name="calendar-clear-outline" size={30} color="#C7D5FF" />
           </View>
           <View style={styles.weekStrip}>
             {weeklyPlans.map(({ date, plan, template }, index) => {
               const isShift = plan?.kind === 'SHIFT';
+              const hour = template ? Number(template.startLocalTime.slice(0, 2)) : 8;
+              const shiftName = isShift ? hour >= 15 && hour < 19 ? 'partly-sunny-outline' : hour >= 19 || hour < 6 ? 'moon-outline' : 'sunny-outline' : plan?.kind === 'LEAVE' || plan?.kind === 'OFF' ? 'bed-outline' : 'remove-outline';
               return <View key={date} accessible accessibilityLabel={`${formatLocalDate(date, { weekday: 'long' })}, ${isShift && template ? `${template.name}, ${template.startLocalTime}–${template.endLocalTime}` : plan?.kind === 'LEAVE' ? 'izin' : plan?.kind === 'OFF' ? 'OFF, planlı boş gün' : 'plan yok'}`} style={[styles.weekDay, date === today && styles.weekDayToday]}>
                 <Text style={[styles.weekDayName, date === today && styles.weekDayTodayText]}>{WEEKDAYS[index]}</Text>
-                <Text style={[styles.weekDayCode, date === today && styles.weekDayTodayText]}>{isShift ? template?.code ?? 'V' : plan?.kind === 'LEAVE' ? 'İ' : plan?.kind === 'OFF' ? '·' : '—'}</Text>
+                <Ionicons accessible={false} name={shiftName as React.ComponentProps<typeof Ionicons>['name']} size={15} color={date === today ? '#233A72' : '#FFFFFF'} />
               </View>;
             })}
           </View>
@@ -369,13 +411,13 @@ export default function TodayScreen() {
           <View style={styles.actionsRow}>
             <View style={[styles.actionColumn, styles.flex]}>
               <Text style={[styles.timeLabel, { color: theme.muted }]}>Başlangıç</Text>
-              <TextInput accessibilityLabel="Mesai başlangıç saati" editable={!active && !saving} value={startTime} onChangeText={setStartTime} placeholder="09:00" keyboardType="numbers-and-punctuation" maxLength={5} style={[styles.timeInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
-              <ActionButton accessibilityLabel={active ? 'Mesai zaten başladı' : 'Mesaiye başla'} label="Mesaiye Başla" icon="▶" color={theme.success} disabled={Boolean(active) || saving} onPress={() => void startShift()} theme={theme} />
+              <Pressable accessibilityRole="button" accessibilityLabel={`Başlangıç saatini seç, ${visibleStartTime}`} accessibilityState={{ disabled: Boolean(active) || saving }} disabled={Boolean(active) || saving} onPress={() => openTimePicker('start')} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: theme.border }]}><Ionicons name="time-outline" size={17} color={theme.accent} /><Text style={{ color: theme.foreground, fontSize: 16, fontWeight: '800' }}>{visibleStartTime}</Text><Ionicons name="chevron-down" size={15} color={theme.muted} /></Pressable>
+              <ActionButton accessibilityLabel={active ? 'Mesai zaten başladı' : 'Mesaiye başla'} label="Mesaiye Başla" icon="play-circle-outline" color={theme.success} disabled={Boolean(active) || saving} onPress={() => void startShift()} theme={theme} />
             </View>
             <View style={[styles.actionColumn, styles.flex]}>
               <Text style={[styles.timeLabel, { color: theme.muted }]}>Bitiş</Text>
-              <TextInput accessibilityLabel="Mesai bitiş saati" editable={Boolean(active) && !saving} value={endTime} onChangeText={(value) => { setEndTime(value); setEndOccurrence(undefined); }} placeholder="17:00" keyboardType="numbers-and-punctuation" maxLength={5} style={[styles.timeInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
-              <ActionButton accessibilityLabel={active ? 'Mesaiyi bitir' : 'Mesai başlamadan bitirme kapalı'} label="Mesaiyi Bitir" icon="■" color={theme.danger} disabled={!active || saving} onPress={() => void finishShift()} theme={theme} />
+              <Pressable accessibilityRole="button" accessibilityLabel={`Bitiş saatini seç, ${visibleEndTime}`} accessibilityState={{ disabled: !active || saving }} disabled={!active || saving} onPress={() => openTimePicker('end')} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: theme.border }]}><Ionicons name="time-outline" size={17} color={theme.accent} /><Text style={{ color: theme.foreground, fontSize: 16, fontWeight: '800' }}>{visibleEndTime}</Text><Ionicons name="chevron-down" size={15} color={theme.muted} /></Pressable>
+              <ActionButton accessibilityLabel={active ? 'Mesaiyi bitir' : 'Mesai başlamadan bitirme kapalı'} label="Mesaiyi Bitir" icon="stop-circle-outline" color={theme.danger} disabled={!active || saving} onPress={() => void finishShift()} theme={theme} />
             </View>
           </View>
           {active && activeStartLocal ? <Text style={[styles.clockCaption, { color: theme.muted }]}>Başlangıç kaydı {shortDate(active.startedLocalDate)} · {activeStartLocal.slice(11)} · {active.timezone}</Text> : null}
@@ -477,7 +519,7 @@ export default function TodayScreen() {
             {(['LEAVE', 'SICK_REPORT', 'NOT_WORKED'] as const).map((status) => <Pressable key={status} accessibilityRole="button" accessibilityState={{ selected: sheetStatus === status }} onPress={() => setSheetStatus(sheetStatus === status ? null : status)} style={[styles.choice, { backgroundColor: sheetStatus === status ? (status === 'NOT_WORKED' ? theme.dangerSurface : theme.warningSurface) : theme.surface, borderColor: sheetStatus === status ? (status === 'NOT_WORKED' ? theme.danger : theme.warning) : theme.border }]}>
               <Text style={{ color: theme.foreground, fontWeight: '700' }}>{STATUS_LABELS[status]}</Text>
             </Pressable>)}
-            {selectedRecords.length ? <View style={[styles.choice, { backgroundColor: theme.successSurface, borderColor: theme.success }]}><Text style={{ color: theme.success, fontWeight: '800' }}>✓ Çalışıldı</Text></View> : null}
+            {selectedRecords.length ? <View style={[styles.choice, { backgroundColor: theme.successSurface, borderColor: theme.success, flexDirection: 'row', alignItems: 'center', gap: 5 }]}><Ionicons name="checkmark-circle" size={16} color={theme.success} /><Text style={{ color: theme.success, fontWeight: '800' }}>Çalışıldı</Text></View> : null}
           </View>
           <TextInput accessibilityLabel="Gün notu" value={sheetNote} onChangeText={setSheetNote} maxLength={2000} placeholder="Kısa not (isteğe bağlı)" placeholderTextColor={theme.muted} style={[styles.noteInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
           <View style={styles.sheetActions}>
@@ -504,6 +546,13 @@ export default function TodayScreen() {
           </>}
         </View>
       </View> : null}
+      {Platform.OS === 'ios' ? <Modal visible={editingTime !== null} transparent animationType="slide" onRequestClose={() => setEditingTime(null)}>
+        <View style={styles.pickerBackdrop}><Pressable accessibilityRole="button" accessibilityLabel="Saat seçiciyi kapat" onPress={() => setEditingTime(null)} style={styles.pickerScrim} /><View style={[styles.pickerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.sheetHeader}><Text accessibilityRole="header" style={[styles.cardTitle, { color: theme.foreground }]}>{editingTime === 'start' ? 'Başlangıç saati' : 'Bitiş saati'}</Text><Pressable accessibilityRole="button" onPress={() => setEditingTime(null)}><Text style={{ color: theme.accent, fontWeight: '800', padding: 10 }}>Kapat</Text></Pressable></View>
+          <DateTimePicker value={draftTime} mode="time" display="spinner" locale="tr-TR" timeZoneName={ZONE} themeVariant={mode} onChange={(_event, picked) => { if (picked) setDraftTime(picked); }} />
+          <Pressable accessibilityRole="button" style={[styles.pickerConfirm, { backgroundColor: theme.accent }]} onPress={() => { if (editingTime === 'start') { setStartTime(timeFromDate(draftTime)); setStartTimeEdited(true); } else { setEndTime(timeFromDate(draftTime)); setEndTimeEdited(true); setEndOccurrence(undefined); } setEditingTime(null); }}><Text style={styles.whiteText}>Saati seç</Text></Pressable>
+        </View></View>
+      </Modal> : null}
     </View>
   );
 }
@@ -521,12 +570,13 @@ const styles = StyleSheet.create({
   flex: { flex: 1 }, topBar: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   dateBlock: { flex: 1, gap: 3 }, topDate: { fontSize: 18, fontWeight: '800', textTransform: 'capitalize' }, topTime: { fontSize: 13 }, topActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   iconButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, iconText: { fontSize: 21, fontWeight: '700' }, avatarButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 17 },
-  weekCard: { borderWidth: 1, borderRadius: 24, padding: 18, gap: 14 }, weekHeadingRow: { flexDirection: 'row', alignItems: 'flex-start' }, cardEyebrow: { color: '#B9CBFF', fontSize: 11, letterSpacing: 1.4, fontWeight: '800' }, weekTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', marginTop: 3 }, weekRange: { color: '#D4DEFA', fontSize: 13, textTransform: 'capitalize', marginTop: 3 }, weekIcon: { color: '#C7D5FF', fontSize: 36, padding: 5 },
-  weekStrip: { flexDirection: 'row', gap: 6 }, weekDay: { flex: 1, minHeight: 53, borderRadius: 13, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF1A' }, weekDayToday: { backgroundColor: '#FFFFFF' }, weekDayName: { color: '#D4DEFA', fontSize: 11, fontWeight: '700' }, weekDayCode: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' }, weekDayTodayText: { color: '#233A72' }, weekSummary: { borderTopWidth: 1, borderTopColor: '#FFFFFF2A', paddingTop: 12, gap: 4 }, weekSummaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 }, todayShiftLabel: { color: '#D4DEFA', fontSize: 13, lineHeight: 19 },
-  actionSection: { gap: 12 }, sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sectionTitle: { fontSize: 21, fontWeight: '800' }, sectionCaption: { fontSize: 13, lineHeight: 19 }, livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, fontSize: 10 }, liveDot: { width: 7, height: 7, borderRadius: 4 }, actionsRow: { flexDirection: 'row', gap: 10 }, actionColumn: { gap: 8, minWidth: 0 }, timeLabel: { fontSize: 12, fontWeight: '700' }, timeInput: { minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 11, fontSize: 16, textAlign: 'center' }, actionCard: { minHeight: 96, borderWidth: 1, borderRadius: 18, justifyContent: 'center', alignItems: 'center', padding: 11, gap: 7 }, actionIcon: { fontSize: 19, fontWeight: '900' }, actionLabel: { fontSize: 14, fontWeight: '800', textAlign: 'center' }, clockCaption: { fontSize: 12, lineHeight: 18 }, saving: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 6 }, feedback: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  weekCard: { borderWidth: 1, borderRadius: 22, padding: 16, gap: 12 }, weekHeadingRow: { flexDirection: 'row', alignItems: 'flex-start' }, cardEyebrow: { color: '#B9CBFF', fontSize: 11, letterSpacing: 1.4, fontWeight: '800' }, weekTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginTop: 3 }, weekRange: { color: '#D4DEFA', fontSize: 13, textTransform: 'capitalize', marginTop: 3 }, weekIcon: { color: '#C7D5FF', fontSize: 36, padding: 5 },
+  weekStrip: { flexDirection: 'row', gap: 6 }, weekDay: { flex: 1, minHeight: 47, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF1A' }, weekDayToday: { backgroundColor: '#FFFFFF' }, weekDayName: { color: '#D4DEFA', fontSize: 11, fontWeight: '700' }, weekDayTodayText: { color: '#233A72' }, weekSummary: { borderTopWidth: 1, borderTopColor: '#FFFFFF2A', paddingTop: 10, gap: 4 }, weekSummaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 }, todayShiftLabel: { color: '#D4DEFA', fontSize: 13, lineHeight: 19 },
+  actionSection: { gap: 12 }, sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sectionTitle: { fontSize: 21, fontWeight: '800' }, sectionCaption: { fontSize: 13, lineHeight: 19 }, livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, fontSize: 10 }, liveDot: { width: 7, height: 7, borderRadius: 4 }, actionsRow: { flexDirection: 'row', gap: 10 }, actionColumn: { gap: 8, minWidth: 0 }, timeLabel: { fontSize: 12, fontWeight: '700' }, timeInput: { minHeight: 42, borderWidth: 1, borderRadius: 12, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, actionCard: { minHeight: 64, borderWidth: 1, borderRadius: 16, justifyContent: 'center', alignItems: 'center', padding: 8, gap: 3 }, actionIcon: { fontSize: 19, fontWeight: '900' }, actionLabel: { fontSize: 13, fontWeight: '800', textAlign: 'center' }, clockCaption: { fontSize: 12, lineHeight: 18 }, saving: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 6 }, feedback: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
   choicesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, choice: { minHeight: 44, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, justifyContent: 'center' },
   calendarHeader: { gap: 10 }, monthControls: { flexDirection: 'row', alignItems: 'center', gap: 7 }, monthButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, monthTitle: { flex: 1, minWidth: 94, fontSize: 15, fontWeight: '800', textAlign: 'center', textTransform: 'capitalize' }, calendarCard: { borderWidth: 1, borderRadius: 20, padding: 10, gap: 9 }, calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.2857%', textAlign: 'center', fontSize: 11, fontWeight: '700', paddingVertical: 6 }, dayCell: { width: '14.2857%', minHeight: 53, alignItems: 'center', justifyContent: 'flex-start', paddingVertical: 4, gap: 1, borderWidth: 1, borderColor: 'transparent', borderRadius: 10 }, dayNumber: { fontSize: 13, fontWeight: '700' }, dayMarker: { fontSize: 13, fontWeight: '900', lineHeight: 16 }, markerSpacer: { height: 16 }, delta: { fontSize: 9, fontWeight: '800' }, legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 5 }, legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 }, legendDot: { width: 8, height: 8, borderRadius: 4 },
   loading: { minHeight: 140, alignItems: 'center', justifyContent: 'center', gap: 10 }, emptyCard: { borderWidth: 1, borderRadius: 18, padding: 17, gap: 10 }, cardTitle: { fontSize: 17, fontWeight: '800' }, linkButton: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 }, linkButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' }, secondaryLink: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
   sheetOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 20 }, sheetScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F66' }, sheet: { minHeight: '54%', maxHeight: '84%', borderTopLeftRadius: 25, borderTopRightRadius: 25, borderWidth: 1, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16, gap: 12 }, sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: '#8A98AC', alignSelf: 'center', marginBottom: 3 }, sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sheetBody: { flexShrink: 1 }, sheetBodyContent: { gap: 12, paddingBottom: 5 }, sheetTitle: { fontSize: 19, fontWeight: '800', textTransform: 'capitalize' }, closeButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, recordList: { borderWidth: 1, borderRadius: 14, padding: 11, gap: 9, maxHeight: 130 }, recordRow: { flexDirection: 'row', alignItems: 'center', gap: 9, flexWrap: 'wrap' }, recordTime: { fontSize: 15, fontWeight: '800' }, editLink: { paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }, sheetLabel: { fontSize: 12, fontWeight: '700' }, noteInput: { minHeight: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 15 }, sheetActions: { flexDirection: 'row', gap: 8 }, sheetAction: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }, sheetActionText: { fontSize: 13, fontWeight: '800', textAlign: 'center' }, whiteText: { color: '#FFFFFF' },
   menuOverlay: { ...StyleSheet.absoluteFill, zIndex: 30 }, menuScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F33' }, menuCard: { position: 'absolute', top: 68, right: 14, width: 232, borderWidth: 1, borderRadius: 18, padding: 12, gap: 4, shadowColor: '#0B1730', shadowOpacity: 0.14, shadowRadius: 18, elevation: 6 }, menuTitle: { fontSize: 16, fontWeight: '800', padding: 7 }, menuRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  pickerBackdrop: { flex: 1, justifyContent: 'flex-end' }, pickerScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F66' }, pickerCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 18, gap: 10 }, pickerConfirm: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,5 +1,20 @@
 # Vardiyam — Hesap ve Cihaz Test Matrisi v0.1
 
+## VDY-010B — Tasarım sistemi, onboarding ve raporlar (2026-11-06)
+
+| Akış / kontrol | Otomatik kanıt | Gerçek UI/cihaz | Sonuç |
+|---|---|---|---|
+| İlk kurulum adımları, ücret adımını atlama, yeniden açılış | `tests/data/appPreferencesRepository.test.mjs`; local SQLite close/reopen | iOS/Android NOT RUN | Otomatik PASS; cihaz akışı NOT RUN |
+| Var olan kurulum onboarding'i atlar ve kayıtları korur | repository preference tests (cycle/setup/work-only cases) | NOT RUN | PASS |
+| Açık tema varsayılanı ve manuel açık/koyu kalıcılığı | existing theme repository + app metadata | NOT RUN | Static/automated PASS; theme screenshot NOT RUN |
+| Gün/akşam/gece ve izin/rapor/devamsızlık/tamamlanan gün ikon dili | `tests/features/shiftPresentation.test.mjs` | screenshot NOT RUN | Automated PASS |
+| Günlük/haftalık/aylık raporda gece çalışmasının dönemlere bölünmesi | `tests/features/reports.test.mjs` day/week/month boundary cases | NOT RUN | Automated PASS; independent review APPROVE |
+| Rapor mola dakika belirsizliği | `tests/features/reports.test.mjs`; report UI disclosure | NOT RUN | PASS; unknown-time break is not assigned to a date |
+| Native time picker and start/end interaction | Android and iOS JS exports only | NOT RUN | Bundle PASS; interaction NOT RUN |
+| Small screen, large text, VoiceOver/TalkBack and light/dark visuals | static accessibility labels and theme implementation | NOT RUN | SKIP pending device acceptance |
+
+**Final VDY-010B verification:** typecheck PASS; lint PASS; tests 269/269 PASS; Android JS export PASS; iOS JS export PASS; Expo Doctor 18/20 (2 remote metadata checks FAIL due DNS/server connectivity); `git diff --check` PASS. GitHub Actions run `42120510298` PASS on implementation commit `1f431410309e7350c9c3ee94dae4c2babcce8c90`; docs-only run `42120854029` PASS on `e63900f5a112505b176c2b2e2712436de159938c`. Independent R2 UI/accessibility reviewer APPROVE after P2 report-range fix. Device visual acceptance NOT RUN. No merge/release.
+
 ## VDY-007 — MVP uçtan uca kabul (2026-11-05)
 
 | Akış / kontrol | Otomatik kanıt | Gerçek UI/cihaz | Sonuç |

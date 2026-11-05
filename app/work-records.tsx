@@ -39,6 +39,7 @@ import { getNominalShiftWindow } from '@/src/domain/shift-cycle';
 import { getLocalToday } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 type FormDraft = {
@@ -499,9 +500,7 @@ export default function WorkRecordsScreen() {
       <Pressable accessibilityLabel="Önceki ekrana dön" accessibilityRole="button" hitSlop={8} onPress={() => router.back()} style={styles.backButton}>
         <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '800' }}>‹ Geri</Text>
       </Pressable>
-      <Text style={[styles.eyebrow, { color: theme.accent }]}>FİİLÎ ÇALIŞMA</Text>
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.foreground }]}>{view === 'form' ? (record ? 'Kaydı düzenle' : 'Çalışma ekle') : 'Çalışma geçmişi'}</Text>
-      <Text style={[styles.intro, { color: theme.muted }]}>Planlanan vardiya ile gerçekleşen çalışma ayrı kayıtlardır. Bu ekranda ücret veya yasal mesai hesabı yapılmaz.</Text>
+      <PageHeading eyebrow="FİİLÎ ÇALIŞMA" title={view === 'form' ? (record ? 'Kaydı düzenle' : 'Çalışma ekle') : 'Çalışma geçmişi'} subtitle="Planlanan vardiya ve gerçekleşen çalışma ayrı kayıtlardır. Bu ekranda ücret veya yasal mesai hesabı yapılmaz." />
     </View>
   );
 
