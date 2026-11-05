@@ -12,7 +12,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { getShiftCycle, getPlannedShiftForDate, listShiftTemplates } from '@/src/data/shiftCycleRepository';
 import {
@@ -204,7 +204,7 @@ function OccurrenceChoices({ label, value, timezone, selected, onSelect, theme }
 }
 
 export default function WorkRecordsScreen() {
-  const database = useSQLiteContext();
+  const database = useAppDatabase();
   const router = useRouter();
   const params = useLocalSearchParams<{ action?: string | string[]; cycleId?: string | string[]; localDate?: string | string[]; }>();
   const action = routeValue(params.action);

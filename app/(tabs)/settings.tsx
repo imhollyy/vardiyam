@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -10,8 +10,8 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 import {
@@ -231,7 +231,8 @@ function Chip({ label, selected, onPress, theme, accessibilityLabel }: {
 }
 
 export default function SettingsScreen() {
-  const database = useSQLiteContext();
+  const database = useAppDatabase();
+  const router = useRouter();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? colors.dark : colors.light;
   const [cycle, setCycle] = useState<ShiftCycle | null>(null);
@@ -244,6 +245,8 @@ export default function SettingsScreen() {
   const [success, setSuccess] = useState<string | null>(null);
   const loadedOnce = useRef(false);
   const startEntry = cycle?.entries[cycle.startIndex];
+
+  useEffect(() => { loadedOnce.current = false; }, [database]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -385,6 +388,12 @@ export default function SettingsScreen() {
       <Text style={[styles.eyebrow, { color: theme.accent }]}>TERCİHLER</Text>
       <Text accessibilityRole="header" style={[styles.title, { color: theme.foreground }]}>Vardiya düzenin</Text>
       <Text style={[styles.intro, { color: theme.muted }]}>Planın cihazında saklanır. Kaydetmeden önce örneğini kontrol edebilirsin.</Text>
+
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Veri güvenliği</Text>
+        <Text style={[styles.body, { color: theme.muted }]}>Şifreli yedeklerini dışa aktar, eski yedeğini geri yükle veya cihazındaki verileri kaldır.</Text>
+        <Action label="Yedekleme ve veri silme" onPress={() => router.push('/backup' as never)} theme={theme} />
+      </View>
 
       {loading ? (
         <View accessibilityLiveRegion="polite" style={styles.statusRow}>

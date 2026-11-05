@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { calculateGrossEarnings, type EarningsCalculationResult, type EarningsRule } from '@/src/domain/earnings';
 import { getLocalDateTimeCandidates } from '@/src/domain/work-record';
@@ -40,7 +40,7 @@ type PreviewInput = ReturnType<typeof makeCalculationInput> & { sourceRangeStart
 type Preview = { input: PreviewInput; result: EarningsCalculationResult; periodStart: LocalDate; periodEnd: LocalDate; version: EarningsProfileVersion<EarningsSettings, EarningsRule[]> };
 
 export default function EarningsScreen() {
-  const database = useSQLiteContext();
+  const database = useAppDatabase();
   const router = useRouter();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? colors.dark : colors.light;

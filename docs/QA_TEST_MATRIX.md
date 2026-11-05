@@ -1,5 +1,20 @@
 # Vardiyam — Hesap ve Cihaz Test Matrisi v0.1
 
+## VDY-007 — MVP uçtan uca kabul (2026-11-05)
+
+| Akış / kontrol | Otomatik kanıt | Gerçek UI/cihaz | Sonuç |
+|---|---|---|---|
+| Vardiya düzeni → Bugün → Takvim → gün değişikliği | Cycle/repository/override/rollback testleri | Android NOT RUN (emulator yok) | Otomatik PASS; UI açık |
+| Fiilî çalışma → mola → gece → geçmiş | WorkRecord, timed break, overnight, persistence testleri | Android NOT RUN | Otomatik PASS; UI açık |
+| Ücret → mesai → tahmini brüt → snapshot geçmişi | 40 fixture ve snapshot invariants | Android NOT RUN | Otomatik PASS; UI açık |
+| Bordro neti → çoklu/kısmi ödeme → mutabakat | Ledger/allocation/unknown-net tests | Android NOT RUN | Otomatik PASS; UI açık |
+| Yedek/restore/tüm veriyi sil | Ürün akışı yok | NOT RUN | FAIL — P1 beta blocker |
+| Uçak modu/cold start | Yerel SQLite/static source evidence only | NOT RUN | SKIP |
+| TalkBack, büyük yazı, tema, küçük ekran | Static labels/theme implementation only | NOT RUN | SKIP |
+| iOS | — | NOT RUN | R08 open |
+
+Current PR #22 checks: typecheck PASS; lint PASS; npm test 210/210 PASS; Expo Doctor 20/20 PASS; Android JS export PASS (1203 modules, 3 MB Hermes); diff check PASS; Actions run #30 `42042008425` SUCCESS. Android bundle is not device acceptance. See `docs/tasks/VDY-007.md` and `docs/progress/PROGRESS.md` for CI chain, reviewer, limitations and evidence provenance. R08, R13, Ethernet policy, and Turkish labor-law review remain open.
+
 ## VDY-004 — Fiilî çalışma kayıtları (otomatik test kanıtı)
 
 | ID | Senaryo | Beklenen | Otomatik kanıt |
@@ -249,3 +264,43 @@ Independent R2 security/data reviewer: **APPROVE**, no P0/P1/P2; verified the st
 | Android/iOS physical visual QA, large text and screen reader | SKIP | Not required by this task; native UI behavior is not claimed as device-verified. Existing VDY-003B Android/SQLite screenshots remain preserved above. |
 
 Reviewer: independent R2 reviewer **APPROVE** after fixes; first review caught and the implementation addressed a saved-phase regression risk, 44 dp touch target gaps, and missing editable IANA zone. Final reviewer verified DayCell `hitSlop` correction. Keep R08 (iOS/device coverage), R13 (12 moderate audit findings), and Ethernet Public-profile policy issue separate and open.
+
+### VDY-008 — encrypted backup, restore and data wipe (2026-11-05)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Synthetic SQLite schema v1–v6 restore/migration | PASS | `tests/data/backupValidation.test.mjs`; canonical migration schema, integrity/FK checks, and synthetic marker preservation. |
+| v6 round-trip data coverage | PASS | Isolated synthetic DB covers shift plan, WorkRecord/timed break, approved gross snapshot, net/payments/allocations and ledger; no personal data. |
+| Password-protected authenticated container | PASS | `tests/features/backupContainer.test.mjs`; AES-GCM round trip, wrong password, tampering, malformed/truncated/future version, password policy. |
+| Swap/rollback failure paths | PASS | `tests/features/safeDatabaseSwap.test.mjs`; prep, partial-file, validation and rollback failure behavior. |
+| Interrupted startup recovery policy | PASS (pure policy) | `tests/features/backupRecoveryPlan.test.mjs` covers staging/prepared/committed, missing live/rollback, rollback recovery, commit cleanup, fail-closed and shared wipe transitions; native file I/O is not simulated. |
+| Missing/corrupt source file, simulated disk-full/rename failure, interrupted restore | PARTIAL | Malformed/truncated/authentication, staged swap failures and pure recovery policy transitions are unit-tested. Native picker missing-file and filesystem crash/reopen recovery are not exercised on a device; retain as acceptance checks. |
+| Cold restart after restore/wipe and recovery-marker replay | NOT RUN | No isolated native filesystem process/device harness was available. Pure policy cases are covered, but do not infer native restart acceptance from them. |
+| Typecheck / lint / full tests | PASS | `npm run typecheck`; `npm run lint`; `npm test` 243/243 (210 baseline retained + 33 added). |
+| Expo Doctor | PASS | `npx expo-doctor --verbose` 20/20 after network-enabled retry. |
+| Android JS export | PASS | `npx expo export --platform android`; 1,252 modules. This is not platform UI acceptance. |
+| File picker, share sheet, restore and cold restart on Android/iOS | NOT RUN | No device/emulator in active environment. Do not treat bundle export as device evidence. |
+| GitHub CI | PASS | Draft PR #25 run #32 (`42054634246`): Typecheck, Lint, Unit tests, Expo dependency health succeeded. |
+| Diff whitespace check | PASS | `git diff --check`; Windows line-ending conversion notices only. |
+
+Security implementation: encrypted file uses PBKDF2-HMAC-SHA256 (600,000 rounds), random 16-byte salt, random 12-byte nonce, AES-256-GCM authenticated header/payload, version/size checks and no plaintext DB export. Restore validates canonical schema, integrity, foreign keys and migration compatibility before replacement; rollback copy is validated before use. Wipe performs a confirmed logical replacement with empty v6 DB; flash forensic erasure is not claimed.
+
+Independent R3 data-security reviewer: **APPROVE; no P0/P1**. P2 evidence boundary remains: native Expo Go picker/share/AES and filesystem cold-recovery were not exercised; no real-device result is claimed.
+
+### VDY-008A — committed database recovery hardening (2026-11-05)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Committed valid candidate before rollback cleanup | PASS | Real v6 SQLite files: candidate digest/schema/integrity/FK/count validates before rollback cleanup. |
+| Corrupt committed live DB + verified rollback | PASS | Corrupt file replaced from copied rollback; rollback retained across a simulated interruption and validated again on retry. |
+| Missing/corrupt rollback + invalid live DB | PASS | Recovery rejects, retains marker/stage and leaves corrupt live bytes unchanged; no empty DB fallback. |
+| Empty v6 candidate for all-data wipe | PASS | Real SQLite file restore validates schema version 6 and zero user rows before cleanup. |
+| Cleanup failure and repeated startup | PASS | Cleanup interruption leaves marker/rollback; second recovery is idempotent. |
+| Malformed marker | PASS | Versioned marker parser rejects malformed/invalid digest and leaves DB bytes untouched. |
+| Typecheck / lint / tests | PASS | `npm run typecheck`; `npm run lint`; `npm test` 248/248 (243 existing + 5 new top-level/integration cases including nested scenarios). |
+| Expo Doctor | PASS | `npx expo-doctor --verbose` 20/20. |
+| Android JS export | PASS | `npx expo export --platform android`; 1,252 modules. Not device acceptance. |
+| Native Expo filesystem cold restart / real Android UI | NOT RUN | No Android emulator/device in active environment; Node SQLite-file recovery tests are not native platform evidence. |
+| GitHub CI | PASS | Actions run #34 (`42061990118`) passed for PR head `186aa8da8b3df03d239a89bd5d4581f7f70680f0`. |
+
+Independent R3 data-security review: **APPROVE; no P0/P1/P2**. Candidate and rollback have separate digest/count expectations. Recovery copy is retained until the copied live DB passes the same integrity, FK, canonical schema, protections, count and digest checks.

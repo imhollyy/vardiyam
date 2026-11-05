@@ -3,6 +3,11 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 type TransactionDatabase = Pick<SQLiteDatabase, 'withTransactionAsync'>;
 
 const databaseQueues = new WeakMap<object, Promise<void>>();
+const retiredDatabases = new WeakSet<object>();
+
+export function retireDatabaseHandle(database: object): void {
+  retiredDatabases.add(database);
+}
 
 /**
  * Serializes all repository reads, migrations, and writes for the same handle.
@@ -23,6 +28,9 @@ export async function withDatabaseOperation<T>(
   await previous;
 
   try {
+    if (retiredDatabases.has(database)) {
+      throw new Error('The local database was replaced. Reload the current screen before retrying.');
+    }
     return await operation();
   } finally {
     release?.();

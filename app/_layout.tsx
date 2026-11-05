@@ -1,19 +1,19 @@
 import { Stack } from 'expo-router';
-import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
-import { initializeDatabase } from '@/src/data/database';
+import { AppDatabaseProvider } from '@/src/data/AppDatabaseProvider';
 
 export default function RootLayout() {
   return (
-    <SQLiteProvider databaseName="vardiyam.db" onInit={initializeDatabase}>
+    <AppDatabaseProvider>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="work-records" />
         <Stack.Screen name="earnings-settings" />
         <Stack.Screen name="net-payments" />
+        <Stack.Screen name="backup" />
       </Stack>
-    </SQLiteProvider>
+    </AppDatabaseProvider>
   );
 }

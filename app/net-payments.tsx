@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
 import { allocatePayment, createNetPayment, deleteAllocation, deleteNetPayment, getOrCreatePayrollPeriod, getPeriodPaymentLedger, listNetPayments, listPayrollPeriods, listPayslipNetVersions, savePayslipNet, updateAllocation, updateNetPayment, type NetPayment, type PayrollPeriod } from '@/src/data/paymentRepository';
 import { getLatestEarningsProfile as loadProfile } from '@/src/data/earningsRepository';
@@ -23,7 +23,7 @@ function moneyInput(minor: number | null | undefined): string { return minor ===
 function periodLabel(period: PayrollPeriod): string { return `${period.startLocalDate} – ${period.endExclusiveLocalDate}`; }
 
 export default function NetPaymentsScreen() {
-  const database = useSQLiteContext();
+  const database = useAppDatabase();
   const router = useRouter();
   const params = useLocalSearchParams<{ periodMonth?: string }>();
   const scheme = useColorScheme();
