@@ -333,6 +333,100 @@ export const migrations: readonly Migration[] = [
         BEFORE DELETE ON earnings_rule_versions BEGIN SELECT RAISE(ABORT, 'earnings rule versions are immutable'); END;
     `,
   },
+  {
+    version: 6,
+    sql: `
+      CREATE TABLE payroll_periods (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        start_local_date TEXT NOT NULL CHECK (length(start_local_date) = 10 AND julianday(start_local_date) IS NOT NULL),
+        end_exclusive_local_date TEXT NOT NULL CHECK (length(end_exclusive_local_date) = 10 AND julianday(end_exclusive_local_date) IS NOT NULL),
+        timezone TEXT NOT NULL CHECK (length(trim(timezone)) > 0),
+        configured_start_day INTEGER NOT NULL CHECK (configured_start_day BETWEEN 1 AND 31),
+        created_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('created_at_utc')}),
+        CHECK (julianday(end_exclusive_local_date) > julianday(start_local_date)),
+        UNIQUE(start_local_date, end_exclusive_local_date, timezone)
+      );
+      CREATE INDEX payroll_periods_recent_idx ON payroll_periods(start_local_date DESC);
+      CREATE TRIGGER payroll_periods_no_update BEFORE UPDATE ON payroll_periods
+        BEGIN SELECT RAISE(ABORT, 'payroll period identity is immutable'); END;
+      CREATE TRIGGER payroll_periods_no_delete BEFORE DELETE ON payroll_periods
+        BEGIN SELECT RAISE(ABORT, 'payroll period identity is immutable'); END;
+
+      CREATE TABLE payslip_net_versions (
+        period_id TEXT NOT NULL,
+        version INTEGER NOT NULL CHECK (version > 0),
+        amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 0 AND 9007199254740991),
+        note TEXT CHECK (note IS NULL OR length(note) <= 2000),
+        created_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('created_at_utc')}),
+        PRIMARY KEY(period_id, version),
+        FOREIGN KEY(period_id) REFERENCES payroll_periods(id) ON DELETE RESTRICT
+      );
+      CREATE TRIGGER payslip_net_versions_no_update BEFORE UPDATE ON payslip_net_versions
+        BEGIN SELECT RAISE(ABORT, 'payslip net history is append-only'); END;
+      CREATE TRIGGER payslip_net_versions_no_delete BEFORE DELETE ON payslip_net_versions
+        BEGIN SELECT RAISE(ABORT, 'payslip net history is append-only'); END;
+
+      CREATE TABLE net_payments (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        payment_local_date TEXT NOT NULL CHECK (length(payment_local_date) = 10 AND julianday(payment_local_date) IS NOT NULL),
+        amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991),
+        method TEXT NOT NULL CHECK (method IN ('BANK', 'CASH', 'OTHER')),
+        description TEXT CHECK (description IS NULL OR length(description) <= 2000),
+        created_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('created_at_utc')}),
+        updated_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('updated_at_utc')}),
+        deleted_at_utc TEXT CHECK (deleted_at_utc IS NULL OR (${canonicalUtcMinuteCheck('deleted_at_utc')}))
+      );
+      CREATE INDEX net_payments_date_idx ON net_payments(payment_local_date DESC, id);
+
+      CREATE TABLE payment_allocations (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        payment_id TEXT NOT NULL,
+        period_id TEXT NOT NULL,
+        amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991),
+        created_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('created_at_utc')}),
+        updated_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('updated_at_utc')}),
+        FOREIGN KEY(payment_id) REFERENCES net_payments(id) ON DELETE RESTRICT,
+        FOREIGN KEY(period_id) REFERENCES payroll_periods(id) ON DELETE RESTRICT,
+        UNIQUE(payment_id, period_id)
+      );
+      CREATE INDEX payment_allocations_period_idx ON payment_allocations(period_id, payment_id);
+      CREATE TRIGGER payment_allocations_limit_insert BEFORE INSERT ON payment_allocations
+      BEGIN
+        SELECT CASE WHEN COALESCE((SELECT deleted_at_utc FROM net_payments WHERE id=NEW.payment_id), 'missing') <> 'missing'
+          AND (SELECT deleted_at_utc FROM net_payments WHERE id=NEW.payment_id) IS NOT NULL
+          THEN RAISE(ABORT, 'cannot allocate to a deleted or missing payment') END;
+        SELECT CASE WHEN COALESCE((SELECT SUM(amount_minor) FROM payment_allocations WHERE payment_id=NEW.payment_id),0) + NEW.amount_minor >
+          (SELECT amount_minor FROM net_payments WHERE id=NEW.payment_id) THEN RAISE(ABORT, 'payment allocations exceed payment amount') END;
+      END;
+      CREATE TRIGGER payment_allocations_limit_update BEFORE UPDATE OF payment_id, amount_minor ON payment_allocations
+      BEGIN
+        SELECT CASE WHEN COALESCE((SELECT deleted_at_utc FROM net_payments WHERE id=NEW.payment_id), 'missing') <> 'missing'
+          AND (SELECT deleted_at_utc FROM net_payments WHERE id=NEW.payment_id) IS NOT NULL
+          THEN RAISE(ABORT, 'cannot allocate to a deleted or missing payment') END;
+        SELECT CASE WHEN COALESCE((SELECT SUM(amount_minor) FROM payment_allocations WHERE payment_id=NEW.payment_id AND id<>OLD.id),0) + NEW.amount_minor >
+          (SELECT amount_minor FROM net_payments WHERE id=NEW.payment_id) THEN RAISE(ABORT, 'payment allocations exceed payment amount') END;
+      END;
+      CREATE TRIGGER net_payments_allocation_limit BEFORE UPDATE OF amount_minor ON net_payments
+      BEGIN
+        SELECT CASE WHEN COALESCE((SELECT SUM(amount_minor) FROM payment_allocations WHERE payment_id=OLD.id),0) > NEW.amount_minor
+          THEN RAISE(ABORT, 'payment amount is below allocated total') END;
+      END;
+
+      CREATE TABLE payment_ledger_events (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        entity_type TEXT NOT NULL CHECK (entity_type IN ('PAYSLIP_NET', 'PAYMENT', 'ALLOCATION')),
+        entity_id TEXT NOT NULL CHECK (length(trim(entity_id)) > 0),
+        event_type TEXT NOT NULL CHECK (event_type IN ('CREATE', 'UPDATE', 'DELETE', 'REVISION')),
+        event_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('event_at_utc')}),
+        data_json TEXT NOT NULL CHECK (json_valid(data_json))
+      );
+      CREATE INDEX payment_ledger_events_entity_idx ON payment_ledger_events(entity_type, entity_id, event_at_utc);
+      CREATE TRIGGER payment_ledger_events_no_update BEFORE UPDATE ON payment_ledger_events
+        BEGIN SELECT RAISE(ABORT, 'payment ledger history is immutable'); END;
+      CREATE TRIGGER payment_ledger_events_no_delete BEFORE DELETE ON payment_ledger_events
+        BEGIN SELECT RAISE(ABORT, 'payment ledger history is immutable'); END;
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;
