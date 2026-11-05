@@ -7,8 +7,8 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
-- **Durum:** VDY-003A R2_REVIEW_APPROVED / DRAFT_PR_OPEN (#7); VDY-002 PR #4 remains device BLOCKED; main merge/release yok
-- **Aktif branch:** feat/vdy-003a-shift-cycle-engine
+- **Durum:** VDY-003B IN_PROGRESS (R2) on PR #7 head; VDY-003A PR #7 draft; PR #4 device BLOCKED; main merge/release yok
+- **Aktif branch:** feat/vdy-003b-sqlite-storage
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -16,13 +16,13 @@
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / test / diff-check:** VDY-003A PASS (62/62 unit tests, 50/50 fixture); cihaz testi kapsam dışı ve NOT RUN.
+- **Typecheck / lint / test / Expo Doctor / diff-check:** VDY-003B NOT RUN yet.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. PR #7 incelemesini ve kurucu kararını bekle; merge için ayrıca açık onay gerekir. Main/release yok.
+1. SQLite v2, typed storage, safety tests, requested verification, and independent R2 review; keep all PRs unmerged.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -287,3 +287,22 @@ NEXT ACTION:
 - **Reviewer:** Gerçek bağımsız R2 reviewer APPROVE; P0/P1/P2 yok. Reviewer npm test komutunu bağımsız çalıştırıp 62/62 PASS doğruladı; dosya değiştirmedi.
 - **PR/commit:** feat/vdy-003a-shift-cycle-engine; bfa349f; draft PR #7 targets docs/vdy-003-shift-cycle-contract: https://github.com/imhollyy/vardiyam/pull/7. GitHub compare: 1 commit ahead, 0 behind. PR #4/#6/main merge veya release yok.
 - **NEXT ACTION:** PR #7 incelemesini ve kurucu kararını bekle; merge/release yalnız ayrıca açık onayla.
+### 2026-11-05 — G1 / VDY-003B — START
+
+- **Issue/base:** GitHub Issue #8 read. PR #7 current head e2e40574fa0ade36bb20bd03395444a50914e942 fetched and verified equal to local; branch feat/vdy-003b-sqlite-storage opened there from a clean worktree.
+- **Risk/scope:** R2 controlled migration plus user-owned shift schedule data. v1 preserve; v2 only; CRUD, FK/UNIQUE/CHECK, safe deletion, pure domain projection, rollback/data-preservation/idempotence tests, large-range resource bound. No UI, device, WorkRecord, wage/overtime, Expo version, or release.
+- **Skills:** vardiyam-task-flow v1.0, vardiyam-data-safety v1.0, vardiyam-test-gate v1.0 read and applied. Expo SDK58 docs reviewed via Context7 /expo/expo/expo_58.0.0 and official API.
+- **Concurrency:** SDK58 docs warn withTransactionAsync includes unrelated same-connection queries; withExclusiveTransactionAsync uses a new connection, does not inherit PRAGMA foreign_keys, and is unsupported on web. Use withTransactionAsync with a per-connection serialized DB transaction queue; onInit gates normal app access.
+- **Initial state:** clean Git worktree, base e2e4057. Existing schemas/tests reviewed. npm ci and all VDY-003B verification commands not run yet.
+- **NEXT ACTION:** Implement additive schema v2 and typed SQLite repository on this branch.
+
+### 2026-11-05 — G1 / VDY-003B — IMPLEMENTED / R2 REVIEW APPROVED
+
+- **Branch/base:** `feat/vdy-003b-sqlite-storage` from PR #7 head `e2e40574fa0ade36bb20bd03395444a50914e942`; no PR #4/#6/#7 or main merge. Current local source branch preserved.
+- **Implementation:** Existing v1 migration kept; transactional/idempotent v2 creates shift_templates, shift_cycles, ordered cycle_entries, plan_overrides. Added schema constraints/triggers, FK activation guard, typed CRUD and safe-delete repository, and projections routed through VDY-003A pure logic.
+- **Resource bound:** `getProjectedRange` and repository range read reject over 3,660 days before allocation or data reads. No chunked unbounded output.
+- **Skills/reviewer:** vardiyam-task-flow, vardiyam-data-safety, vardiyam-test-gate. Independent `sqlite_reviewer` APPROVE; no P0/P1/P2; independently ran `npm test` 69/69 PASS. Caveat recorded: all future same-connection queries must use serialized repository operations; no direct bypass currently found.
+- **Actual verification:** `npm ci` PASS (766 packages installed; 12 moderate audit findings remain R13; no remediations applied); `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (69/69: 9 data + 60 domain); `git diff --check` PASS. First `npx expo-doctor` attempt could not reach metadata services; retry `npx expo-doctor --verbose` PASS 20/20, confirming packages against SDK 58.0.0.
+- **Security/scope:** No real salary data, secrets, .env, production access, UI, wage/overtime, IAP, device test, Expo SDK change, merge, or release.
+- **PR/commit:** Implementation commit `0607c301ed643dff94d7122e01997997748efffd`; pushed feature branch. Draft PR #9 targets `feat/vdy-003a-shift-cycle-engine` (PR #7 head): https://github.com/imhollyy/vardiyam/pull/9. No merge/release.
+- **NEXT ACTION:** Obtain PR #9 review and explicit merge authorization; do not merge in this task.

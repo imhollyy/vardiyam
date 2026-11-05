@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-import { runMigrations, CURRENT_SCHEMA_VERSION } from '../../src/data/migrations.ts';
+import { CURRENT_SCHEMA_VERSION } from '../../src/data/migrations.ts';
+import { initializeDatabase } from '../../src/data/database.ts';
 
 function createExpoSqliteAdapter(database) {
   return {
@@ -11,6 +12,12 @@ function createExpoSqliteAdapter(database) {
     },
     async getFirstAsync(sql) {
       return database.prepare(sql).get() ?? null;
+    },
+    async getAllAsync(sql, ...params) {
+      return database.prepare(sql).all(...params);
+    },
+    async runAsync(sql, ...params) {
+      return database.prepare(sql).run(...params);
     },
     async withTransactionAsync(callback) {
       database.exec('BEGIN;');
@@ -29,7 +36,7 @@ test('initial migration creates only additive app metadata and sets schema versi
   const sqlite = new DatabaseSync(':memory:');
 
   try {
-    await runMigrations(createExpoSqliteAdapter(sqlite));
+    await initializeDatabase(createExpoSqliteAdapter(sqlite));
 
     assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, CURRENT_SCHEMA_VERSION);
     assert.equal(
@@ -38,6 +45,13 @@ test('initial migration creates only additive app metadata and sets schema versi
       'app_metadata',
     );
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
+    assert.equal(sqlite.prepare('PRAGMA foreign_keys;').get().foreign_keys, 1);
+    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides']) {
+      assert.equal(
+        sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name=?;").get(table).count,
+        1,
+      );
+    }
   } finally {
     sqlite.close();
   }
@@ -47,18 +61,26 @@ test('migration is idempotent and preserves unrelated existing data', async () =
   const sqlite = new DatabaseSync(':memory:');
 
   try {
+    sqlite.exec('CREATE TABLE app_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);');
+    sqlite.exec("INSERT INTO app_metadata (key, value) VALUES ('keep', 'preserved');");
+    sqlite.exec('PRAGMA user_version = 1;');
     sqlite.exec('CREATE TABLE preserved_record (id INTEGER PRIMARY KEY, note TEXT NOT NULL);');
     sqlite.exec("INSERT INTO preserved_record (note) VALUES ('keep');");
     const adapter = createExpoSqliteAdapter(sqlite);
 
-    await runMigrations(adapter);
-    await runMigrations(adapter);
+    await initializeDatabase(adapter);
+    await initializeDatabase(adapter);
 
     assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, CURRENT_SCHEMA_VERSION);
     assert.deepEqual({ ...sqlite.prepare('SELECT id, note FROM preserved_record;').get() }, {
       id: 1,
       note: 'keep',
     });
+    assert.deepEqual({ ...sqlite.prepare('SELECT key, value FROM app_metadata;').get() }, {
+      key: 'keep',
+      value: 'preserved',
+    });
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM shift_templates;').get().count, 0);
   } finally {
     sqlite.close();
   }
@@ -70,13 +92,37 @@ test('migration refuses a database schema newer than this app supports', async (
   try {
     sqlite.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION + 1};`);
     await assert.rejects(
-      runMigrations(createExpoSqliteAdapter(sqlite)),
+      initializeDatabase(createExpoSqliteAdapter(sqlite)),
       /newer than supported version/,
     );
     assert.equal(
       sqlite.prepare('PRAGMA user_version;').get().user_version,
       CURRENT_SCHEMA_VERSION + 1,
     );
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('failed v2 migration rolls back partial DDL and preserves v1 rows', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('CREATE TABLE app_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);');
+    sqlite.exec("INSERT INTO app_metadata (key, value) VALUES ('legacy', 'unchanged');");
+    sqlite.exec('PRAGMA user_version = 1;');
+    sqlite.exec('CREATE TABLE shift_cycles (sentinel TEXT);');
+
+    await assert.rejects(initializeDatabase(createExpoSqliteAdapter(sqlite)));
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 1);
+    assert.deepEqual({ ...sqlite.prepare('SELECT key, value FROM app_metadata;').get() }, {
+      key: 'legacy',
+      value: 'unchanged',
+    });
+    assert.equal(
+      sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='shift_templates';").get().count,
+      0,
+    );
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM shift_cycles;').get().count, 0);
   } finally {
     sqlite.close();
   }

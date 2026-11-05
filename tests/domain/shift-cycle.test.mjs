@@ -16,6 +16,8 @@ import {
   getNominalShiftWindow,
   getProjectedDay,
   getProjectedRange,
+  getProjectedRangeDayCount,
+  MAX_PROJECTED_RANGE_DAYS,
   validatePlanOverrides,
   validateShiftCycle,
 } from '../../src/domain/shift-cycle/index.ts';
@@ -332,4 +334,17 @@ test('Gregorian ordinal handles year zero and years below 100 without Date.UTC q
   assert.equal(acrossLeapDay[2].localDate, '0000-03-01');
   assert.equal(acrossYear.length, 2);
   assert.equal(acrossYear[1].localDate, '0100-01-01');
+});
+
+test('projection refuses excessively large output arrays before allocation', () => {
+  assert.equal(MAX_PROJECTED_RANGE_DAYS, 3660);
+  assert.equal(getProjectedRangeDayCount('2026-01-01', '2026-01-01'), 1);
+  expectedError(
+    () => getProjectedRangeDayCount('2026-01-01', '2037-01-01'),
+    'RANGE_TOO_LARGE',
+  );
+  expectedError(
+    () => getProjectedRange(fixtureCycle('two_two_two'), templates, '2026-01-01', '2037-01-01'),
+    'RANGE_TOO_LARGE',
+  );
 });
