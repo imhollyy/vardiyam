@@ -16,7 +16,7 @@
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / unit test / Expo Doctor:** VDY-004 local PASS: typecheck, lint, 103/103 tests, Expo Doctor 20/20, Android export, diff check. GitHub CI run 42004438035 PASS on feature commit `ad4bfdc`. R13 remains OPEN.
+- **Typecheck / lint / unit test / Expo Doctor:** VDY-004 local PASS: typecheck, lint, 103/103 tests, Expo Doctor 20/20, Android export, diff check. GitHub CI run 42004833540 PASS on final PR head `edd2e6b`. R13 remains OPEN.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
@@ -37,7 +37,7 @@
 - **Ayrı riskler:** R08 iOS/device coverage, R13 npm audit moderate bulguları ve Ethernet ağ profili konusu açık ve ayrı takipte; bu görevde değişiklik yok.
 - **QA matrisi:** `docs/QA_TEST_MATRIX.md` içine WR01–WR09 otomatik senaryoları ve kanıt dosyaları eklendi. PR/CI head durumu push sonrasında kaydedilecek.
 - **Teslimat:** Commit `ad4bfdc13328ef73c1b8dde6f7e54974fd7f2d98` (13 explicit paths; local `expo-env.d.ts` excluded). Branch pushed. Taslak [PR #12](https://github.com/imhollyy/vardiyam/pull/12) açık, base `feat/vdy-003c-shift-calendar-ui`, PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`. PR #11 ve diğer bağlı PR'lar merge edilmedi.
-- **GitHub CI:** run 42004438035 SUCCESS; setup, checkout, install locked dependencies, typecheck, lint, unit tests ve Expo dependency health adımlarının tamamı success.
+- **GitHub CI:** run 42004833540 SUCCESS on final head `edd2e6b4cd2f7dc2a26d992e1e16186f8b779c48`; setup, checkout, install locked dependencies, typecheck, lint, unit tests ve Expo dependency health adımlarının tamamı success.
 - **Çalışma ağacı:** Yalnız önceden var olan `expo-env.d.ts` modified/un-staged. VDY-004 dosyaları clean/staged değil; bu `expo-env.d.ts` değişikliği branch/commit'e dahil edilmedi.
 - **NEXT ACTION:** Kurucu/reviewer PR #12'yi inceleyip karar versin; merge için ayrıca açık kurucu onayı gerekir.
 
