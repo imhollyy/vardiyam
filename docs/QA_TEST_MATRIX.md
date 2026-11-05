@@ -88,3 +88,50 @@
 | D10 | Mağaza gizlilik beyanı | SDK envanteriyle tutarlı |
 
 **Test kanıt formatı:** `caseId | komut/cihaz | tarih | PASS/FAIL/SKIP | çıktı veya screenshot referansı | reviewer`.
+
+### Android emulator evidence — 2026-11-05
+
+Device: `Medium_Phone_API_37.0` (Android 17 / API 37, x86_64), Expo Go, VDY-003B source HEAD `58b9091abacebbc1223e7c085d9ca3f8b96660c1`. SQLite checks used two isolated synthetic databases through the existing `SQLiteProvider` `onInit` connection. A temporary development-only diagnostic was removed after the run; it logged only mode, schema version, v2 table count, and the synthetic marker.
+
+| Case | Result | Evidence |
+|---|---|---|
+| Android fresh database v0→v2 | PASS | `vdy-smoke-fresh.db`: `before=0`, `after=2`, all four v2 tables present. The Expo Go app itself was already installed; this proves a clean provider database, not a clean Expo Go reinstall. |
+| Android existing v1→v2 | PASS | Separate `vdy-smoke-upgrade.db`, seeded with only `app_metadata(synthetic_smoke_marker, 'v1-preserved')`: `before=1`, `after=2`, all four v2 tables present. |
+| v1 data preservation | PASS | Synthetic marker read back as `v1-preserved` after migration and again after cold restart. No real/user data was used. |
+| Android application cold restart | PASS | `adb shell am force-stop host.exp.exponent`, then reopen `exp://127.0.0.1:8081`; provider reports `before=2`, `after=2`, four v2 tables, marker preserved. |
+| D04 cold start subcase | PASS; airplane-mode subcase SKIP | Cold restart evidence above. Airplane mode was not enabled/tested. |
+| D07 Android four-tab smoke | PASS | Screenshots: [`today.png`](progress/evidence/android-2026-11-05/today.png), [`calendar.png`](progress/evidence/android-2026-11-05/calendar.png), [`earnings.png`](progress/evidence/android-2026-11-05/earnings.png), [`settings.png`](progress/evidence/android-2026-11-05/settings.png). Captured after loading the identified source commit; Expo Go development overlay is visible. |
+| D07 iOS smoke | SKIP | No iOS device/simulator available in this Windows run; R08 remains open. |
+| Debug APK build | SKIP | Not required after Expo Go exercised the native Expo SQLite provider on-device. Earlier native build attempts failed at the Windows MAX_PATH limit; no system-wide long-path setting was changed. |
+
+Runtime provenance: Metro output `Android Bundled ... node_modules\expo-router\entry.js (1319 modules)` from repository HEAD `58b9091abacebbc1223e7c085d9ca3f8b96660c1`; the same provider callback logged `before=0, after=2, v2Tables=4` and separately `before=1, after=2, v2Tables=4, syntheticMarker=v1-preserved`. `npm run typecheck` passed while the temporary diagnostic existed; the diagnostic is not present in final source.
+
+Windows network correction: initial read-only inspection in this run found Ethernet interface 11 still Private and only two enabled inbound `adb.exe` Allow rules, both scoped Private and bound to the installed SDK adb executable. Returning Ethernet to Public was attempted once and rejected with the Network List Manager Policies / Group Policy diagnostic; the profile remains Private. ADB itself is verified local-only for this run: emulator `device`, ADB server `127.0.0.1:5037`, Expo port forwarded through `adb reverse`; no Public/Any ADB exception was created. See `docs/progress/PROGRESS.md` for the before/after record.
+
+Independent R2 security/data reviewer: **APPROVE**, no P0/P1/P2; verified the status claims, synthetic-only marker, no remaining provider diagnostic, network-policy blocker, and open iOS/R13 gates. Results were posted to PR #4 and PR #9 conversations; neither PR was merged or changed in code.
+
+### VDY-003C — planned schedule UI and persistence
+
+| Case | Result | Evidence |
+|---|---|---|
+| Schedule creation presets (fixed, weekly three-shift, 2+2+2, 4+2, 6+1) and selected start shift | PASS | `tests/features/schedule.test.mjs`; schedule draft delegates constructors/projection to `src/domain/shift-cycle`. |
+| Custom schedule, invalid templates and anchor validation | PASS | `tests/features/schedule.test.mjs`; invalid/incomplete drafts rejected before save. |
+| Month navigation and leap/month boundaries | PASS | `tests/features/dates.test.mjs`; December/January and leap-February boundaries. |
+| Atomic template/cycle save and editing preserves existing daily overrides | PASS | `tests/data/shiftCycleRepository.test.mjs`; repository transaction test. |
+| Failed schedule save rollback | PASS | `tests/data/shiftCycleRepository.test.mjs`; synthetic failure during second template insert leaves no partial schedule. |
+| SQLite close/reopen persistence | PASS | `tests/data/shiftCycleRepository.test.mjs`; isolated synthetic temporary file database. |
+| Calendar one-day SHIFT/OFF/LEAVE behavior and cycle unaffected | PASS | Existing repository/domain override cases plus calendar UI review; OFF remains a planned day off, never a legal-rest claim. |
+| Today/upcoming view, empty/loading/error/success, theme and accessibility | PASS (automated/static) | Implemented in Today/Calendar/Settings routes. No physical device smoke required or run for VDY-003C; see visual QA limitation below. |
+| Saved cycle edit preserves exact phase, including startIndex in the middle of a repeated-shift run | PASS | Repository-backed round-trip regression in `tests/data/shiftCycleRepository.test.mjs`; pure builder case in `tests/features/schedule.test.mjs`. |
+| User-editable IANA time zone and invalid zone rejection | PASS | Settings exposes IANA field; existing domain validator validates identifiers. |
+| UI touch target sizing | PASS (code review) | Settings chips/remove action are ≥44 dp; calendar day press target adds 4 dp horizontal hit area. |
+| `npm run typecheck` | PASS | 2026-11-05; exit 0. |
+| `npm run lint` | PASS | 2026-11-05; exit 0. |
+| `npm test` | PASS | 83/83 tests; includes repository persistence/rollback, exact saved phase, and schedule/date cases. |
+| `npx expo-doctor --verbose` | PASS | 20/20; first attempt had transient DNS failures, successful connected retry completed all checks. |
+| Android bundle export | PASS | `npx expo export --platform android --output-dir .expo\vdy-003c-export`; Metro bundled 1,190 modules. This is bundle verification, not device smoke. |
+| `git diff --check` | PASS | 2026-11-05; no whitespace errors. |
+| GitHub CI | PASS | Draft PR #11 head `8d110e93c4e663c7aa6fcb52eb6df9813b0c6f74`; `Verify Expo scaffold` job 127144494014 / Actions run 41997597725 completed successfully. |
+| Android/iOS physical visual QA, large text and screen reader | SKIP | Not required by this task; native UI behavior is not claimed as device-verified. Existing VDY-003B Android/SQLite screenshots remain preserved above. |
+
+Reviewer: independent R2 reviewer **APPROVE** after fixes; first review caught and the implementation addressed a saved-phase regression risk, 44 dp touch target gaps, and missing editable IANA zone. Final reviewer verified DayCell `hitSlop` correction. Keep R08 (iOS/device coverage), R13 (12 moderate audit findings), and Ethernet Public-profile policy issue separate and open.

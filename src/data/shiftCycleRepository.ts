@@ -364,6 +364,71 @@ export async function createShiftCycle(
   });
 }
 
+/** Saves the complete editor payload atomically while preserving the connection queue. */
+export async function saveShiftSchedule(
+  database: ShiftCycleDatabase,
+  templates: readonly ShiftTemplate[],
+  cycle: ShiftCycle,
+): Promise<void> {
+  validateShiftCycle(cycle, templates);
+
+  await withDatabaseTransaction(database, async () => {
+    await assertForeignKeysEnabled(database);
+
+    for (const template of templates) {
+      validateShiftTemplate(template);
+      await database.runAsync(
+        'INSERT INTO shift_templates ' +
+          '(id, code, name, start_local_time, end_local_time, color_token, icon_key) ' +
+          'VALUES (?, ?, ?, ?, ?, ?, ?) ' +
+          'ON CONFLICT(id) DO UPDATE SET code = excluded.code, name = excluded.name, ' +
+          'start_local_time = excluded.start_local_time, end_local_time = excluded.end_local_time, ' +
+          'color_token = excluded.color_token, icon_key = excluded.icon_key;',
+        template.id,
+        template.code,
+        template.name,
+        template.startLocalTime,
+        template.endLocalTime,
+        template.colorToken ?? null,
+        template.iconKey ?? null,
+      );
+    }
+
+    validateShiftCycle(cycle, await listShiftTemplatesInternal(database));
+    const existing = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM shift_cycles WHERE id = ?;',
+      cycle.id,
+    );
+
+    if (existing) {
+      await database.runAsync(
+        'UPDATE shift_cycles SET name = ?, timezone = ?, anchor_local_date = ?, ' +
+          'start_index = ?, entry_count = ? WHERE id = ?;',
+        cycle.name,
+        cycle.timezone,
+        cycle.anchorLocalDate,
+        cycle.startIndex,
+        cycle.entries.length,
+        cycle.id,
+      );
+      await database.runAsync('DELETE FROM cycle_entries WHERE cycle_id = ?;', cycle.id);
+    } else {
+      await database.runAsync(
+        'INSERT INTO shift_cycles (id, name, timezone, anchor_local_date, start_index, entry_count) ' +
+          'VALUES (?, ?, ?, ?, ?, ?);',
+        cycle.id,
+        cycle.name,
+        cycle.timezone,
+        cycle.anchorLocalDate,
+        cycle.startIndex,
+        cycle.entries.length,
+      );
+    }
+
+    await insertCycleEntries(database, cycle);
+  });
+}
+
 export async function getShiftCycle(
   database: ShiftCycleDatabase,
   id: string,

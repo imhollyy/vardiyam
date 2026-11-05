@@ -140,7 +140,7 @@ function localDateFromOrdinal(ordinal: number): LocalDate {
   );
 }
 
-function addCalendarDays(localDate: LocalDate, days: number): LocalDate {
+export function addCalendarDays(localDate: LocalDate, days: number): LocalDate {
   if (!Number.isSafeInteger(days)) {
     return fail('INVALID_DATE', 'Calendar day offset must be a safe integer.');
   }

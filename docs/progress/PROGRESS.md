@@ -6,23 +6,23 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** G1 — Expo/Router/SQLite başlangıç scaffold'ı
-- **Durum:** VDY-003B IN_PROGRESS (R2) on PR #7 head; VDY-003A PR #7 draft; PR #4 device BLOCKED; main merge/release yok
-- **Aktif branch:** feat/vdy-003b-sqlite-storage
+- **Aktif aşama:** VDY-003C — Gerçek Vardiya Takvimi ve Bugün Ekranı
+- **Durum:** VDY-003C implementation/review/GitHub CI PASS; draft PR #11 open on `feat/vdy-003c-shift-calendar-ui`, based on VDY-003B HEAD `58b9091`; previous Android evidence retained; R08/R13 and Ethernet policy issue remain separately OPEN; main merge/release yok
+- **Aktif branch:** feat/vdy-003c-shift-calendar-ui
 - **Ana depo:** `imhollyy/vardiyam`
-- **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
+- **Ürün kodu:** VDY-003C ile gerçek vardiya düzeni oluşturma, Bugün ve Takvim akışları eklendi
 - **Expo/SQLite scaffold:** READY_FOR_PR
 - **Gerçek alt ajan çağrısı:** Implementer + bağımsız reviewer önceki preflight'te; R2 reviewer son diff'i ayrıca inceledi ve düzeltmelerden sonra bulgu bırakmadı. Uzman ajan denemesi repo erişimi olmadığı için sayılmadı; R2 sınıfında uzman zorunlu değil.
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / test / Expo Doctor / diff-check:** VDY-003B NOT RUN yet.
+- **Typecheck / lint / unit test / Expo Doctor:** VDY-003C PASS: typecheck, lint, 83/83 tests, Expo Doctor 20/20, Android bundle export, diff check. GitHub CI awaits draft PR head. R13 remains OPEN.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. SQLite v2, typed storage, safety tests, requested verification, and independent R2 review; keep all PRs unmerged.
+1. Review draft PR #11; then proceed to VDY-004 when ready. Do not merge without separate authorization.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -306,3 +306,37 @@ NEXT ACTION:
 - **Security/scope:** No real salary data, secrets, .env, production access, UI, wage/overtime, IAP, device test, Expo SDK change, merge, or release.
 - **PR/commit:** Implementation commit `0607c301ed643dff94d7122e01997997748efffd`; pushed feature branch. Draft PR #9 targets `feat/vdy-003a-shift-cycle-engine` (PR #7 head): https://github.com/imhollyy/vardiyam/pull/9. No merge/release.
 - **NEXT ACTION:** Obtain PR #9 review and explicit merge authorization; do not merge in this task.
+
+### 2026-11-05 — VDY-002 Android / VDY-003B — DEVICE FOLLOW-UP START
+
+- **User scope:** Preserve prior four-tab screenshots and smoke evidence; no PR merge/release. Correct Ethernet network profile to Public, verify ADB is localhost-only; then use Expo SQLiteProvider's live handle for sanitized development-only PRAGMA diagnostics, test clean v0→v2 and synthetic v1→v2/data preservation separately, cold restart, and record exact results in QA/related PRs.
+- **Baseline:** `feat/vdy-003b-sqlite-storage`, HEAD `58b9091abacebbc1223e7c085d9ca3f8b96660c1`, clean worktree. Earlier run captured four screenshots in prior work outputs and they are preserved.
+- **Network initial state (read-only):** Ethernet index 11 = Private; two enabled inbound Allow `adb.exe` rules = Private only, executable constrained to the installed SDK adb.exe. No Public/Any adb rule found. Earlier session evidence records Ethernet as Public before it was changed to Private.
+- **Network correction:** `Set-NetConnectionProfile -InterfaceIndex 11 -NetworkCategory Public` failed; Windows error explicitly cites non-elevated PowerShell or Network List Manager Policies / Group Policy. Profile remains Private. Stop condition honored; did not try registry/policy/UI bypass or alter other firewall rules.
+- **ADB local check:** adb 1.0.41 / Platform-Tools 37.0.1; emulator-5554 `device`; server listens on 127.0.0.1:5037. Private-scoped inbound adb rules remain untouched.
+- **Risk/scope:** R2 user data migration evidence. No production data; only synthetic marker will be used. Temporary dev diagnostic must be removed before final; reviewer must inspect QA claims/evidence. Skills read: vardiyam-task-flow v1.0, vardiyam-data-safety v1.0, vardiyam-test-gate v1.0, find-docs (Expo SQLite SDK 58 runtime docs queried earlier in VDY-003B; this run uses existing v58 provider API).
+- **NEXT ACTION:** Test `initializeDatabase` and `PRAGMA user_version` through the running Expo SQLiteProvider without shipping diagnostic code; separately record v0→v2 and seeded synthetic v1→v2 results.
+
+### 2026-11-05 — VDY-002 Android smoke / VDY-003B SQLite device verification — RESULT
+
+- **Risk/scope:** R2 controlled migration/user-owned data. Read `vardiyam-task-flow v1.0`, `vardiyam-data-safety v1.0`, `vardiyam-test-gate v1.0`, and `find-docs`; Context7 Expo SDK 58 docs confirmed SQLiteProvider `onInit` exposes the live database connection and that it gates consumers.
+- **Source provenance:** branch `feat/vdy-003b-sqlite-storage`, HEAD `58b9091abacebbc1223e7c085d9ca3f8b96660c1`. Elevated Expo CLI output: `Android Bundled ... node_modules\expo-router\entry.js (1319 modules)`. The temporary dev diagnostic was attached to the existing provider handle, then removed; production app layout remains unchanged.
+- **On-device SQLite:** PASS — clean isolated provider DB `vdy-smoke-fresh.db`: `before=0`, `after=2`, `v2Tables=4`, marker null. PASS — separate synthetic v1 DB `vdy-smoke-upgrade.db`: `before=1`, `after=2`, `v2Tables=4`, `syntheticMarker=v1-preserved`. PASS — after `adb shell am force-stop host.exp.exponent` and reopening the same loopback Metro URL: `before=2`, `after=2`, four v2 tables, marker still `v1-preserved`. No real personal or pay data used. SQLite actual Android `PRAGMA user_version` = **2**.
+- **Android UI:** PASS — all four tabs were opened and new emulator screenshots visually verified under `docs/progress/evidence/android-2026-11-05/`; prior screenshots remain in their original outputs folder. App was Expo Go on Android 17/API 37. D04 cold-start subcase PASS but airplane-mode subcase SKIP; D07 Android PASS, iOS SKIP. R08 remains OPEN.
+- **Validation:** Temporary diagnostic `npm run typecheck` PASS; Metro successfully bundled 1,319 modules; logcat showed no fatal/SQLite error for the successful launch/restart. `git diff --check` recorded after docs update. No release APK needed after native Expo SQLite ran in Expo Go; prior CMake/Ninja failures were MAX_PATH (`Filename longer than 260 characters`), and system-wide long-path settings were not changed.
+- **Network before/after:** Read-only before: Ethernet index 11 Private; two enabled inbound adb.exe Allow rules Private only and app-path-bound. Attempt to restore Ethernet to Public failed with Windows Network List Manager Policies/Group Policy denial; after remains Private. Stopped as instructed; no policy/registry workaround, no unrelated firewall rule touched, no Public/Any ADB rule added. ADB remained local: emulator `device`, server `127.0.0.1:5037`, Metro via `adb reverse`.
+- **PRs:** No merge, release, branch rewrite, or PR code change. Device evidence is ready to add as status comments to PR #4 (Android smoke) and PR #9 (provider migration follow-up).
+- **Independent review:** Required R2 security reviewer must verify this narrow evidence/docs diff and that the test harness is absent from final source before task closure.
+- **Open risks:** Ethernet is still Private pending authorized admin/policy correction; R08 iOS device coverage OPEN; R13 12 moderate npm audit findings OPEN. No risk is marked closed by this run.
+- **NEXT ACTION:** Complete independent R2 evidence review, add accurate read-only-result comments to PR #4/#9, then leave the Windows profile blocker and R08/R13 explicitly open.
+
+### 2026-11-05 — VDY-003C — IMPLEMENTATION / VERIFY / R2 REVIEW APPROVED
+
+- **Source/branch:** GitHub Issue #10; `feat/vdy-003c-shift-calendar-ui` created from local VDY-003B head `58b9091abacebbc1223e7c085d9ca3f8b96660c1`. Implementation commit `f9e174ae5e25ae9cf1b3da1e257ebcbdaad1a541`; draft PR #11 targets `feat/vdy-003b-sqlite-storage`: https://github.com/imhollyy/vardiyam/pull/11. PR #4/#6/#7/#9, main and release remain untouched. Previous Android four-tab screenshots and SQLite v0→v2/v1→v2 evidence were preserved.
+- **Skills:** `vardiyam-task-flow` v1.0, `vardiyam-ui-quality` v1.0, `vardiyam-data-safety` v1.0, `vardiyam-test-gate` v1.0 and `find-docs` applied; Expo SDK 58 SQLite/Router APIs verified using current documentation. Native UI skill guidance fetched from UI Skills CLI.
+- **Implementation:** Settings creates/edits shift templates and fixed/weekly-three/2+2+2/4+2/6+1/custom cycle schedules, IANA timezone, anchor date and start shift. `saveShiftSchedule` writes template/cycle/entries atomically through existing repository queue/transaction. Calendar queries actual planned shifts by month and supports selected-day SHIFT/OFF/LEAVE override. Today shows today's plan and upcoming shifts. Existing domain cycle engine/projection is reused. Prior overrides survive schedule edits; OFF is not called legal rest.
+- **Reviewer findings/fixes:** Independent R2 reviewer initially found P1 saved cycle phase could drift and P2 touch target/timezone gaps. Exact stored `startIndex` is now retained for unchanged start selection, with builder and SQLite round-trip regressions. IANA zone is editable and validated by the existing domain validator. Settings controls meet 44 dp; calendar day cells add 6 dp horizontal hit area. Reviewer final **APPROVE**, no remaining P0/P1/P2; independently ran tests (83/83 PASS).
+- **Verification:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (83/83); `npx expo-doctor --verbose` PASS (20/20; initial offline DNS failure, successful connected retry); `npx expo export --platform android --output-dir .expo\vdy-003c-export` PASS (Android bundle, 1,190 modules, 2.7 MB Hermes); `git diff --check` PASS. No VDY-003C device smoke was required or performed. PR #11 current code head `8d110e93c4e663c7aa6fcb52eb6df9813b0c6f74` GitHub Actions `Verify Expo scaffold` job 127144494014 / run 41997597725 **PASS**.
+- **Files:** Today/Calendar/Settings routes; repository atomic schedule-save API; pure schedule/date helpers; shared shift-kind badge; schedule/repository/date test coverage; QA matrix and task record. Prior Android screenshots under `docs/progress/evidence/android-2026-11-05/` preserved.
+- **Separate open risks:** R08 iOS/device coverage remains OPEN; R13 12 moderate npm audit findings remain OPEN; Ethernet index 11 still Private because Network List Manager policy blocked Public restoration; no firewall broadening. No APK build, main merge, release, or PR merge in VDY-003C.
+- **NEXT ACTION:** Review draft PR #11; then proceed to VDY-004 when ready. Do not merge without separate authorization.
