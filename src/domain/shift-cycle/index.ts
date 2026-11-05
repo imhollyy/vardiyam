@@ -38,6 +38,7 @@ export type PlannedShift = {
 export type ShiftCycleErrorCode =
   | 'INVALID_DATE'
   | 'INVALID_DATE_RANGE'
+  | 'RANGE_TOO_LARGE'
   | 'EMPTY_CYCLE'
   | 'INVALID_START_INDEX'
   | 'INVALID_TIMEZONE'
@@ -61,6 +62,7 @@ export class ShiftCycleError extends Error {
 type DateParts = { year: number; month: number; day: number };
 
 const DAYS_PER_400_YEARS = 146_097;
+export const MAX_PROJECTED_RANGE_DAYS = 3_660;
 
 function fail(code: ShiftCycleErrorCode, message: string): never {
   throw new ShiftCycleError(code, message);
@@ -408,6 +410,28 @@ export function getProjectedDay(
 }
 
 /** Returns an inclusive range by applying the exact same projection used for a single date. */
+export function getProjectedRangeDayCount(
+  startLocalDate: LocalDate,
+  endLocalDate: LocalDate,
+): number {
+  const firstDay = dayOrdinal(startLocalDate);
+  const lastDay = dayOrdinal(endLocalDate);
+
+  if (lastDay < firstDay) {
+    return fail('INVALID_DATE_RANGE', 'Range end must not be before range start.');
+  }
+
+  const dayCount = lastDay - firstDay + 1;
+  if (dayCount > MAX_PROJECTED_RANGE_DAYS) {
+    return fail(
+      'RANGE_TOO_LARGE',
+      'Projection ranges are limited to ' + MAX_PROJECTED_RANGE_DAYS + ' local calendar days.',
+    );
+  }
+
+  return dayCount;
+}
+
 export function getProjectedRange(
   cycle: ShiftCycle,
   templates: readonly ShiftTemplate[],
@@ -416,17 +440,13 @@ export function getProjectedRange(
   overrides: readonly PlanOverride[] = [],
 ): PlannedShift[] {
   validateShiftCycle(cycle, templates);
+  const dayCount = getProjectedRangeDayCount(startLocalDate, endLocalDate);
   const firstDay = dayOrdinal(startLocalDate);
-  const lastDay = dayOrdinal(endLocalDate);
-
-  if (lastDay < firstDay) {
-    return fail('INVALID_DATE_RANGE', 'Range end must not be before range start.');
-  }
-
   const byDate = overridesByDate(overrides, templates);
   const result: PlannedShift[] = [];
 
-  for (let ordinal = firstDay; ordinal <= lastDay; ordinal += 1) {
+  for (let offset = 0; offset < dayCount; offset += 1) {
+    const ordinal = firstDay + offset;
     const localDate = localDateFromOrdinal(ordinal);
     result.push(projectValidatedDay(cycle, localDate, byDate, templates));
   }
