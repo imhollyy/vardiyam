@@ -127,7 +127,7 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 
 Gerçek doğrulama sonuçları VDY-005C1 kapanış kaydında `docs/progress/PROGRESS.md` içinde tutulur. Bu testler sentetiktir; hukuk mütalaası, gerçek işyeri bordro teyidi veya kalıcı snapshot/SQLite kabulü değildir.
 
-Son yerel çalıştırma: `npm test` PASS 184/184 (57 yeni domain testi, 40 ayrı sayı fixture'ı); focused kazanç testi 57/57; `npm run typecheck` PASS; `npm run lint` PASS; `npx expo-doctor --verbose` PASS 20/20 (ağ erişimli yeniden deneme); `git diff --check` PASS. PR/GitHub CI durumu `docs/progress/PROGRESS.md` kapanış kaydında güncellenecek.
+Son çalıştırma: `npm test` PASS 184/184 (57 yeni domain testi, 40 ayrı sayı fixture'ı); focused kazanç testi 57/57; `npm run typecheck` PASS; `npm run lint` PASS; `npx expo-doctor --verbose` PASS 20/20 (ağ erişimli yeniden deneme); `git diff --check` PASS; taslak PR #18 GitHub Actions run #22 (`42029068508`) PASS.
 
 ## Yasal uyarı / ürün davranışı
 
