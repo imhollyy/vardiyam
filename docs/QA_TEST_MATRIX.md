@@ -31,6 +31,21 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 | WS09 | Çakışan tatil/kural boundary pencereleri | parçalar atomik ve çakışmasız; her gerçek dakika bir kez sayılır, tüm aktif kaynak kimlikleri eklenir | aynı |
 | WS10 | Zamanlı mola toplamı WorkRecord `breakMinutes` ile uyuşmuyor | açık tutarlılık hatası; sessiz normalizasyon yok | aynı |
 
+## VDY-005B — Zamanlı mola ve SQLite v4
+
+| ID | Senaryo | Beklenen | Otomatik kanıt |
+|---|---|---|---|
+| WB01 | Temiz 0→4 ve v3→v4 migration | `break_intervals` ve kontroller transaction içinde oluşur; eski WorkRecord satırları ve mola toplamları aynen korunur | `tests/data/migrations.test.mjs` |
+| WB02 | v4 DDL hata/rollback | `user_version=3` ve v3 work records korunur; kısmi tablo/trigger kalmaz | aynı |
+| WB03 | Tek/çoklu mola oluştur, değiştir ve kaldır | sıralı UTC aralıklar kalıcı CRUD yapar; kaldırınca toplam dakika silinmez | `tests/data/workRecordRepository.test.mjs` |
+| WB04 | Çakışma, çalışma dışı aralık, geçersiz an, yanlış toplam | açık hata; önceki mola satırları ve WorkRecord korunur | aynı + `tests/domain/timed-break.test.mjs` |
+| WB05 | Gece yarısını aşan mola ve 28 Ekim 13:00 | UTC anları korunur; segmenter sadece gerçek mola dakikalarını doğru sınır taraflarından çıkarır | `tests/data/workRecordRepository.test.mjs`; `tests/domain/timed-break.test.mjs` |
+| WB06 | DST boşluğu/tekrarlanan yerel saat | var olmayan saat reddedilir; fold için kullanıcı oluşum seçer; saklama UTC'dir | `tests/domain/timed-break.test.mjs` |
+| WB07 | SQLite soğuk yeniden açılış ve FK cascade | mola aralıkları kalır; yalnız WorkRecord silinirse ilişkili aralıklar silinir | `tests/data/workRecordRepository.test.mjs` |
+| WB08 | Aynı connection'da eşzamanlı yazım/başarısız replace | repository kuyruğu yazımları serileştirir; hata transaction'ı rollback eder ve eski aralıklar kalır | aynı |
+| WB09 | Legacy aggregate-only mola | eski `break_minutes` değişmez, timed rows oluşturulmaz, segment bazında `workedMinutes=null`; arayüz “saati belirtilmemiş” gösterir | `tests/data/workRecordRepository.test.mjs`; UI cihaz testi ayrı raporlanır |
+| WB10 | WorkRecord başlangıç/bitiş veya mola toplamı değişikliği | mevcut timed interval'lar yeni kayıtla hâlâ tutarlı değilse tüm update reddedilir; geçerli ortak düzenleme tek transaction'da kaydedilir | `tests/data/workRecordRepository.test.mjs` |
+
 > Aşağıdaki VDY-004 satırları uygulanmış otomatik senaryoları ve dosya kanıtlarını listeler. Diğer hesap ve cihaz satırları planlanan kapsamdır; her görev kendi gerçek PASS/FAIL/SKIP sonucunu `docs/progress/PROGRESS.md` içinde kaydeder.
 
 ## Zaman ve vardiya
