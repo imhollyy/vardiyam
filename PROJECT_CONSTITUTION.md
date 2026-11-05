@@ -1,6 +1,6 @@
-# VARDİYAM — PROJE ANAYASASI v1.0
+# VARDİYAM — PROJE ANAYASASI v1.1
 
-> **Durum: APPROVED — kurucu tarafından 2026-11-05 tarihinde onaylandı.** Bu anayasa bağlayıcıdır; değişiklikler ayrı karar ve kurucu onayı gerektirir. Bölüm 14'teki açık kararlar henüz kesinleşmemiştir.
+> **Durum: APPROVED — v1.0 kurucu onayı 2026-11-05; ajan/skill orkestrasyonu v1.1 kurucu talebiyle 2026-11-05 tarihinde onaylandı.** Bu anayasa bağlayıcıdır; sonraki değişiklikler ayrı karar ve kurucu onayı gerektirir. Bölüm 14'teki açık kararlar henüz kesinleşmemiştir.
 > **Öncelik:** Kurucunun açık kararı > onaylanmış bu anayasa > AGENTS.md > PRODUCT_SPEC.md > görev belgeleri. Hukuk, mağaza kuralları ve güvenlik yükümlülükleri bu sırayla bertaraf edilemez.
 > **Köken:** Tam Kare deposundaki PROJECT_CONSTITUTION.md v2.2, AGENTS.md ve Development Quality Tooling disiplininden **uyarlanmıştır**. Tam Kare'nin Supabase, RLS, çok kiracılı SaaS, web ve sektör modülü zorunlulukları **aktarılmamıştır**.
 
@@ -85,7 +85,7 @@ Bulut senkronizasyonu, üyelik/şifre/SMS, işveren paneli, GPS/konum/puantaj iz
 - Büyük yazı, ekran okuyucu etiketleri, dinamik font, klavye/giriş odağı, erişilebilir kontrast (normal metinde en az 4.5:1 hedefi), platforma uygun dokunma alanı (yaklaşık 44pt/48dp hedefi).
 - Her ekran: loading, empty, error, content, disabled, offline, kaydetme/başarı, geçersiz giriş, Pro kilidi ve veri geri yükleme onayı durumlarını gerektikçe tasarlar.
 - Motion anlamlı ve kısa; reduce motion'a saygı. Gereksiz animasyon, reklam görünümü ve sahte finansal kesinlik yasak.
-- UI işi **tasarım alt ajanı + ilgili beceri** incelemesi ve gerçek Android/iOS ekran görüntüsü kontrolü olmadan tamamlanmış sayılmaz.
+- UI işi ilgili UI becerisi, etkilenen ekran durumlarının doğrulanması ve gerçek Android/iOS ekran görüntüsü kontrolü olmadan tamamlanmış sayılmaz. UI alt ajanı/reviewer eşiği §12'deki risk sınıfına göre seçilir; R0/R1 UI işi tek başına ajan zorunluluğu doğurmaz.
 
 ## 9. Mahremiyet, güvenlik, yedekleme
 
@@ -111,13 +111,14 @@ Bulut senkronizasyonu, üyelik/şifre/SMS, işveren paneli, GPS/konum/puantaj iz
 
 ## 12. Ajanlar, beceriler ve kayıt disiplini
 
-- Her geliştirme görevi için **uygulayıcı + bağımsız denetçi alt ajan** ve en az **1 ilgili repo becerisi** zorunludur. Domain/ücret, UI, güvenlik, QA, release etkisine göre üçüncü uzman alt ajan eklenir. Ayrı ajanlar gerçekten çalıştırılmadıysa çalıştırıldı denmez.
-- Alt ajan çalıştırma yeteneği yoksa **BLOCKED_AGENT_UNAVAILABLE** olarak ilerlemeyi kaydet, kullanıcıdan alternatif işleyiş onayı iste; aynı oturumdaki rol simülasyonunu gerçek alt ajan gibi gösterme.
-- Her görev: **Inspect → Plan → Skill seçimi → Ajan ataması → Implement → Verify → Independent Review → Evidence → Progress log → Founder gate**.
-- Her adım ve kesinti sonrası `docs/progress/PROGRESS.md` güncellenir. Task ID, branch, değişen dosyalar, test komutu/sonucu, reviewer, kullanılan skill, karar, açık risk, sonraki tek eylem kaydedilir.
+- Ajan kullanımı risk bazlıdır; birden çok sınıf uyuyorsa **en yüksek sınıf uygulanır**. **R0 — mikro:** typo, küçük belge düzeltmesi, davranış değiştirmeyen düzenleme; ana ajan yeterlidir. **R1 — standart:** sınırlı UI/CRUD/belge işi; ana ajan uygular, bağımsız ana-ajan kontrolü yeterlidir; kapsam birden fazla modüle veya kullanıcı verisine yayılırsa reviewer yükseltilir. **R2 — kritik:** onaylanmış iş kurallarına bağlı, dar kapsamlı pay/segmentasyon değişikliği; kontrollü migration/restore; satın alma veya kişisel veri akışı değişikliği; secret/data export sınırını etkilemeyen proje-scope agent/skill/MCP yapılandırma değişikliği — bağımsız reviewer zorunludur. **R3 — yüksek:** hakediş tutarını/öncelik politikasını değiştiren algoritma, geçmiş snapshot değişmezliği, yıkıcı/veri kaybı ihtimali, kişisel/secret veri sızma sınırı, production/payments güvenlik sınırı, IAP entitlement veya release/store kararı — reviewer ve gerekçeli uzman ajan zorunludur. Belirsizlikte yüksek sınıfı seç. Aynı işi paralel çoğaltma.
+- Her subagent çağrısı için soruyu, gerekçeyi, dosya/kapsam sınırını ve sonucu PROGRESS'e yaz. Reviewer bağımsız kanıt ve dar diff alır; tüm depoyu yeniden okumaz. Gerçek ajan çağrısı yapılmadıysa yapılmış denmez.
+- R2/R3 görevinde ajan yeteneği yoksa `BLOCKED_AGENT_UNAVAILABLE` kaydet ve kullanıcıya alternatif review seçeneği sun; rol simülasyonunu gerçek ajan gibi gösterme. R0/R1 işte ajan yokluğu blokaj değildir.
+- Her görev: **Inspect → Risk → ilgili skill → Implement → Verify → risk gerektiriyorsa Review → Evidence → Progress log → Founder gate**.
+- `docs/progress/PROGRESS.md` başlangıçta, önemli karar/blokajda ve görev sonunda güncellenir; olağan görev başına en fazla üç checkpoint. Kesinti veya güvenlik/veri riski bu sınırı aşmayı gerektirebilir. Task ID, branch, dosyalar, test sonucu, reviewer (varsa), skill, karar/risk ve tek NEXT ACTION kaydedilir.
 - `AGENTS.md`, `docs/DECISIONS.md`, `docs/RISKS.md`, `docs/tasks/` ve `docs/QA_TEST_MATRIX.md` aynı doğruluk kaynağına bağlıdır.
 - `main`e doğrudan geliştirme push'u, PR merge, force push, history rewrite, production release ve anayasayı sessiz değiştirme yasaktır. İlk başlangıç commit'i istisnası dokümante edilir.
-- Alt ajan maliyeti kontrolü: küçük işte iki rol; hesap/güvenlik/release işinde ek uzman. Aynı işi gereksiz paralel çoğaltma.
+- Alt ajan varsayılanı: R0'da sıfır; R1'de yalnız kapsam gerektirirse bir reviewer; R2'de bir reviewer; R3'te reviewer ve yalnız gerekçeli uzman. Codex proje ayarı eşzamanlı spawned ajan sayısını en fazla ikiyle sınırlar; görevler bağımsız değilse paralellik açılmaz.
 
 ## 13. Sürüm ve yayın kapısı
 
@@ -141,4 +142,8 @@ Bulut senkronizasyonu, üyelik/şifre/SMS, işveren paneli, GPS/konum/puantaj iz
 
 İlk araştırma: **2026-11-05**. Yayın öncesi mevzuat, mağaza ve SDK sürümleri yeniden doğrulanır. Ayrıntılı bağlantılar `docs/RESEARCH_SOURCES.md` içindedir.
 
-**Bu dosyanın statüsü:** `v1.0 APPROVED` (2026-11-05). Bölüm 14 açık kararları ayrı onay bekler.
+**Bu dosyanın statüsü:** `v1.1 APPROVED` (2026-11-05). Bölüm 14 açık kararları ayrı onay bekler.
+
+## Değişiklik geçmişi
+
+- **v1.1 (2026-11-05, APPROVED):** Kurucunun düşük kredi tüketimli ajan/skill/MCP mimarisi talebiyle §12 risk bazlı ajan kullanımına ve görev başına en fazla üç olağan progress checkpoint'ine geçti. Ürün kapsamı ve bölüm 14 kararları değişmedi.
