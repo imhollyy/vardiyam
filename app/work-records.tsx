@@ -40,6 +40,7 @@ import { getLocalToday } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 type FormDraft = {
@@ -522,13 +523,13 @@ export default function WorkRecordsScreen() {
           ) : null}
           <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Gerçekleşen zaman aralığı</Text>
           <View style={styles.twoColumns}>
-            <View style={styles.flex}><Field label="Başlangıç tarihi (YYYY-MM-DD)" value={draft.startDate} onChangeText={(startDate) => setDraft({ ...draft, startDate, startOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
-            <View style={styles.flex}><Field label="Başlangıç saati (HH:mm)" value={draft.startTime} onChangeText={(startTime) => setDraft({ ...draft, startTime, startOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+            <View style={styles.flex}><DateTimePickerField mode="date" label="Başlangıç tarihi" value={draft.startDate} timezone={draft.timezone} onChange={(startDate) => setDraft({ ...draft, startDate, startOccurrence: null })} onError={setError} /></View>
+            <View style={styles.flex}><DateTimePickerField mode="time" label="Başlangıç saati" value={draft.startTime} timezone={draft.timezone} localDate={draft.startDate} onChange={(startTime) => setDraft({ ...draft, startTime, startOccurrence: null })} onError={setError} /></View>
           </View>
           <OccurrenceChoices label="Başlangıç saati" value={`${draft.startDate}T${draft.startTime}`} timezone={draft.timezone} selected={draft.startOccurrence} onSelect={(startOccurrence) => setDraft({ ...draft, startOccurrence })} theme={theme} />
           <View style={styles.twoColumns}>
-            <View style={styles.flex}><Field label="Bitiş tarihi (YYYY-MM-DD)" value={draft.endDate} onChangeText={(endDate) => setDraft({ ...draft, endDate, endOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
-            <View style={styles.flex}><Field label="Bitiş saati (HH:mm)" value={draft.endTime} onChangeText={(endTime) => setDraft({ ...draft, endTime, endOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+            <View style={styles.flex}><DateTimePickerField mode="date" label="Bitiş tarihi" value={draft.endDate} timezone={draft.timezone} onChange={(endDate) => setDraft({ ...draft, endDate, endOccurrence: null })} onError={setError} /></View>
+            <View style={styles.flex}><DateTimePickerField mode="time" label="Bitiş saati" value={draft.endTime} timezone={draft.timezone} localDate={draft.endDate} onChange={(endTime) => setDraft({ ...draft, endTime, endOccurrence: null })} onError={setError} /></View>
           </View>
           <OccurrenceChoices label="Bitiş saati" value={`${draft.endDate}T${draft.endTime}`} timezone={draft.timezone} selected={draft.endOccurrence} onSelect={(endOccurrence) => setDraft({ ...draft, endOccurrence })} theme={theme} />
           <Field label="Zaman dilimi (IANA)" value={draft.timezone} onChangeText={(timezone) => {
@@ -566,8 +567,8 @@ export default function WorkRecordsScreen() {
                   </Pressable>
                 </View>
                 <View style={styles.twoColumns}>
-                  <View style={styles.flex}><Field label={`Mola ${index + 1} başlangıç tarihi`} value={item.startDate} onChangeText={(startDate) => updateBreakDraft(item.id, { startDate, startOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
-                  <View style={styles.flex}><Field label={`Mola ${index + 1} başlangıç saati`} value={item.startTime} onChangeText={(startTime) => updateBreakDraft(item.id, { startTime, startOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+                  <View style={styles.flex}><DateTimePickerField mode="date" label={`Mola ${index + 1} başlangıç tarihi`} value={item.startDate} timezone={draft.timezone} onChange={(startDate) => updateBreakDraft(item.id, { startDate, startOccurrence: null })} onError={setError} /></View>
+                  <View style={styles.flex}><DateTimePickerField mode="time" label={`Mola ${index + 1} başlangıç saati`} value={item.startTime} timezone={draft.timezone} localDate={item.startDate} onChange={(startTime) => updateBreakDraft(item.id, { startTime, startOccurrence: null })} onError={setError} /></View>
                 </View>
                 <OccurrenceChoices
                   label={`Mola ${index + 1} başlangıç saati`}
@@ -578,8 +579,8 @@ export default function WorkRecordsScreen() {
                   theme={theme}
                 />
                 <View style={styles.twoColumns}>
-                  <View style={styles.flex}><Field label={`Mola ${index + 1} bitiş tarihi`} value={item.endDate} onChangeText={(endDate) => updateBreakDraft(item.id, { endDate, endOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
-                  <View style={styles.flex}><Field label={`Mola ${index + 1} bitiş saati`} value={item.endTime} onChangeText={(endTime) => updateBreakDraft(item.id, { endTime, endOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+                  <View style={styles.flex}><DateTimePickerField mode="date" label={`Mola ${index + 1} bitiş tarihi`} value={item.endDate} timezone={draft.timezone} onChange={(endDate) => updateBreakDraft(item.id, { endDate, endOccurrence: null })} onError={setError} /></View>
+                  <View style={styles.flex}><DateTimePickerField mode="time" label={`Mola ${index + 1} bitiş saati`} value={item.endTime} timezone={draft.timezone} localDate={item.endDate} onChange={(endTime) => updateBreakDraft(item.id, { endTime, endOccurrence: null })} onError={setError} /></View>
                 </View>
                 <OccurrenceChoices
                   label={`Mola ${index + 1} bitiş saati`}

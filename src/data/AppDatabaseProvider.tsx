@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import * as SplashScreen from 'expo-splash-screen';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { initializeDatabase } from './database.ts';
@@ -40,6 +41,10 @@ export function AppDatabaseProvider({ children }: PropsWithChildren) {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const databaseRef = useRef<SQLiteDatabase | null>(null);
+
+  useEffect(() => {
+    if (error) void SplashScreen.hideAsync().catch(() => undefined);
+  }, [error]);
 
   useEffect(() => {
     let active = true;

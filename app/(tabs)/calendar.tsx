@@ -49,7 +49,7 @@ import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
 import { listWorkDayStatuses, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
 import { getRecordRangeDifferenceMinutes } from '@/src/domain/work-record';
-import { calendarMarker } from '@/src/features/shifts/presentation';
+import { calendarMarker, hasUnsavedPlanDraft } from '@/src/features/shifts/presentation';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
@@ -177,6 +177,18 @@ export default function CalendarScreen() {
   const [overrideKind, setOverrideKind] = useState<OverrideKind>('SHIFT');
   const [overrideTemplateId, setOverrideTemplateId] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
+  const [overrideBaseline, setOverrideBaseline] = useState('');
+  const overrideDraftSignature = JSON.stringify({ overrideKind, overrideTemplateId, overrideReason });
+  const closeOverrideEditor = () => {
+    if (hasUnsavedPlanDraft(overrideBaseline, overrideDraftSignature)) {
+      Alert.alert('Değişiklikler kaydedilmedi', 'Gün planındaki taslak değişiklikler silinecek.', [
+        { text: 'Düzenlemeye dön', style: 'cancel' },
+        { text: 'Taslağı sil', style: 'destructive', onPress: () => setEditorVisible(false) },
+      ]);
+      return;
+    }
+    setEditorVisible(false);
+  };
 
   useEffect(() => {
     if (!initialDateParam) return;
@@ -261,6 +273,11 @@ export default function CalendarScreen() {
             : templates[0]?.id ?? '',
       );
       setOverrideReason(existing?.reason ?? '');
+      setOverrideBaseline(JSON.stringify({
+        overrideKind: existing?.kind ?? plan?.kind ?? 'SHIFT',
+        overrideTemplateId: existing?.kind === 'SHIFT' ? existing.templateId : plan?.kind === 'SHIFT' ? plan.templateId ?? templates[0]?.id ?? '' : templates[0]?.id ?? '',
+        overrideReason: existing?.reason ?? '',
+      }));
       setEditorVisible(true);
     } catch {
       setError('Seçilen günün planı yüklenemedi.');
@@ -288,6 +305,7 @@ export default function CalendarScreen() {
       } else {
         await createPlanOverride(database, cycle.id, override);
       }
+      setOverrideBaseline(JSON.stringify({ overrideKind, overrideTemplateId, overrideReason }));
       setEditorVisible(false);
       setMessage(`${formatLocalDate(selectedDate)} planı kaydedildi.`);
       await load();
@@ -435,7 +453,7 @@ export default function CalendarScreen() {
         {message ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{message}</Text> : null}
       </ScrollView>
 
-      <Modal animationType="slide" onRequestClose={() => setEditorVisible(false)} transparent visible={editorVisible}>
+      <Modal animationType="slide" onRequestClose={closeOverrideEditor} transparent visible={editorVisible}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
@@ -444,7 +462,7 @@ export default function CalendarScreen() {
                   <Text accessibilityRole="header" style={[styles.modalTitle, { color: theme.foreground }]}>Gün planını değiştir</Text>
                   <Text style={[styles.body, { color: theme.muted }]}>{formatLocalDate(selectedDate)}</Text>
                 </View>
-                <Pressable accessibilityLabel="Pencereyi kapat" accessibilityRole="button" onPress={() => setEditorVisible(false)} style={[styles.closeButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Pressable accessibilityLabel="Pencereyi kapat" accessibilityRole="button" onPress={closeOverrideEditor} style={[styles.closeButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                   <Text style={{ color: theme.foreground, fontSize: 18 }}>×</Text>
                 </Pressable>
               </View>

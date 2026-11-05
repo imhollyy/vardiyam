@@ -593,3 +593,19 @@ NEXT ACTION:
 - Draft PR #30 created from `feat/vdy-010b-design-onboarding` to PR #29 base. Implementation commit `1f431410309e7350c9c3ee94dae4c2babcce8c90`; follow-up documentation commit `e63900f5a112505b176c2b2e2712436de159938c`. GitHub Actions runs `42120510298` and `42120854029` both PASS. No merge/rebase/release.
 - R08, R13, Ethernet profile policy, and Turkish labor-law expert review remain open separately.
 - NEXT ACTION: Review the VDY-010B draft PR and arrange real iOS/Android visual acceptance for onboarding, themes, native time picker, calendar panel, and reports before marking those device interactions accepted.
+
+### 2026-11-06 — VDY-010C — START / PRODUCT UX AUDIT
+
+- PR #30 current branch HEAD verified as `fe93e27ba8695ab6a414c79839326e92afd17e37`. Opened `feat/vdy-010c-product-ux-polish` in separate worktree `C:\Users\emrey\.codex\worktrees\vdy-010c-product-ux-polish\vardiyam` from that exact commit. The previous worktree’s unstaged `.gitignore` and `expo-env.d.ts` remain untouched.
+- Risk: R2 broad UI and accessibility with sensitive finance/data display; no domain rules, SQLite schema, backup/restore engine, or migration changes planned. A single independent UI/accessibility reviewer will inspect the final diff.
+- Skills: `vardiyam-task-flow` v1.0 and `vardiyam-ui-quality` v1.0 read/applied; `vardiyam-test-gate` v1.0 read for verification selection. UI Skills CLI discovery was attempted but did not return (network/tool unavailable); will use the repo’s native guidance and record outcome accurately.
+- Initial audit and focused P1/P2/P3 findings are recorded in `docs/tasks/VDY-010C.md`. First priority is to verify the completed-session clock-in guard, simplify redundant onboarding navigation, prevent calendar draft loss, improve native date entry, theme readiness, and reports/settings hierarchy.
+- NEXT ACTION: Complete read-only route/data-flow audit and execute the small, reversible UX fixes in this isolated worktree.
+
+### 2026-11-06 — VDY-010C — IMPLEMENTATION / VERIFICATION CHECKPOINT
+
+- Shared tokens and common settings action/date-time picker added. Theme loading now keeps the native splash visible until the locally saved preference resolves.
+- Today prevents a second primary clock-in after a same-day completed record and links to explicit manual history entry. Calendar confirms discarding an edited plan draft. Onboarding removes repeated earnings-settings navigation and shows a saved-cycle summary. Payment date, shift-cycle start date/template times, and work-record/break dates and times use native pickers. Reports adds an accessible period trend via the existing segmentation engine, preserving unknown-break uncertainty.
+- Verification: typecheck PASS; lint PASS; tests PASS **276/276** (baseline 269 plus 7 focused cases); Android and iOS JS exports PASS with Hermes `.hbc`; Expo Doctor PASS **20/20**; `git diff --check` PASS.
+- Independent R2 UI/accessibility review **APPROVE**; findings fixed and re-reviewed with no remaining static P0/P1/P2. Real Android/iOS, screenshots, large text, and TalkBack/VoiceOver NOT RUN. No SQLite migrations or business rule engines changed.
+- Commit `2b26b25c4c756b487a5384a18c27d06f549c0fd5` pushed to `feat/vdy-010c-product-ux-polish`; draft PR #31 opened against PR #30. GitHub Actions run #42 (`42129795159`) PASS. PR remains draft/open and unmerged. NEXT ACTION: User iPhone acceptance of onboarding, theme, calendar draft guard, native pickers, work trend, and small/large text/screen-reader behavior before deciding whether to advance the UI branch.

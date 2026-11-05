@@ -35,6 +35,8 @@ import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { saveOnboardingState } from '@/src/data/appPreferencesRepository';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
+import { ActionButton } from '@/src/components/ui/ActionButton';
 
 const PATTERNS: { id: ShiftPattern; title: string; hint: string }[] = [
   { id: 'fixed', title: 'Sabit', hint: 'Her gün seçilen vardiya' },
@@ -191,21 +193,8 @@ function Action({
   disabled?: boolean;
   accessibilityLabel?: string;
 }) {
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.action,
-        { backgroundColor: secondary ? theme.surface : theme.accent, borderColor: secondary ? theme.border : theme.accent, opacity: disabled ? 0.55 : pressed ? 0.75 : 1 },
-      ]}
-    >
-      <Text style={[styles.actionText, { color: secondary ? theme.foreground : theme.surface }]}>{label}</Text>
-    </Pressable>
-  );
+  void theme;
+  return <ActionButton label={label} accessibilityLabel={accessibilityLabel} onPress={onPress} variant={secondary ? 'secondary' : 'primary'} disabled={disabled} />;
 }
 
 function Chip({ label, selected, onPress, theme, accessibilityLabel }: {
@@ -235,7 +224,7 @@ function Chip({ label, selected, onPress, theme, accessibilityLabel }: {
 export default function SettingsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
-  const { theme } = useAppTheme();
+  const { theme, mode, toggleMode } = useAppTheme();
   const [cycle, setCycle] = useState<ShiftCycle | null>(null);
   const [storedTemplates, setStoredTemplates] = useState<ShiftTemplate[]>([]);
   const [draft, setDraft] = useState<ScheduleDraft>(() => createDefaults());
@@ -389,6 +378,13 @@ export default function SettingsScreen() {
       <PageHeading eyebrow="TERCİHLER" title="Ayarlar" subtitle="Vardiya düzenin cihazında saklanır. Kaydetmeden önce örneğini kontrol edebilirsin." />
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Görünüm ve hızlı erişim</Text>
+        <Action label={mode === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} onPress={() => void toggleMode()} theme={theme} secondary />
+        <Action label="Ücret ve işyeri ayarları" onPress={() => router.push('/earnings-settings' as never)} theme={theme} secondary />
+        <Action label="Net ödemeler" onPress={() => router.push('/net-payments' as never)} theme={theme} secondary />
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Veri güvenliği</Text>
         <Text style={[styles.body, { color: theme.muted }]}>Şifreli yedeklerini dışa aktar, eski yedeğini geri yükle veya cihazındaki verileri kaldır.</Text>
         <Action label="Yedekleme ve veri silme" onPress={() => router.push('/backup' as never)} theme={theme} />
@@ -434,7 +430,7 @@ export default function SettingsScreen() {
             <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Döngü bilgileri</Text>
             <Field label="Düzen adı" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} theme={theme} placeholder="Örn. Üretim vardiyam" />
             <Field label="Zaman dilimi (IANA)" value={draft.timezone} onChangeText={(timezone) => setDraft({ ...draft, timezone })} theme={theme} placeholder="Europe/Istanbul" />
-            <Field label="Başlangıç tarihi (YYYY-MM-DD)" value={draft.anchorLocalDate} onChangeText={(anchorLocalDate) => setDraft({ ...draft, anchorLocalDate })} theme={theme} keyboardType="numbers-and-punctuation" maxLength={10} placeholder="2026-11-05" />
+            <DateTimePickerField mode="date" label="Döngü başlangıç tarihi" value={draft.anchorLocalDate} timezone={draft.timezone} onChange={(anchorLocalDate) => setDraft({ ...draft, anchorLocalDate })} onError={setError} />
             <Text style={[styles.fieldLabel, { color: theme.muted }]}>Düzen türü</Text>
             <View style={styles.chipWrap}>
               {PATTERNS.map((item) => <Chip key={item.id} label={item.title} selected={draft.pattern === item.id} onPress={() => choosePattern(item.id)} theme={theme} accessibilityLabel={`${item.title}: ${item.hint}`} />)}
@@ -452,8 +448,8 @@ export default function SettingsScreen() {
                   <View style={styles.codeField}><Field label={`Şablon ${index + 1} kodu`} value={template.code} onChangeText={(code) => updateTemplate(index, { code: code.toLocaleUpperCase('tr-TR') })} theme={theme} maxLength={5} placeholder="G" /></View>
                 </View>
                 <View style={styles.twoColumns}>
-                  <View style={styles.flex}><Field label={`Şablon ${index + 1} başlangıç saati`} value={template.startLocalTime} onChangeText={(startLocalTime) => updateTemplate(index, { startLocalTime })} theme={theme} keyboardType="numbers-and-punctuation" maxLength={5} placeholder="08:00" /></View>
-                  <View style={styles.flex}><Field label={`Şablon ${index + 1} bitiş saati`} value={template.endLocalTime} onChangeText={(endLocalTime) => updateTemplate(index, { endLocalTime })} theme={theme} keyboardType="numbers-and-punctuation" maxLength={5} placeholder="16:00" /></View>
+                  <View style={styles.flex}><DateTimePickerField mode="time" label={`Şablon ${index + 1} başlangıç saati`} value={template.startLocalTime} localDate={draft.anchorLocalDate} timezone={draft.timezone} onChange={(startLocalTime) => updateTemplate(index, { startLocalTime })} onError={setError} /></View>
+                  <View style={styles.flex}><DateTimePickerField mode="time" label={`Şablon ${index + 1} bitiş saati`} value={template.endLocalTime} localDate={draft.anchorLocalDate} timezone={draft.timezone} onChange={(endLocalTime) => updateTemplate(index, { endLocalTime })} onError={setError} /></View>
                 </View>
               </View>
             ))}

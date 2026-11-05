@@ -14,7 +14,7 @@ import { getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTe
 import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalToday, localDateForMonthDay, monthForLocalDate, monthRange, mondayFirstOffset, mondayFirstWeekdayOffset, shiftYearMonth } from '@/src/features/shifts/dates';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { colors } from '@/src/theme/tokens';
-import { calendarMarker } from '@/src/features/shifts/presentation';
+import { calendarMarker, canStartClockIn } from '@/src/features/shifts/presentation';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 const ZONE = 'Europe/Istanbul';
@@ -77,11 +77,12 @@ function durationShort(minutes: number): string {
 function ActionButton({ label, icon, color, disabled, onPress, theme, accessibilityLabel }: {
   label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; disabled: boolean; onPress: () => void; theme: Theme; accessibilityLabel: string;
 }) {
+  const actionText = theme === colors.dark ? theme.background : '#FFFFFF';
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled}
       onPress={onPress} style={({ pressed }) => [styles.actionCard, { backgroundColor: disabled ? theme.surface : color, borderColor: disabled ? theme.border : color, opacity: pressed ? 0.82 : 1 }]}>
-      <Ionicons accessible={false} name={icon} size={20} color={disabled ? theme.muted : '#FFFFFF'} />
-      <Text style={[styles.actionLabel, { color: disabled ? theme.muted : '#FFFFFF' }]}>{label}</Text>
+      <Ionicons accessible={false} name={icon} size={20} color={disabled ? theme.muted : actionText} />
+      <Text style={[styles.actionLabel, { color: disabled ? theme.muted : actionText }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -214,6 +215,7 @@ export default function TodayScreen() {
   const cellCount = mondayFirstOffset(month);
   const todayPlan = plansByDate.get(today);
   const todayTemplate = todayPlan?.kind === 'SHIFT' ? templatesById.get(todayPlan.templateId ?? '') : undefined;
+  const todayRecordAlreadyCompleted = records.some((item) => utcToLocalDateTime(item.record.startedAtUtc, cycle?.timezone ?? ZONE).slice(0, 10) === today);
   const activeStartLocal = active ? utcToLocalDateTime(active.startedAtUtc, active.timezone) : null;
   const endCandidates = active ? (() => {
     const current = currentDateTime(now, active.timezone);
@@ -226,6 +228,10 @@ export default function TodayScreen() {
   })() : null;
 
   const startShift = async () => {
+    if (todayRecordAlreadyCompleted) {
+      setNotice('Bugün için tamamlanmış çalışma kaydı var. Yeni kayıt gerekiyorsa çalışma geçmişinden elle ekleyebilirsin.');
+      return;
+    }
     setError(null); setNotice(null); setSaving(true);
     try {
       const timezone = cycle?.timezone ?? ZONE;
@@ -412,7 +418,7 @@ export default function TodayScreen() {
             <View style={[styles.actionColumn, styles.flex]}>
               <Text style={[styles.timeLabel, { color: theme.muted }]}>Başlangıç</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={`Başlangıç saatini seç, ${visibleStartTime}`} accessibilityState={{ disabled: Boolean(active) || saving }} disabled={Boolean(active) || saving} onPress={() => openTimePicker('start')} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: theme.border }]}><Ionicons name="time-outline" size={17} color={theme.accent} /><Text style={{ color: theme.foreground, fontSize: 16, fontWeight: '800' }}>{visibleStartTime}</Text><Ionicons name="chevron-down" size={15} color={theme.muted} /></Pressable>
-              <ActionButton accessibilityLabel={active ? 'Mesai zaten başladı' : 'Mesaiye başla'} label="Mesaiye Başla" icon="play-circle-outline" color={theme.success} disabled={Boolean(active) || saving} onPress={() => void startShift()} theme={theme} />
+              <ActionButton accessibilityLabel={active ? 'Mesai zaten başladı' : todayRecordAlreadyCompleted ? 'Bugünün çalışması tamamlandı' : 'Mesaiye başla'} label={todayRecordAlreadyCompleted ? 'Bugün tamamlandı' : 'Mesaiye Başla'} icon={todayRecordAlreadyCompleted ? 'checkmark-circle-outline' : 'play-circle-outline'} color={theme.success} disabled={!canStartClockIn(Boolean(active) || saving, todayRecordAlreadyCompleted)} onPress={() => void startShift()} theme={theme} />
             </View>
             <View style={[styles.actionColumn, styles.flex]}>
               <Text style={[styles.timeLabel, { color: theme.muted }]}>Bitiş</Text>
@@ -421,6 +427,7 @@ export default function TodayScreen() {
             </View>
           </View>
           {active && activeStartLocal ? <Text style={[styles.clockCaption, { color: theme.muted }]}>Başlangıç kaydı {shortDate(active.startedLocalDate)} · {activeStartLocal.slice(11)} · {active.timezone}</Text> : null}
+          {!active && todayRecordAlreadyCompleted ? <Pressable accessibilityRole="button" onPress={() => router.push('/work-records')}><Text style={[styles.clockCaption, { color: theme.accent, fontWeight: '700' }]}>Çalışma geçmişini aç · gerekirse ayrı kayıt ekle</Text></Pressable> : null}
           {endCandidates && endCandidates.candidates.length > 1 ? <View style={styles.choicesRow}>
             {(['earlier', 'later'] as const).map((choice, index) => <Pressable key={choice} accessibilityRole="radio" accessibilityState={{ selected: endOccurrence === choice }} onPress={() => setEndOccurrence(choice)} style={[styles.choice, { backgroundColor: endOccurrence === choice ? theme.accentSurface : theme.surface, borderColor: endOccurrence === choice ? theme.accent : theme.border }]}>
               <Text style={{ color: theme.foreground, fontWeight: '700' }}>{index === 0 ? 'İlk' : 'İkinci'} oluşum</Text>
@@ -447,7 +454,7 @@ export default function TodayScreen() {
           <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text accessibilityRole="header" style={[styles.cardTitle, { color: theme.foreground }]}>Vardiya düzenin hazır değil</Text>
             <Text style={[styles.sectionCaption, { color: theme.muted }]}>Bir düzen oluşturduğunda haftalık plan ve takvim burada görünür.</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/settings')} style={[styles.linkButton, { backgroundColor: theme.accent }]}><Text style={styles.linkButtonText}>Vardiya düzeni oluştur</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/settings')} style={[styles.linkButton, { backgroundColor: theme.primaryAction }]}><Text style={[styles.linkButtonText, { color: theme.onPrimaryAction }]}>Vardiya düzeni oluştur</Text></Pressable>
           </View>
         ) : (
           <View style={[styles.calendarCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -511,7 +518,7 @@ export default function TodayScreen() {
             </View>
           </> : null}
           <View style={styles.sheetActions}>
-            <Pressable accessibilityRole="button" disabled={saving || !cycle} onPress={() => void saveDayPlan()} style={[styles.sheetAction, { borderColor: theme.accent, backgroundColor: theme.accent }]}><Text style={[styles.sheetActionText, styles.whiteText]}>{saving ? 'Kaydediliyor…' : 'Vardiya planını kaydet'}</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={saving || !cycle} onPress={() => void saveDayPlan()} style={[styles.sheetAction, { borderColor: theme.primaryAction, backgroundColor: theme.primaryAction }]}><Text style={[styles.sheetActionText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : 'Vardiya planını kaydet'}</Text></Pressable>
             {cycle && plansByDate.has(selectedDate) ? <Pressable accessibilityRole="button" disabled={saving} onPress={() => void resetDayPlan()} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Düzeni kullan</Text></Pressable> : null}
           </View>
           <Text style={[styles.sheetLabel, { color: theme.muted }]}>Gün durumu · çalışma/ücret hesabı kuralı değildir</Text>
@@ -524,7 +531,7 @@ export default function TodayScreen() {
           <TextInput accessibilityLabel="Gün notu" value={sheetNote} onChangeText={setSheetNote} maxLength={2000} placeholder="Kısa not (isteğe bağlı)" placeholderTextColor={theme.muted} style={[styles.noteInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
           <View style={styles.sheetActions}>
             <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setSelectedDate(null); router.push({ pathname: '/(tabs)/calendar', params: { initialDate: selectedDate } }); }} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Vardiya planını düzenle</Text></Pressable>
-            <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveDayStatus()} style={[styles.sheetAction, { borderColor: theme.accent, backgroundColor: theme.accent }]}><Text style={[styles.sheetActionText, styles.whiteText]}>{saving ? 'Kaydediliyor…' : 'Gün bilgisini kaydet'}</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveDayStatus()} style={[styles.sheetAction, { borderColor: theme.primaryAction, backgroundColor: theme.primaryAction }]}><Text style={[styles.sheetActionText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : 'Gün bilgisini kaydet'}</Text></Pressable>
           </View>
           {error ? <Text accessibilityRole="alert" style={{ color: theme.danger }}>{error}</Text> : null}
           </ScrollView>
@@ -550,7 +557,7 @@ export default function TodayScreen() {
         <View style={styles.pickerBackdrop}><Pressable accessibilityRole="button" accessibilityLabel="Saat seçiciyi kapat" onPress={() => setEditingTime(null)} style={styles.pickerScrim} /><View style={[styles.pickerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.sheetHeader}><Text accessibilityRole="header" style={[styles.cardTitle, { color: theme.foreground }]}>{editingTime === 'start' ? 'Başlangıç saati' : 'Bitiş saati'}</Text><Pressable accessibilityRole="button" onPress={() => setEditingTime(null)}><Text style={{ color: theme.accent, fontWeight: '800', padding: 10 }}>Kapat</Text></Pressable></View>
           <DateTimePicker value={draftTime} mode="time" display="spinner" locale="tr-TR" timeZoneName={ZONE} themeVariant={mode} onChange={(_event, picked) => { if (picked) setDraftTime(picked); }} />
-          <Pressable accessibilityRole="button" style={[styles.pickerConfirm, { backgroundColor: theme.accent }]} onPress={() => { if (editingTime === 'start') { setStartTime(timeFromDate(draftTime)); setStartTimeEdited(true); } else { setEndTime(timeFromDate(draftTime)); setEndTimeEdited(true); setEndOccurrence(undefined); } setEditingTime(null); }}><Text style={styles.whiteText}>Saati seç</Text></Pressable>
+          <Pressable accessibilityRole="button" style={[styles.pickerConfirm, { backgroundColor: theme.primaryAction }]} onPress={() => { if (editingTime === 'start') { setStartTime(timeFromDate(draftTime)); setStartTimeEdited(true); } else { setEndTime(timeFromDate(draftTime)); setEndTimeEdited(true); setEndOccurrence(undefined); } setEditingTime(null); }}><Text style={{ color: theme.onPrimaryAction, fontWeight: '800' }}>Saati seç</Text></Pressable>
         </View></View>
       </Modal> : null}
     </View>
