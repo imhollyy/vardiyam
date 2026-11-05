@@ -18,10 +18,13 @@ import { getShiftCycle, getPlannedShiftForDate, listShiftTemplates } from '@/src
 import {
   createWorkRecord,
   deleteWorkRecord,
-  getWorkRecord,
-  listWorkRecords,
+  getWorkRecordWithTimedBreaks,
+  listWorkRecordsWithTimedBreaks,
   updateWorkRecord,
+  type WorkRecordWithTimedBreaks,
 } from '@/src/data/workRecordRepository';
+import { resetTimedBreakOccurrences, type TimedBreakInterval } from '@/src/domain/timed-break';
+import { segmentWorkRecord } from '@/src/domain/work-segmentation';
 import {
   formatDuration,
   getLocalDateTimeCandidates,
@@ -46,6 +49,16 @@ type FormDraft = {
   timezone: string;
   breakMinutes: string;
   note: string;
+  startOccurrence: 'earlier' | 'later' | null;
+  endOccurrence: 'earlier' | 'later' | null;
+};
+
+type BreakDraft = {
+  id: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
   startOccurrence: 'earlier' | 'later' | null;
   endOccurrence: 'earlier' | 'later' | null;
 };
@@ -124,6 +137,10 @@ function actualSpanMinutes(record: WorkRecord): number {
   return (Date.parse(record.endedAtUtc) - Date.parse(record.startedAtUtc)) / 60_000;
 }
 
+function breakDurationLabel(minutes: number): string {
+  return minutes < 60 ? `${minutes} dk` : formatDuration(minutes);
+}
+
 function recordError(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return 'Çalışma kaydı kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.';
@@ -132,6 +149,17 @@ function recordError(error: unknown): string {
 function candidateCount(value: string, timezone: string): number {
   try { return getLocalDateTimeCandidates(value, timezone).length; }
   catch { return 0; }
+}
+
+function resolveTimedBreaks(drafts: readonly BreakDraft[], timezone: string): TimedBreakInterval[] {
+  return drafts.map((item, index) => {
+    if (!item.startTime.trim() || !item.endTime.trim()) throw new Error(`Mola ${index + 1}: başlangıç ve bitiş saatlerini gir.`);
+    return {
+      id: item.id,
+      startedAtUtc: localDateTimeToUtc(`${item.startDate}T${item.startTime}`, timezone, item.startOccurrence ?? undefined),
+      endedAtUtc: localDateTimeToUtc(`${item.endDate}T${item.endTime}`, timezone, item.endOccurrence ?? undefined),
+    };
+  });
 }
 
 function OccurrenceChoices({ label, value, timezone, selected, onSelect, theme }: {
@@ -186,7 +214,7 @@ export default function WorkRecordsScreen() {
   const theme = scheme === 'dark' ? colors.dark : colors.light;
   const errorColor = scheme === 'dark' ? '#FFB4A8' : '#A12B20';
 
-  const [records, setRecords] = useState<WorkRecord[]>([]);
+  const [records, setRecords] = useState<WorkRecordWithTimedBreaks[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -196,6 +224,7 @@ export default function WorkRecordsScreen() {
   const [record, setRecord] = useState<WorkRecord | null>(null);
   const [source, setSource] = useState<WorkRecordSource>('MANUAL');
   const [planned, setPlanned] = useState<PlannedWorkSnapshot | null>(null);
+  const [breakDrafts, setBreakDrafts] = useState<BreakDraft[]>([]);
   const [draft, setDraft] = useState<FormDraft>(() => {
     const today = localDateParam ?? getLocalToday('Europe/Istanbul');
     return { startDate: today, startTime: '08:00', endDate: today, endTime: '16:00', timezone: 'Europe/Istanbul', breakMinutes: '0', note: '', startOccurrence: null, endOccurrence: null };
@@ -206,7 +235,7 @@ export default function WorkRecordsScreen() {
     setLoading(true);
     setError(null);
     try {
-      setRecords(await listWorkRecords(database));
+      setRecords(await listWorkRecordsWithTimedBreaks(database));
     } catch {
       setError('Çalışma geçmişi yüklenemedi. Veritabanını ve bağlantıyı kontrol edip yeniden deneyin.');
     } finally {
@@ -218,6 +247,7 @@ export default function WorkRecordsScreen() {
     setRecord(null);
     setSource('MANUAL');
     setPlanned(null);
+    setBreakDrafts([]);
     setDraft({ startDate: localDate, startTime: '08:00', endDate: localDate, endTime: '16:00', timezone: 'Europe/Istanbul', breakMinutes: '0', note: '', startOccurrence: null, endOccurrence: null });
     setError(null);
     setMessage(null);
@@ -245,6 +275,7 @@ export default function WorkRecordsScreen() {
       setRecord(null);
       setSource('PLANNED');
       setPlanned({ cycleId: cycle.id, localDate, templateId: template.id, templateName: template.name, startLocalDateTime, endLocalDateTime });
+      setBreakDrafts([]);
       setDraft({
         startDate: window.startDate,
         startTime: window.startLocalTime,
@@ -270,8 +301,9 @@ export default function WorkRecordsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const existing = await getWorkRecord(database, id);
-      if (!existing) throw new Error('Çalışma kaydı bulunamadı. Geçmişi yenileyin.');
+      const stored = await getWorkRecordWithTimedBreaks(database, id);
+      if (!stored) throw new Error('Çalışma kaydı bulunamadı. Geçmişi yenileyin.');
+      const { record: existing, timedBreaks } = stored;
       const start = utcToLocalDateTime(existing.startedAtUtc, existing.timezone);
       const end = utcToLocalDateTime(existing.endedAtUtc, existing.timezone);
       const [startDate, startTime] = start.split('T');
@@ -281,6 +313,23 @@ export default function WorkRecordsScreen() {
       setRecord(existing);
       setSource(existing.source);
       setPlanned(existing.planned);
+      setBreakDrafts(timedBreaks.map((interval) => {
+        const startLocal = utcToLocalDateTime(interval.startedAtUtc, existing.timezone);
+        const endLocal = utcToLocalDateTime(interval.endedAtUtc, existing.timezone);
+        const [breakStartDate, breakStartTime] = startLocal.split('T');
+        const [breakEndDate, breakEndTime] = endLocal.split('T');
+        const startCandidatesForBreak = getLocalDateTimeCandidates(startLocal, existing.timezone);
+        const endCandidatesForBreak = getLocalDateTimeCandidates(endLocal, existing.timezone);
+        return {
+          id: interval.id,
+          startDate: breakStartDate,
+          startTime: breakStartTime,
+          endDate: breakEndDate,
+          endTime: breakEndTime,
+          startOccurrence: startCandidatesForBreak.length > 1 ? (startCandidatesForBreak[0] === interval.startedAtUtc ? 'earlier' : 'later') : null,
+          endOccurrence: endCandidatesForBreak.length > 1 ? (endCandidatesForBreak[0] === interval.endedAtUtc ? 'earlier' : 'later') : null,
+        };
+      }));
       setDraft({
         startDate, startTime, endDate, endTime, timezone: existing.timezone,
         breakMinutes: String(existing.breakMinutes), note: existing.note ?? '',
@@ -312,6 +361,38 @@ export default function WorkRecordsScreen() {
     } catch { return null; }
   }, [draft]);
 
+  const segmentationPreview = useMemo(() => {
+    if (elapsedMinutes === null || elapsedMinutes <= 0) return null;
+    try {
+      const breakMinutes = draft.breakMinutes.trim() === '' ? Number.NaN : Number(draft.breakMinutes);
+      const timedBreaks = resolveTimedBreaks(breakDrafts, draft.timezone.trim());
+      return segmentWorkRecord({
+        startedAtUtc: localDateTimeToUtc(`${draft.startDate}T${draft.startTime}`, draft.timezone, draft.startOccurrence ?? undefined),
+        endedAtUtc: localDateTimeToUtc(`${draft.endDate}T${draft.endTime}`, draft.timezone, draft.endOccurrence ?? undefined),
+        timezone: draft.timezone.trim(),
+        breakMinutes,
+      }, timedBreaks.length > 0 ? { breakIntervals: timedBreaks } : {});
+    } catch {
+      return null;
+    }
+  }, [breakDrafts, draft, elapsedMinutes]);
+
+  const updateBreakDraft = (id: string, patch: Partial<BreakDraft>) => {
+    setBreakDrafts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  };
+
+  const addBreakDraft = () => {
+    setBreakDrafts((current) => [...current, {
+      id: `break-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      startDate: draft.startDate,
+      startTime: '',
+      endDate: draft.startDate,
+      endTime: '',
+      startOccurrence: null,
+      endOccurrence: null,
+    }]);
+  };
+
   const save = async () => {
     setSaving(true);
     setError(null);
@@ -328,8 +409,9 @@ export default function WorkRecordsScreen() {
         planned,
       };
       validateWorkRecord(next);
-      if (record) await updateWorkRecord(database, next);
-      else await createWorkRecord(database, next);
+      const timedBreaks = resolveTimedBreaks(breakDrafts, next.timezone);
+      if (record) await updateWorkRecord(database, next, timedBreaks);
+      else await createWorkRecord(database, next, timedBreaks);
       setMessage(record ? 'Çalışma kaydı güncellendi.' : 'Çalışma kaydı kaydedildi.');
       setView('history');
       await loadHistory();
@@ -367,33 +449,45 @@ export default function WorkRecordsScreen() {
     ]);
   };
 
-  const renderRecord = ({ item }: { item: WorkRecord }) => {
-    const start = utcToLocalDateTime(item.startedAtUtc, item.timezone);
-    const end = utcToLocalDateTime(item.endedAtUtc, item.timezone);
-    const difference = getRecordRangeDifferenceMinutes(item);
+  const renderRecord = ({ item }: { item: WorkRecordWithTimedBreaks }) => {
+    const { record: workRecord, timedBreaks } = item;
+    const start = utcToLocalDateTime(workRecord.startedAtUtc, workRecord.timezone);
+    const end = utcToLocalDateTime(workRecord.endedAtUtc, workRecord.timezone);
+    const difference = getRecordRangeDifferenceMinutes(workRecord);
+    const breakSummary = workRecord.breakMinutes === 0
+      ? 'Mola yok'
+      : timedBreaks.length === 0
+        ? `Mola: ${breakDurationLabel(workRecord.breakMinutes)} — saati belirtilmemiş`
+        : `Mola: ${breakDurationLabel(workRecord.breakMinutes)} · ${timedBreaks.length} zamanlı aralık`;
     return (
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={styles.rowBetween}>
           <View style={styles.flex}>
-            <Text style={[styles.dateTitle, { color: theme.foreground }]}>{recordDateLabel(item)}</Text>
-            <Text style={[styles.kind, { color: theme.accent }]}>{item.source === 'PLANNED' ? 'PLANLI KAYIT' : 'PLANSIZ KAYIT'}</Text>
+            <Text style={[styles.dateTitle, { color: theme.foreground }]}>{recordDateLabel(workRecord)}</Text>
+            <Text style={[styles.kind, { color: theme.accent }]}>{workRecord.source === 'PLANNED' ? 'PLANLI KAYIT' : 'PLANSIZ KAYIT'}</Text>
           </View>
-          <Text style={[styles.duration, { color: theme.foreground }]}>{formatDuration(actualSpanMinutes(item))}</Text>
+          <Text style={[styles.duration, { color: theme.foreground }]}>{formatDuration(actualSpanMinutes(workRecord))}</Text>
         </View>
-        <Text style={[styles.body, { color: theme.foreground }]}>{localLabel(start, item.timezone)} → {localLabel(end, item.timezone)}</Text>
-        <Text style={[styles.detail, { color: theme.muted }]}>Mola: {formatDuration(item.breakMinutes)} · Zaman dilimi: {item.timezone}</Text>
-        {item.planned ? (
+        <Text style={[styles.body, { color: theme.foreground }]}>{localLabel(start, workRecord.timezone)} → {localLabel(end, workRecord.timezone)}</Text>
+        <Text style={[styles.detail, { color: theme.muted }]}>{breakSummary}</Text>
+        {timedBreaks.map((interval, index) => (
+          <Text key={interval.id} style={[styles.detail, { color: theme.muted }]}>
+            Mola {index + 1}: {localLabel(utcToLocalDateTime(interval.startedAtUtc, workRecord.timezone), workRecord.timezone)} → {localLabel(utcToLocalDateTime(interval.endedAtUtc, workRecord.timezone), workRecord.timezone)}
+          </Text>
+        ))}
+        <Text style={[styles.detail, { color: theme.muted }]}>Zaman dilimi: {workRecord.timezone}</Text>
+        {workRecord.planned ? (
           <View style={[styles.planSnapshot, { borderColor: theme.border }]}>
-            <Text style={[styles.detailStrong, { color: theme.foreground }]}>Plan anlık görüntüsü · {item.planned.templateName}</Text>
-            <Text style={[styles.detail, { color: theme.muted }]}>{localLabel(item.planned.startLocalDateTime, item.timezone)} → {localLabel(item.planned.endLocalDateTime, item.timezone)}</Text>
+            <Text style={[styles.detailStrong, { color: theme.foreground }]}>Plan anlık görüntüsü · {workRecord.planned.templateName}</Text>
+            <Text style={[styles.detail, { color: theme.muted }]}>{localLabel(workRecord.planned.startLocalDateTime, workRecord.timezone)} → {localLabel(workRecord.planned.endLocalDateTime, workRecord.timezone)}</Text>
             {difference === null ? null : <Text style={[styles.detailStrong, { color: theme.accent }]}>Saat aralığı farkı: {formatDuration(difference)}</Text>}
             <Text style={[styles.hint, { color: theme.muted }]}>Yalnız süre farkıdır; ücret veya yasal mesai hesabı değildir.</Text>
           </View>
         ) : null}
-        {item.note ? <Text style={[styles.body, { color: theme.muted }]}>{item.note}</Text> : null}
+        {workRecord.note ? <Text style={[styles.body, { color: theme.muted }]}>{workRecord.note}</Text> : null}
         <View style={styles.actions}>
-          <Button label="Düzenle" onPress={() => void openEditForm(item.id)} theme={theme} secondary />
-          <Button label={deleting ? 'Siliniyor…' : 'Sil'} onPress={() => confirmDelete(item)} theme={theme} secondary disabled={deleting} />
+          <Button label="Düzenle" onPress={() => void openEditForm(workRecord.id)} theme={theme} secondary />
+          <Button label={deleting ? 'Siliniyor…' : 'Sil'} onPress={() => confirmDelete(workRecord)} theme={theme} secondary disabled={deleting} />
         </View>
       </View>
     );
@@ -437,10 +531,76 @@ export default function WorkRecordsScreen() {
             <View style={styles.flex}><Field label="Bitiş saati (HH:mm)" value={draft.endTime} onChangeText={(endTime) => setDraft({ ...draft, endTime, endOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
           </View>
           <OccurrenceChoices label="Bitiş saati" value={`${draft.endDate}T${draft.endTime}`} timezone={draft.timezone} selected={draft.endOccurrence} onSelect={(endOccurrence) => setDraft({ ...draft, endOccurrence })} theme={theme} />
-          <Field label="Zaman dilimi (IANA)" value={draft.timezone} onChangeText={(timezone) => setDraft({ ...draft, timezone, startOccurrence: null, endOccurrence: null })} theme={theme} editable={!record && source === 'MANUAL' && !planned} hint="Gece yarısını aşan kayıt için bitiş tarihini ertesi gün seç. Tekrarlanan saatlerde oluşumu seç." />
+          <Field label="Zaman dilimi (IANA)" value={draft.timezone} onChangeText={(timezone) => {
+            setDraft({ ...draft, timezone, startOccurrence: null, endOccurrence: null });
+            setBreakDrafts((current) => resetTimedBreakOccurrences(current));
+          }} theme={theme} editable={!record && source === 'MANUAL' && !planned} hint="Gece yarısını aşan kayıt için bitiş tarihini ertesi gün seç. Tekrarlanan saatlerde oluşumu yeniden seç." />
           <Field label="Mola süresi (tam dakika)" value={draft.breakMinutes} onChangeText={(breakMinutes) => setDraft({ ...draft, breakMinutes })} theme={theme} keyboardType="numeric" hint="0 veya çalışma aralığından kısa bir tam sayı gir." />
+          <View style={styles.breakEditor}>
+            <View style={styles.rowBetween}>
+              <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Zamanlı mola aralıkları</Text>
+              <Text style={[styles.detailStrong, { color: theme.accent }]}>{breakDrafts.length}</Text>
+            </View>
+            <Text style={[styles.hint, { color: theme.muted }]}>
+              Yalnız çalışma süresinden düşülecek molaları gir; ücretli mola sınıflaması yapılmaz. Saatleri bilinmiyorsa aralık ekleme. Eski toplam mola korunur ve “saati belirtilmemiş” görünür. Zamanlı aralıklar girildiğinde toplamları mola dakikasına eşit olmalıdır.
+            </Text>
+            {breakDrafts.map((item, index) => (
+              <View key={item.id} style={[styles.breakCard, { borderColor: theme.border }]}>
+                <View style={styles.rowBetween}>
+                  <Text style={[styles.detailStrong, { color: theme.foreground }]}>Mola {index + 1}</Text>
+                  <Pressable
+                    accessibilityLabel={`Mola ${index + 1} saatlerini kaldır`}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => Alert.alert(
+                      'Mola saatleri kaldırılsın mı?',
+                      'Toplam mola dakikası korunur; mola saati belirtilmemiş olarak saklanır.',
+                      [
+                        { text: 'Vazgeç', style: 'cancel' },
+                        { text: 'Saatleri kaldır', style: 'destructive', onPress: () => setBreakDrafts((current) => current.filter((entry) => entry.id !== item.id)) },
+                      ],
+                    )}
+                    style={styles.removeBreak}
+                  >
+                    <Text style={{ color: errorColor, fontSize: 14, fontWeight: '800' }}>Kaldır</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.twoColumns}>
+                  <View style={styles.flex}><Field label={`Mola ${index + 1} başlangıç tarihi`} value={item.startDate} onChangeText={(startDate) => updateBreakDraft(item.id, { startDate, startOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+                  <View style={styles.flex}><Field label={`Mola ${index + 1} başlangıç saati`} value={item.startTime} onChangeText={(startTime) => updateBreakDraft(item.id, { startTime, startOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+                </View>
+                <OccurrenceChoices
+                  label={`Mola ${index + 1} başlangıç saati`}
+                  value={`${item.startDate}T${item.startTime}`}
+                  timezone={draft.timezone}
+                  selected={item.startOccurrence}
+                  onSelect={(startOccurrence) => updateBreakDraft(item.id, { startOccurrence })}
+                  theme={theme}
+                />
+                <View style={styles.twoColumns}>
+                  <View style={styles.flex}><Field label={`Mola ${index + 1} bitiş tarihi`} value={item.endDate} onChangeText={(endDate) => updateBreakDraft(item.id, { endDate, endOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+                  <View style={styles.flex}><Field label={`Mola ${index + 1} bitiş saati`} value={item.endTime} onChangeText={(endTime) => updateBreakDraft(item.id, { endTime, endOccurrence: null })} theme={theme} keyboardType="numbers-and-punctuation" /></View>
+                </View>
+                <OccurrenceChoices
+                  label={`Mola ${index + 1} bitiş saati`}
+                  value={`${item.endDate}T${item.endTime}`}
+                  timezone={draft.timezone}
+                  selected={item.endOccurrence}
+                  onSelect={(endOccurrence) => updateBreakDraft(item.id, { endOccurrence })}
+                  theme={theme}
+                />
+              </View>
+            ))}
+            <Button label="Zamanlı mola ekle" onPress={addBreakDraft} theme={theme} secondary />
+          </View>
           <Field label="Not (isteğe bağlı)" value={draft.note} onChangeText={(note) => setDraft({ ...draft, note })} theme={theme} multiline />
           <Text style={[styles.detail, { color: theme.muted }]}>{elapsedMinutes === null ? 'Zaman aralığını kontrol et.' : elapsedMinutes > 0 ? `Toplam aralık: ${formatDuration(elapsedMinutes)} · Mola sonrası: ${formatDuration(elapsedMinutes - Number(draft.breakMinutes || 0))}` : 'Bitiş, başlangıçtan sonra olmalıdır.'}</Text>
+          {segmentationPreview ? (
+            <Text accessibilityLiveRegion="polite" style={[styles.detailStrong, { color: theme.accent }]}>
+              Segmentasyon önizlemesi · çalışılan toplam: {formatDuration(segmentationPreview.totalWorkedMinutes)}
+              {segmentationPreview.breakTiming === 'AGGREGATE_ONLY' ? ' · mola saati bilinmediği için aralık dağılımı belirsiz' : segmentationPreview.breakTiming === 'TIMED' ? ` · ${breakDrafts.length} zamanlı mola aktarıldı` : ''}
+            </Text>
+          ) : null}
           {error ? <Text accessibilityRole="alert" style={[styles.error, { color: errorColor }]}>{error}</Text> : null}
           <Button
             label={saving ? 'Kaydediliyor…' : record ? 'Değişiklikleri kaydet' : 'Çalışma kaydını kaydet'}
@@ -458,7 +618,7 @@ export default function WorkRecordsScreen() {
     <FlatList
       contentContainerStyle={[styles.screen, { backgroundColor: theme.background }, records.length === 0 && styles.emptyScreen]}
       data={records}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item) => item.record.id}
       ListEmptyComponent={(
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Henüz çalışma kaydı yok</Text>
@@ -503,6 +663,9 @@ const styles = StyleSheet.create({
   twoColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   flex: { flex: 1, minWidth: 0 },
   planSnapshot: { borderLeftWidth: 3, paddingLeft: 12, gap: 6 },
+  breakEditor: { gap: 12 },
+  breakCard: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 12 },
+  removeBreak: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' },
   occurrenceGroup: { gap: 8 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   occurrenceChoice: { minHeight: 44, paddingHorizontal: 12, borderWidth: 1, borderRadius: 12, justifyContent: 'center' },

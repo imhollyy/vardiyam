@@ -12,6 +12,27 @@ type Migration = {
   sql: string;
 };
 
+function canonicalUtcMinuteCheck(column: string): string {
+  return `
+    length(${column}) = 24
+    AND ${column} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:00.000Z'
+    AND julianday(${column}) IS NOT NULL
+    AND CAST(substr(${column}, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+    AND CAST(substr(${column}, 9, 2) AS INTEGER) BETWEEN 1 AND CASE CAST(substr(${column}, 6, 2) AS INTEGER)
+      WHEN 2 THEN CASE
+        WHEN CAST(substr(${column}, 1, 4) AS INTEGER) % 400 = 0
+          OR (CAST(substr(${column}, 1, 4) AS INTEGER) % 4 = 0
+            AND CAST(substr(${column}, 1, 4) AS INTEGER) % 100 <> 0) THEN 29
+        ELSE 28
+      END
+      WHEN 4 THEN 30 WHEN 6 THEN 30 WHEN 9 THEN 30 WHEN 11 THEN 30
+      ELSE 31
+    END
+    AND CAST(substr(${column}, 12, 2) AS INTEGER) BETWEEN 0 AND 23
+    AND CAST(substr(${column}, 15, 2) AS INTEGER) BETWEEN 0 AND 59
+  `;
+}
+
 export const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -186,6 +207,78 @@ export const migrations: readonly Migration[] = [
 
       CREATE INDEX work_records_started_at_utc_idx ON work_records(started_at_utc DESC, id);
       CREATE INDEX work_records_planned_day_idx ON work_records(planned_cycle_id, planned_local_date);
+    `,
+  },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE break_intervals (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        work_record_id TEXT NOT NULL,
+        started_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('started_at_utc')}),
+        ended_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('ended_at_utc')}),
+        FOREIGN KEY (work_record_id) REFERENCES work_records(id) ON DELETE CASCADE,
+        CHECK (julianday(ended_at_utc) > julianday(started_at_utc)),
+        UNIQUE (work_record_id, started_at_utc, ended_at_utc)
+      );
+
+      CREATE INDEX break_intervals_work_record_start_idx
+        ON break_intervals(work_record_id, started_at_utc, id);
+
+      CREATE TRIGGER break_intervals_validate_insert
+      BEFORE INSERT ON break_intervals
+      BEGIN
+        SELECT CASE WHEN NOT EXISTS (
+          SELECT 1 FROM work_records
+          WHERE id = NEW.work_record_id
+            AND julianday(NEW.started_at_utc) >= julianday(started_at_utc)
+            AND julianday(NEW.ended_at_utc) <= julianday(ended_at_utc)
+        ) THEN RAISE(ABORT, 'break interval outside work record') END;
+        SELECT CASE WHEN EXISTS (
+          SELECT 1 FROM break_intervals existing
+          WHERE existing.work_record_id = NEW.work_record_id
+            AND julianday(NEW.started_at_utc) < julianday(existing.ended_at_utc)
+            AND julianday(NEW.ended_at_utc) > julianday(existing.started_at_utc)
+        ) THEN RAISE(ABORT, 'overlapping break interval') END;
+      END;
+
+      CREATE TRIGGER break_intervals_validate_update
+      BEFORE UPDATE OF work_record_id, started_at_utc, ended_at_utc ON break_intervals
+      BEGIN
+        SELECT CASE WHEN NOT EXISTS (
+          SELECT 1 FROM work_records
+          WHERE id = NEW.work_record_id
+            AND julianday(NEW.started_at_utc) >= julianday(started_at_utc)
+            AND julianday(NEW.ended_at_utc) <= julianday(ended_at_utc)
+        ) THEN RAISE(ABORT, 'break interval outside work record') END;
+        SELECT CASE WHEN EXISTS (
+          SELECT 1 FROM break_intervals existing
+          WHERE existing.work_record_id = NEW.work_record_id
+            AND existing.id <> NEW.id
+            AND julianday(NEW.started_at_utc) < julianday(existing.ended_at_utc)
+            AND julianday(NEW.ended_at_utc) > julianday(existing.started_at_utc)
+        ) THEN RAISE(ABORT, 'overlapping break interval') END;
+      END;
+
+      CREATE TRIGGER work_records_validate_existing_breaks
+      BEFORE UPDATE OF started_at_utc, ended_at_utc, break_minutes ON work_records
+      WHEN EXISTS (
+        SELECT 1 FROM break_intervals WHERE work_record_id = OLD.id
+      )
+      BEGIN
+        SELECT CASE WHEN EXISTS (
+          SELECT 1 FROM break_intervals
+          WHERE work_record_id = OLD.id
+            AND (julianday(started_at_utc) < julianday(NEW.started_at_utc)
+              OR julianday(ended_at_utc) > julianday(NEW.ended_at_utc))
+        ) THEN RAISE(ABORT, 'work record update would exclude break interval') END;
+        SELECT CASE WHEN NEW.break_minutes <> (
+          SELECT COALESCE(SUM(
+            (CAST(strftime('%s', ended_at_utc) AS INTEGER) - CAST(strftime('%s', started_at_utc) AS INTEGER)) / 60
+          ), 0)
+          FROM break_intervals WHERE work_record_id = OLD.id
+        ) THEN RAISE(ABORT, 'work record update would mismatch break total') END;
+      END;
     `,
   },
 ];

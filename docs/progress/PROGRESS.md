@@ -6,11 +6,11 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-005A — Çalışma Zamanı Segmentasyon Motoru
-- **Durum:** VDY-005A READY_FOR_REVIEW; draft PR #14 open, CI PASS, R2 APPROVE. Implementation commit `42a0fe3d6ab38ba05d1f597b80d69521e5a3b766`; current PR head `adf790ca6aacab066651704b1d834c82005a36d0` (documentation closure), stacked on PR #12 at `f3d5bc571058120334d0355287bbcaafea31edc5`. PR #14 and all earlier PRs remain unmerged. Local user changes and `expo-env.d.ts` are preserved and unstaged.
-- **Aktif branch:** feat/vdy-005a-work-segmentation
+- **Aktif aşama:** VDY-005B — Zamanlı Mola Kayıtları ve SQLite v4
+- **Durum:** VDY-005B implementation, local checks, Android bundle export, and independent R2 review PASS. Stacked draft PR/CI evidence pending on `feat/vdy-005b-timed-breaks`, based on verified PR #14 HEAD `5b6c1fc848a263095c34198379aaa411ed0bce20`. Existing local `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain unstaged and untouched.
+- **Aktif branch:** feat/vdy-005b-timed-breaks
 - **Ana depo:** `imhollyy/vardiyam`
-- **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records complete; VDY-005A pure UTC/IANA segmentation in progress
+- **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
 - **Gerçek alt ajan çağrısı:** Implementer + bağımsız reviewer önceki preflight'te; R2 reviewer son diff'i ayrıca inceledi ve düzeltmelerden sonra bulgu bırakmadı. Uzman ajan denemesi repo erişimi olmadığı için sayılmadı; R2 sınıfında uzman zorunlu değil.
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
@@ -22,9 +22,32 @@
 
 ## NEXT ACTION
 
-1. Await founder/reviewer decision on draft PR #14; separately authorize any merge. Next coding target: VDY-005B timed-break data model. Do not merge or release.
+1. Push the verified VDY-005B branch, open a stacked draft PR against PR #14, and verify GitHub CI. Do not merge or release.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-005B — IMPLEMENTED / R2 APPROVED / LOCAL VERIFY PASS
+
+- **Başlangıç:** Issue #15 read. PR #14 is open/draft/unmerged, current head and local starting HEAD both `5b6c1fc848a263095c34198379aaa411ed0bce20`. Branch `feat/vdy-005b-timed-breaks` opened from it. No earlier PR or main merge/release.
+- **Yerel değişiklik koruması:** Pre-existing `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain unstaged; neither was staged, overwritten, stashed, reset or deleted. All VDY-005B commits will use an explicit file allowlist.
+- **Uygulama:** SQLite v4 adds `break_intervals` with FK cascade, UTC minute/Gregorian calendar checks, no-overlap/range triggers, parent update guards, index, and no data rewrite. Timed-break repository CRUD, atomic replace, read/join APIs and `segmentStoredWorkRecord` use the existing serialized repository queue. WorkRecord and timed breaks stay consistent inside one transaction. UI supports multiple local-time intervals, editing and confirmed removal, fold choices and actual segmenter preview; unknown aggregate rows retain exact “30 dk — saati belirtilmemiş” wording.
+- **Data boundary:** Only intervals the user identifies as deducted from work duration are stored/passed to segmentation. Legacy aggregate-only minutes remain unallocated and produce `workedMinutes=null`. No paid-break policy, legal category, rate, monetary amount or snapshot was introduced.
+- **Test results:** Existing 114 tests retained; full `npm test` PASS (127/127), including v4 fresh/v3 migration, old record preservation, rollback, CRUD, concurrency, cold reopen, delete cascade, DST gap/fold, cross-midnight, 28 October 13:00, raw-SQL invalid-date rejection, edit consistency and segmenter integration. `npm run typecheck` PASS; `npm run lint` PASS; `git diff --check` PASS.
+- **Expo:** Initial Doctor without network 18/20 because `exp.host` and RN Directory DNS failed; network-enabled `npx expo-doctor --verbose` PASS 20/20. Initial Android export failed in sandbox-generated long temp path; retry with a task-scoped short repo temp path PASS, Android Hermes bundle 1,195 modules / 2.8 MB. Temp/export artifacts were removed. No Android/iOS device smoke was run; it is not a task prerequisite.
+- **Independent reviewer:** actual independent R2 data reviewer initially reported two P2s: SQLite `julianday` accepted an impossible calendar date on raw SQL; timezone change could preserve a stale fold selection in break drafts. Fixed with Gregorian/leap-year/hour/minute CHECK expressions and clearing every break fold choice on timezone change. Follow-up **APPROVE**, no remaining findings; focused tests 28/28, typecheck/lint/diff PASS.
+- **Skills and tools:** `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-test-gate`, `vardiyam-ui-quality`, and targeted React Native best-practices CLI skill applied. Context7 `/expo/expo/expo_58.0.0` verified transaction rollback/serialization rules. Graphify local no-LLM AST scan: 78 files, 792 nodes, 1474 edges; generated output removed. Playwright/browser test not used because this is a native React Native + SQLite route; device smoke was explicitly not a prerequisite.
+- **Open independent risks:** R08 iOS acceptance, R13 npm audit findings, and Ethernet profile remain separate/open; Windows, ADB, firewall and Expo SDK were not changed.
+- **NEXT ACTION:** Push the verified branch, open a stacked draft PR against PR #14, and verify GitHub CI. No merge/release.
+
+### 2026-11-05 — VDY-005B — START / BRANCH VERIFIED
+
+- **Issue/base:** Issue #15 read. PR #14 is open, draft, mergeable, and unmerged; remote head `5b6c1fc848a263095c34198379aaa411ed0bce20` matches local. New `feat/vdy-005b-timed-breaks` opened exactly there.
+- **Preservation:** `docs/tasks/VDY-004.md` and `expo-env.d.ts` were already locally modified before branch creation; both remain unstaged and unchanged. No stash/reset/worktree move.
+- **Risk/scope:** R2 controlled local personal-data migration. Additive transactional v4 only; no monetary/pay/legal classification or SQLite rewrite. Legacy aggregate-only breaks stay without interval rows.
+- **Skills/docs:** `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-test-gate`, and `vardiyam-ui-quality` read/applied. Context7 `/expo/expo/expo_58.0.0` verified `withTransactionAsync` rollback/serialization caveat; all same-connection access remains through repository queue. UI Skills CLI catalog was queried and the React Native best-practices skill fetched; no browser/Playwright task surface.
+- **Plan:** (1) add v4 break table/index/constraints/guards; (2) implement repository APIs that preserve consistency in one queued transaction; (3) connect the timezone-aware form and visible aggregate-only wording; (4) add migration/repository/DST/segmenter integration regression tests; (5) run required local gates, independent R2 review, push and open draft PR to #14.
+- **Initial verification:** current task tests not yet complete; NOT RUN at checkpoint.
+- **NEXT ACTION:** Finish timed-break form state and add transaction/migration regression coverage.
 
 ### 2026-11-05 — VDY-005A — LOCAL VERIFY / R2 APPROVED
 

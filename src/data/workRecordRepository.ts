@@ -1,6 +1,11 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { validateWorkRecord, type PlannedWorkSnapshot, type WorkRecord } from '../domain/work-record.ts';
+import {
+  validateTimedBreakIntervals,
+  type TimedBreakInterval,
+  type WorkRecordBreakInterval,
+} from '../domain/timed-break.ts';
 import { withDatabaseOperation, withDatabaseTransaction } from './transactions.ts';
 
 type WorkRecordDatabase = Pick<
@@ -39,6 +44,17 @@ type WorkRecordRow = {
   planned_template_name: string | null;
   planned_start_local_datetime: string | null;
   planned_end_local_datetime: string | null;
+};
+
+type WorkRecordWithBreaksRow = WorkRecordRow & {
+  break_id: string | null;
+  break_started_at_utc: string | null;
+  break_ended_at_utc: string | null;
+};
+
+export type WorkRecordWithTimedBreaks = {
+  record: WorkRecord;
+  timedBreaks: WorkRecordBreakInterval[];
 };
 
 const SELECT_COLUMNS =
@@ -106,6 +122,40 @@ async function getInternal(database: WorkRecordDatabase, id: string): Promise<Wo
   return row ? fromRow(row) : null;
 }
 
+async function getTimedBreaksInternal(database: WorkRecordDatabase, workRecordId: string): Promise<WorkRecordBreakInterval[]> {
+  const rows = await database.getAllAsync<{ id: string; started_at_utc: string; ended_at_utc: string }>(
+    'SELECT id, started_at_utc, ended_at_utc FROM break_intervals WHERE work_record_id = ? ORDER BY started_at_utc, id;',
+    workRecordId,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    workRecordId,
+    startedAtUtc: row.started_at_utc,
+    endedAtUtc: row.ended_at_utc,
+  }));
+}
+
+async function replaceTimedBreaksInternal(
+  database: WorkRecordDatabase,
+  workRecordId: string,
+  intervals: readonly TimedBreakInterval[],
+): Promise<void> {
+  await database.runAsync('DELETE FROM break_intervals WHERE work_record_id = ?;', workRecordId);
+  for (const interval of intervals) {
+    await database.runAsync(
+      'INSERT INTO break_intervals (id, work_record_id, started_at_utc, ended_at_utc) VALUES (?, ?, ?, ?);',
+      interval.id,
+      workRecordId,
+      interval.startedAtUtc,
+      interval.endedAtUtc,
+    );
+  }
+}
+
+function validateBreaks(record: WorkRecord, intervals: readonly TimedBreakInterval[]): void {
+  validateTimedBreakIntervals(record, intervals);
+}
+
 async function findOverlap(database: WorkRecordDatabase, record: WorkRecord, excludingId?: string): Promise<string | null> {
   const row = excludingId === undefined
     ? await database.getFirstAsync<{ id: string }>(
@@ -154,8 +204,13 @@ async function insertInternal(database: WorkRecordDatabase, record: WorkRecord):
   );
 }
 
-export async function createWorkRecord(database: WorkRecordDatabase, record: WorkRecord): Promise<void> {
+export async function createWorkRecord(
+  database: WorkRecordDatabase,
+  record: WorkRecord,
+  timedBreaks: readonly TimedBreakInterval[] = [],
+): Promise<void> {
   validateWorkRecord(record);
+  validateBreaks(record, timedBreaks);
   if (record.source === 'PLANNED' && (!record.planned?.cycleId || !record.planned.templateId)) {
     throw new Error('Yeni plan bağlantısı için kayıtlı vardiya düzeni gerekir.');
   }
@@ -164,10 +219,15 @@ export async function createWorkRecord(database: WorkRecordDatabase, record: Wor
     await assertForeignKeysEnabled(database);
     assertNoOverlap(await findOverlap(database, record));
     await insertInternal(database, record);
+    await replaceTimedBreaksInternal(database, record.id, timedBreaks);
   });
 }
 
-export async function updateWorkRecord(database: WorkRecordDatabase, record: WorkRecord): Promise<void> {
+export async function updateWorkRecord(
+  database: WorkRecordDatabase,
+  record: WorkRecord,
+  timedBreaks?: readonly TimedBreakInterval[],
+): Promise<void> {
   validateWorkRecord(record);
   await withDatabaseTransaction(database, async () => {
     await assertForeignKeysEnabled(database);
@@ -179,7 +239,13 @@ export async function updateWorkRecord(database: WorkRecordDatabase, record: Wor
         'Kayıt kaynağı, zaman dilimi ve plan anlık görüntüsü düzenleme sırasında değiştirilemez.',
       );
     }
+    const existingBreaks = await getTimedBreaksInternal(database, record.id);
+    const breaksToKeep = timedBreaks ?? existingBreaks;
+    validateBreaks(record, breaksToKeep);
     assertNoOverlap(await findOverlap(database, record, record.id));
+    if (timedBreaks !== undefined) {
+      await database.runAsync('DELETE FROM break_intervals WHERE work_record_id = ?;', record.id);
+    }
     await database.runAsync(
       'UPDATE work_records SET started_at_utc = ?, ended_at_utc = ?, break_minutes = ?, note = ? WHERE id = ?;',
       record.startedAtUtc,
@@ -188,6 +254,89 @@ export async function updateWorkRecord(database: WorkRecordDatabase, record: Wor
       record.note,
       record.id,
     );
+    if (timedBreaks !== undefined) {
+      await replaceTimedBreaksInternal(database, record.id, timedBreaks);
+    }
+  });
+}
+
+export async function getTimedBreaksForWorkRecord(
+  database: WorkRecordDatabase,
+  workRecordId: string,
+): Promise<WorkRecordBreakInterval[]> {
+  return withDatabaseOperation(database, async () => {
+    await assertForeignKeysEnabled(database);
+    const record = await getInternal(database, workRecordId);
+    if (!record) throw new WorkRecordStorageError('NOT_FOUND', 'Work record was not found.');
+    const intervals = await getTimedBreaksInternal(database, workRecordId);
+    validateBreaks(record, intervals);
+    return intervals;
+  });
+}
+
+export async function replaceTimedBreaksForWorkRecord(
+  database: WorkRecordDatabase,
+  workRecordId: string,
+  intervals: readonly TimedBreakInterval[],
+): Promise<void> {
+  await withDatabaseTransaction(database, async () => {
+    await assertForeignKeysEnabled(database);
+    const record = await getInternal(database, workRecordId);
+    if (!record) throw new WorkRecordStorageError('NOT_FOUND', 'Work record was not found.');
+    validateBreaks(record, intervals);
+    await replaceTimedBreaksInternal(database, workRecordId, intervals);
+  });
+}
+
+export async function getWorkRecordWithTimedBreaks(
+  database: WorkRecordDatabase,
+  id: string,
+): Promise<WorkRecordWithTimedBreaks | null> {
+  return withDatabaseOperation(database, async () => {
+    await assertForeignKeysEnabled(database);
+    const record = await getInternal(database, id);
+    if (!record) return null;
+    const timedBreaks = await getTimedBreaksInternal(database, id);
+    validateBreaks(record, timedBreaks);
+    return { record, timedBreaks };
+  });
+}
+
+export async function listWorkRecordsWithTimedBreaks(
+  database: WorkRecordDatabase,
+  limit = 5000,
+): Promise<WorkRecordWithTimedBreaks[]> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 5000) {
+    throw new Error('Work-record history limit must be an integer from 1 to 5000.');
+  }
+  return withDatabaseOperation(database, async () => {
+    await assertForeignKeysEnabled(database);
+    const rows = await database.getAllAsync<WorkRecordWithBreaksRow>(
+      `SELECT ${SELECT_COLUMNS.split(', ').map((column) => `w.${column}`).join(', ')},
+        b.id AS break_id, b.started_at_utc AS break_started_at_utc, b.ended_at_utc AS break_ended_at_utc
+       FROM (SELECT * FROM work_records ORDER BY started_at_utc DESC, id DESC LIMIT ?) w
+       LEFT JOIN break_intervals b ON b.work_record_id = w.id
+       ORDER BY w.started_at_utc DESC, w.id DESC, b.started_at_utc, b.id;`,
+      limit,
+    );
+    const records = new Map<string, WorkRecordWithTimedBreaks>();
+    for (const row of rows) {
+      let entry = records.get(row.id);
+      if (!entry) {
+        entry = { record: fromRow(row), timedBreaks: [] };
+        records.set(row.id, entry);
+      }
+      if (row.break_id !== null && row.break_started_at_utc !== null && row.break_ended_at_utc !== null) {
+        entry.timedBreaks.push({
+          id: row.break_id,
+          workRecordId: row.id,
+          startedAtUtc: row.break_started_at_utc,
+          endedAtUtc: row.break_ended_at_utc,
+        });
+      }
+    }
+    for (const entry of records.values()) validateBreaks(entry.record, entry.timedBreaks);
+    return [...records.values()];
   });
 }
 

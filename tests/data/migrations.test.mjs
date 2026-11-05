@@ -46,7 +46,7 @@ test('initial migration creates only additive app metadata and sets schema versi
     );
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
     assert.equal(sqlite.prepare('PRAGMA foreign_keys;').get().foreign_keys, 1);
-    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records']) {
+    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals']) {
       assert.equal(
         sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name=?;").get(table).count,
         1,
@@ -128,7 +128,7 @@ test('failed v2 migration rolls back partial DDL and preserves v1 rows', async (
   }
 });
 
-test('v2 to v3 adds work records and preserves existing shift configuration and overrides', async () => {
+test('v2 to v4 adds work records and timed-break storage while preserving shift configuration and overrides', async () => {
   const sqlite = new DatabaseSync(':memory:');
   try {
     sqlite.exec('PRAGMA foreign_keys = ON;');
@@ -148,7 +148,7 @@ test('v2 to v3 adds work records and preserves existing shift configuration and 
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
 
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 3);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 4);
     assert.deepEqual({ ...sqlite.prepare('SELECT id, name FROM shift_cycles;').get() }, { id: 'cycle', name: 'Synthetic' });
     assert.deepEqual({ ...sqlite.prepare('SELECT * FROM cycle_entries;').get() }, {
       cycle_id: 'cycle', position: 0, kind: 'SHIFT', template_id: 'day',
@@ -156,6 +156,55 @@ test('v2 to v3 adds work records and preserves existing shift configuration and 
     assert.equal(sqlite.prepare('SELECT kind FROM plan_overrides WHERE cycle_id = ?;').get('cycle').kind, 'OFF');
     assert.equal(sqlite.prepare('SELECT value FROM app_metadata WHERE key = ?;').get('keep').value, 'v2-data');
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM work_records;').get().count, 0);
+  } finally { sqlite.close(); }
+});
+
+test('v3 to v4 leaves historical aggregate-only work records unchanged', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of migrations.filter(({ version }) => version <= 3)) sqlite.exec(migration.sql);
+    sqlite.exec(`
+      INSERT INTO work_records (
+        id, record_source, started_at_utc, ended_at_utc, timezone, break_minutes, note
+      ) VALUES (
+        'legacy-work', 'MANUAL', '2026-10-28T07:00:00.000Z', '2026-10-28T15:00:00.000Z',
+        'Europe/Istanbul', 30, 'synthetic legacy record'
+      );
+      PRAGMA user_version = 3;
+    `);
+    const adapter = createExpoSqliteAdapter(sqlite);
+
+    await initializeDatabase(adapter);
+    await initializeDatabase(adapter);
+
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 4);
+    assert.deepEqual({ ...sqlite.prepare('SELECT id, started_at_utc, ended_at_utc, break_minutes, note FROM work_records WHERE id = ?;').get('legacy-work') }, {
+      id: 'legacy-work', started_at_utc: '2026-10-28T07:00:00.000Z', ended_at_utc: '2026-10-28T15:00:00.000Z',
+      break_minutes: 30, note: 'synthetic legacy record',
+    });
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM break_intervals WHERE work_record_id = ?;').get('legacy-work').count, 0);
+    assert.equal(sqlite.prepare('PRAGMA foreign_key_list(break_intervals);').get().on_delete, 'CASCADE');
+  } finally { sqlite.close(); }
+});
+
+test('failed v4 DDL rolls back and preserves v3 work-record rows and version', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of migrations.filter(({ version }) => version <= 3)) sqlite.exec(migration.sql);
+    sqlite.exec(`
+      INSERT INTO work_records (
+        id, record_source, started_at_utc, ended_at_utc, timezone, break_minutes
+      ) VALUES ('legacy-work', 'MANUAL', '2026-01-01T05:00:00.000Z', '2026-01-01T13:00:00.000Z', 'Europe/Istanbul', 30);
+      CREATE TABLE break_intervals (sentinel TEXT);
+      PRAGMA user_version = 3;
+    `);
+    await assert.rejects(initializeDatabase(createExpoSqliteAdapter(sqlite)));
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 3);
+    assert.equal(sqlite.prepare('SELECT break_minutes FROM work_records WHERE id = ?;').get('legacy-work').break_minutes, 30);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM pragma_table_info('break_intervals') WHERE name = 'sentinel';").get().count, 1);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='trigger' AND name='break_intervals_validate_insert';").get().count, 0);
   } finally { sqlite.close(); }
 });
 
