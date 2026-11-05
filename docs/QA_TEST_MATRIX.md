@@ -280,7 +280,7 @@ Reviewer: independent R2 reviewer **APPROVE** after fixes; first review caught a
 | Expo Doctor | PASS | `npx expo-doctor --verbose` 20/20 after network-enabled retry. |
 | Android JS export | PASS | `npx expo export --platform android`; 1,252 modules. This is not platform UI acceptance. |
 | File picker, share sheet, restore and cold restart on Android/iOS | NOT RUN | No device/emulator in active environment. Do not treat bundle export as device evidence. |
-| GitHub CI | PENDING | Draft PR will trigger the project workflow; record its actual state after creation. |
+| GitHub CI | IN PROGRESS | Draft PR #25 run #31 (`42054494585`); record final conclusion after completion. |
 | Diff whitespace check | PASS | `git diff --check`; Windows line-ending conversion notices only. |
 
 Security implementation: encrypted file uses PBKDF2-HMAC-SHA256 (600,000 rounds), random 16-byte salt, random 12-byte nonce, AES-256-GCM authenticated header/payload, version/size checks and no plaintext DB export. Restore validates canonical schema, integrity, foreign keys and migration compatibility before replacement; rollback copy is validated before use. Wipe performs a confirmed logical replacement with empty v6 DB; flash forensic erasure is not claimed.
