@@ -1,6 +1,6 @@
 # VDY-003C — Gerçek Vardiya Takvimi ve Bugün Ekranı
 
-**Durum:** IN_PROGRESS — R2, `feat/vdy-003c-shift-calendar-ui`.
+**Durum:** READY_FOR_REVIEW — R2, `feat/vdy-003c-shift-calendar-ui`; draft PR #11 open, no merge.
 **Kaynak:** GitHub Issue #10. **Base:** VDY-003B `58b9091abacebbc1223e7c085d9ca3f8b96660c1`.
 
 ## Kabul kapsamı
@@ -35,5 +35,6 @@ VDY-004 fiilî kayıtları, ücret, mesai, IAP, tam onboarding, backup/restore, 
 - Automated tests cover schedule constructors, custom validation, date/month/leap boundaries, save rollback, SQLite persistence/reopen, overrides and exact saved `startIndex` phase preservation. Synthetic repository tests only; no diagnostic code added to production.
 - `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (83/83); `npx expo-doctor --verbose` PASS (20/20); Android Expo bundle export PASS (1,190 modules); `git diff --check` PASS.
 - UI touch target follow-up: schedule chips/removal buttons ≥44 dp; calendar day cells have 6 dp horizontal hit expansion. No VDY-003C device smoke was required or performed. Previous VDY-003B Android SQLite screenshots remain unchanged in `docs/progress/evidence/android-2026-11-05/`.
-- GitHub CI: pending PR publication. Independent R2 reviewer follow-up status and PR/head SHA will be added to `docs/progress/PROGRESS.md`.
+- GitHub CI: PASS on PR #11 code head `8d110e93c4e663c7aa6fcb52eb6df9813b0c6f74`; `Verify Expo scaffold` job 127144494014 / Actions run 41997597725.
+- Independent R2 reviewer: final APPROVE after fixes; no P0/P1/P2. Draft PR #11 targets `feat/vdy-003b-sqlite-storage`; no merge.
 - Separate open risks: R08 iOS/device coverage, R13 moderate npm audit findings, Ethernet Private-profile/GPO issue. No merge or release.

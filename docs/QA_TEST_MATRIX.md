@@ -131,7 +131,7 @@ Independent R2 security/data reviewer: **APPROVE**, no P0/P1/P2; verified the st
 | `npx expo-doctor --verbose` | PASS | 20/20; first attempt had transient DNS failures, successful connected retry completed all checks. |
 | Android bundle export | PASS | `npx expo export --platform android --output-dir .expo\vdy-003c-export`; Metro bundled 1,190 modules. This is bundle verification, not device smoke. |
 | `git diff --check` | PASS | 2026-11-05; no whitespace errors. |
-| GitHub CI | PENDING | Draft PR #11 head `f9e174ae5e25ae9cf1b3da1e257ebcbdaad1a541`; Actions CI run 41997473336 was IN_PROGRESS at first poll. Record terminal status in progress log. |
+| GitHub CI | PASS | Draft PR #11 head `8d110e93c4e663c7aa6fcb52eb6df9813b0c6f74`; `Verify Expo scaffold` job 127144494014 / Actions run 41997597725 completed successfully. |
 | Android/iOS physical visual QA, large text and screen reader | SKIP | Not required by this task; native UI behavior is not claimed as device-verified. Existing VDY-003B Android/SQLite screenshots remain preserved above. |
 
 Reviewer: independent R2 reviewer **APPROVE** after fixes; first review caught and the implementation addressed a saved-phase regression risk, 44 dp touch target gaps, and missing editable IANA zone. Final reviewer verified DayCell `hitSlop` correction. Keep R08 (iOS/device coverage), R13 (12 moderate audit findings), and Ethernet Public-profile policy issue separate and open.

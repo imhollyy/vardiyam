@@ -7,10 +7,10 @@
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-003C — Gerçek Vardiya Takvimi ve Bugün Ekranı
-- **Durum:** VDY-003C implementation/review PASS; draft PR/CI pending on `feat/vdy-003c-shift-calendar-ui`, based on VDY-003B HEAD `58b9091`; previous Android evidence retained; R08/R13 and Ethernet policy issue remain separately OPEN; main merge/release yok
+- **Durum:** VDY-003C implementation/review/GitHub CI PASS; draft PR #11 open on `feat/vdy-003c-shift-calendar-ui`, based on VDY-003B HEAD `58b9091`; previous Android evidence retained; R08/R13 and Ethernet policy issue remain separately OPEN; main merge/release yok
 - **Aktif branch:** feat/vdy-003c-shift-calendar-ui
 - **Ana depo:** `imhollyy/vardiyam`
-- **Ürün kodu:** Scaffold placeholder'ları oluşturuldu
+- **Ürün kodu:** VDY-003C ile gerçek vardiya düzeni oluşturma, Bugün ve Takvim akışları eklendi
 - **Expo/SQLite scaffold:** READY_FOR_PR
 - **Gerçek alt ajan çağrısı:** Implementer + bağımsız reviewer önceki preflight'te; R2 reviewer son diff'i ayrıca inceledi ve düzeltmelerden sonra bulgu bırakmadı. Uzman ajan denemesi repo erişimi olmadığı için sayılmadı; R2 sınıfında uzman zorunlu değil.
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. Read and record PR #11 GitHub CI completion; then leave the draft PR open for human review. Do not merge.
+1. Review draft PR #11; then proceed to VDY-004 when ready. Do not merge without separate authorization.
 
 ## OLAY GÜNLÜĞÜ
 
@@ -336,7 +336,7 @@ NEXT ACTION:
 - **Skills:** `vardiyam-task-flow` v1.0, `vardiyam-ui-quality` v1.0, `vardiyam-data-safety` v1.0, `vardiyam-test-gate` v1.0 and `find-docs` applied; Expo SDK 58 SQLite/Router APIs verified using current documentation. Native UI skill guidance fetched from UI Skills CLI.
 - **Implementation:** Settings creates/edits shift templates and fixed/weekly-three/2+2+2/4+2/6+1/custom cycle schedules, IANA timezone, anchor date and start shift. `saveShiftSchedule` writes template/cycle/entries atomically through existing repository queue/transaction. Calendar queries actual planned shifts by month and supports selected-day SHIFT/OFF/LEAVE override. Today shows today's plan and upcoming shifts. Existing domain cycle engine/projection is reused. Prior overrides survive schedule edits; OFF is not called legal rest.
 - **Reviewer findings/fixes:** Independent R2 reviewer initially found P1 saved cycle phase could drift and P2 touch target/timezone gaps. Exact stored `startIndex` is now retained for unchanged start selection, with builder and SQLite round-trip regressions. IANA zone is editable and validated by the existing domain validator. Settings controls meet 44 dp; calendar day cells add 6 dp horizontal hit area. Reviewer final **APPROVE**, no remaining P0/P1/P2; independently ran tests (83/83 PASS).
-- **Verification:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (83/83); `npx expo-doctor --verbose` PASS (20/20; initial offline DNS failure, successful connected retry); `npx expo export --platform android --output-dir .expo\vdy-003c-export` PASS (Android bundle, 1,190 modules, 2.7 MB Hermes); `git diff --check` PASS. No VDY-003C device smoke was required or performed. PR #11 GitHub Actions CI run 41997473336 is IN_PROGRESS; combined status had no individual status checks at first poll.
+- **Verification:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (83/83); `npx expo-doctor --verbose` PASS (20/20; initial offline DNS failure, successful connected retry); `npx expo export --platform android --output-dir .expo\vdy-003c-export` PASS (Android bundle, 1,190 modules, 2.7 MB Hermes); `git diff --check` PASS. No VDY-003C device smoke was required or performed. PR #11 current code head `8d110e93c4e663c7aa6fcb52eb6df9813b0c6f74` GitHub Actions `Verify Expo scaffold` job 127144494014 / run 41997597725 **PASS**.
 - **Files:** Today/Calendar/Settings routes; repository atomic schedule-save API; pure schedule/date helpers; shared shift-kind badge; schedule/repository/date test coverage; QA matrix and task record. Prior Android screenshots under `docs/progress/evidence/android-2026-11-05/` preserved.
 - **Separate open risks:** R08 iOS/device coverage remains OPEN; R13 12 moderate npm audit findings remain OPEN; Ethernet index 11 still Private because Network List Manager policy blocked Public restoration; no firewall broadening. No APK build, main merge, release, or PR merge in VDY-003C.
-- **NEXT ACTION:** Read and record PR #11 GitHub CI completion; then leave the draft PR open for human review. Do not merge.
+- **NEXT ACTION:** Review draft PR #11; then proceed to VDY-004 when ready. Do not merge without separate authorization.
