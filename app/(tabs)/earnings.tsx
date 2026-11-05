@@ -8,10 +8,12 @@ import { getLocalDateTimeCandidates } from '@/src/domain/work-record';
 import { addCalendarDays, dayOrdinal, type LocalDate } from '@/src/domain/shift-cycle';
 import { listWorkRecordsWithTimedBreaksInRange } from '@/src/data/workRecordRepository';
 import { getLatestEarningsProfile, listApprovedEarningsSnapshots, saveApprovedEarningsSnapshot, type EarningsProfileVersion } from '@/src/data/earningsRepository';
+import { getOrCreatePayrollPeriod, getPeriodPaymentLedger } from '@/src/data/paymentRepository';
 import { isEarningsSettings, makeCalculationInput, type EarningsSettings } from '@/src/features/earnings/profile';
 import { canApproveEarnings, shouldShowGrossEstimate } from '@/src/features/earnings/presentation';
 import { formatLocalDate, getLocalToday, shiftYearMonth } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
+import { payrollPeriodForMonth } from '@/src/features/payments/period';
 
 function startOfWeek(date: LocalDate, weekStartsOn: number): LocalDate {
   const ordinal = dayOrdinal(date);
@@ -52,11 +54,13 @@ export default function EarningsScreen() {
   const [calculating, setCalculating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentLedger, setPaymentLedger] = useState<Awaited<ReturnType<typeof getPeriodPaymentLedger>> | null>(null);
 
   const period = useMemo(() => {
     const day = version?.profile.payrollPeriodStartDay ?? 1;
-    const start = `${periodMonth}-${String(day).padStart(2, '0')}` as LocalDate;
-    const end = `${shiftYearMonth(periodMonth, 1)}-${String(day).padStart(2, '0')}` as LocalDate;
+    const identity = payrollPeriodForMonth(periodMonth, day, version?.profile.timezone ?? 'Europe/Istanbul');
+    const start = identity.startLocalDate as LocalDate;
+    const end = identity.endExclusiveLocalDate as LocalDate;
     return { start, end };
   }, [periodMonth, version]);
 
@@ -64,14 +68,19 @@ export default function EarningsScreen() {
     setLoading(true); setError(null); setPreview(null);
     try {
       const current = await getLatestEarningsProfile<EarningsSettings, EarningsRule[]>(database);
+      const paymentPeriod = payrollPeriodForMonth(periodMonth, current?.profile && isEarningsSettings(current.profile) ? current.profile.payrollPeriodStartDay : 1,
+        current?.profile && isEarningsSettings(current.profile) ? current.profile.timezone : 'Europe/Istanbul');
+      const persistedPeriod = await getOrCreatePayrollPeriod(database, paymentPeriod);
+      setPaymentLedger(await getPeriodPaymentLedger(database, persistedPeriod.id));
       if (!current || !isEarningsSettings(current.profile)) {
         setVersion(null); setRecords([]); setWeekChoices([]); setHistory(await listApprovedEarningsSnapshots(database));
         return;
       }
       setVersion(current);
       const periodStartDay = current.profile.payrollPeriodStartDay;
-      const start = `${periodMonth}-${String(periodStartDay).padStart(2, '0')}` as LocalDate;
-      const end = `${shiftYearMonth(periodMonth, 1)}-${String(periodStartDay).padStart(2, '0')}` as LocalDate;
+      const identity = payrollPeriodForMonth(periodMonth, periodStartDay, current.profile.timezone);
+      const start = identity.startLocalDate as LocalDate;
+      const end = identity.endExclusiveLocalDate as LocalDate;
       const firstWeek = startOfWeek(start, current.profile.weekStartsOn);
       const lastWeek = startOfWeek(addCalendarDays(end, -1), current.profile.weekStartsOn);
       const queryStart = firstWeek;
@@ -98,8 +107,9 @@ export default function EarningsScreen() {
     setCalculating(true);
     try {
       const settings = version.profile;
-      const periodStart = `${periodMonth}-${String(settings.payrollPeriodStartDay).padStart(2, '0')}` as LocalDate;
-      const periodEnd = `${shiftYearMonth(periodMonth, 1)}-${String(settings.payrollPeriodStartDay).padStart(2, '0')}` as LocalDate;
+      const identity = payrollPeriodForMonth(periodMonth, settings.payrollPeriodStartDay, settings.timezone);
+      const periodStart = identity.startLocalDate as LocalDate;
+      const periodEnd = identity.endExclusiveLocalDate as LocalDate;
       const now = new Date();
       const id = `preview-${now.getTime()}`;
       now.setUTCSeconds(0, 0);
@@ -199,6 +209,14 @@ export default function EarningsScreen() {
       <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Planı kayıtlı vardiyalar</Text><Text style={[styles.metric, { color: theme.foreground }]}>{(linkedPlannedMinutes / 60).toFixed(1)} sa</Text></View>
       <Text style={[styles.caption, { color: theme.muted }]}>Planlanan süre yalnız fiilî kayda bağlı vardiyalardan toplanmıştır; tam takvim planı değildir.</Text>
     </View>
+    <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <Text style={[styles.cardTitle, { color: theme.foreground }]}>Net ödeme takibi</Text>
+      <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Bordro neti</Text><Text style={[styles.metric, { color: theme.foreground }]}>{paymentLedger?.statement ? money(paymentLedger.statement.amountMinor) : 'Bilinmiyor'}</Text></View>
+      <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Bu döneme atanmış ödemeler</Text><Text style={[styles.metric, { color: theme.foreground }]}>{money(paymentLedger?.reconciliation.allocatedPaymentMinor ?? 0)}</Text></View>
+      <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Bordro neti ile kayıtlı ödeme farkı</Text><Text style={[styles.metric, { color: theme.accent }]}>{paymentDifference(paymentLedger?.reconciliation.differenceMinor ?? null)}</Text></View>
+      <Text style={[styles.caption, { color: theme.muted }]}>Bu tutarlar kullanıcı kayıtlarıdır; bordro neti ile ödeme arasındaki fark dışında brüt-net karşılaştırması yapılmaz.</Text>
+      <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/net-payments', params: { periodMonth } } as never)} style={[styles.primary, { backgroundColor: theme.accent }]}><Text style={styles.primaryText}>Bordro ve ödemeleri yönet</Text></Pressable>
+    </View>
     {showGross ? <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Text style={[styles.cardTitle, { color: theme.foreground }]}>Brüt tahmin</Text>
       {version?.profile.mode === 'MONTHLY_GROSS' && version.profile.monthlyGrossMinor !== null ? <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Aylık brüt baz (ayar)</Text><Text style={[styles.metric, { color: theme.foreground }]}>{money(version.profile.monthlyGrossMinor)}</Text></View> : null}
@@ -226,6 +244,12 @@ export default function EarningsScreen() {
       {history.length ? history.map((item) => <View key={item.calculationId} style={[styles.historyItem, { borderColor: theme.border }]}><Text style={[styles.body, { color: theme.foreground }]}>{shortTime(item.createdAtUtc)}{showGross ? ` · ${money(item.result.totalAmountMinor ?? 0)}` : ''}</Text><Text style={[styles.caption, { color: theme.muted }]}>{showGross ? `Sabit kayıt · ${item.result.snapshot?.ruleSetVersionId ?? item.ruleVersionId}` : 'Önceden onaylanmış yerel kayıt'}</Text></View>) : <Text style={[styles.body, { color: theme.muted }]}>Henüz onaylanmış bir hesap yok. Önizleme geçmişe yazılmaz.</Text>}
     </View>
   </ScrollView>;
+}
+
+function paymentDifference(value: number | null): string {
+  if (value === null) return 'Bilinmiyor';
+  if (value === 0) return '0 TL';
+  return `${money(Math.abs(value))} ${value > 0 ? 'düşük kayıtlı ödeme' : 'fazla kayıtlı ödeme'}`;
 }
 
 const styles = StyleSheet.create({ container: { padding: 18, paddingBottom: 44, gap: 12 }, center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }, eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.1, marginTop: 10 }, title: { fontSize: 30, fontWeight: '800' }, periodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48 }, arrow: { fontSize: 34, paddingHorizontal: 10 }, periodTitle: { fontSize: 17, fontWeight: '700', textTransform: 'capitalize' }, settingsLink: { minHeight: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'space-between', flexDirection: 'row' }, summary: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 }, notice: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 8 }, cardTitle: { fontSize: 17, fontWeight: '800' }, body: { fontSize: 14, lineHeight: 20 }, caption: { fontSize: 12, lineHeight: 17 }, metricRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }, metric: { fontSize: 17, fontWeight: '800' }, week: { minHeight: 48, flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 12, alignItems: 'center', paddingHorizontal: 12 }, primary: { minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 }, primaryText: { color: '#fff', fontSize: 15, fontWeight: '800', textAlign: 'center' }, detail: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 10, gap: 5 }, historyItem: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 3 } });

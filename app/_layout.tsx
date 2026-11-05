@@ -12,6 +12,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="work-records" />
         <Stack.Screen name="earnings-settings" />
+        <Stack.Screen name="net-payments" />
       </Stack>
     </SQLiteProvider>
   );

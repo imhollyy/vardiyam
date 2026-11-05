@@ -6,9 +6,9 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-005C2 — Gerçek Kazanç ekranı ve kalıcı ücret ayarları
-- **Durum:** IMPLEMENTED / R3 APPROVED; code commits `1312e367fced093017dcaa1c53d27320567820b8` + effective-date fix `50cdc5b0d21052778656f55d5bb90619837644d0`; taslak PR [#20](https://github.com/imhollyy/vardiyam/pull/20) açık/unmerged, PR #18'in branch `feat/vdy-005c1-earnings-engine` güncel head'i `44dcbd563004c43eec224e8fa3a6db5aa156da97` üzerine. Final code CI run #27 `42036369312` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged korundu.
-- **Aktif branch:** feat/vdy-005c2-earnings-ui-persistence
+- **Aktif aşama:** VDY-006 — Bordro neti ve gerçek ödeme takibi
+- **Durum:** DONE / R3 REVIEW APPROVED / CI PASS; branch `feat/vdy-006-net-payments-reconciliation`, commit `a8216ecd342c0fddc24ce05de0ea274e907ce32a`. Taslak PR [#22](https://github.com/imhollyy/vardiyam/pull/22) açık/unmerged, PR #20 HEAD `42002fc4a4ac84c9a559847e6a79230db529662b` üzerine stacked. GitHub Actions run #29 `42041568683` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged korundu.
+- **Aktif branch:** feat/vdy-006-net-payments-reconciliation
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,9 +22,22 @@
 
 ## NEXT ACTION
 
-1. VDY-006 — bordro neti, gerçek net ödeme kayıtları ve ödeme mutabakatı; PR #20 kurucu/reviewer kararından sonra. Merge/release yok.
+1. MVP'nin uçtan uca kullanıcı kabulü ve eksik ürün özelliklerinin önceliklendirilmesi. PR/main merge ve release yok.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-006 — DONE / R3 REVIEW APPROVED / PR #22 CI PASS
+
+- **Kaynak/branch:** Issue #21 okundu. PR #20 güncel ve yerel HEAD `42002fc4a4ac84c9a559847e6a79230db529662b`, open/draft/unmerged/mergeable. `feat/vdy-006-net-payments-reconciliation` bu SHA'dan açıldı. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişmeden unstaged.
+- **Uygulama:** Additive transactional SQLite v6: immutable sınır/tz period kimliği, append-only bordro net revizyonları, gerçek net ödeme, dönem allocations ve append-only ledger events. SQL triggers payment amount/allocations toplamı üst sınırını INSERT/UPDATE yarışlarında uygular; repository tüm mutasyonları `withDatabaseTransaction` + mevcut per-DB queue üzerinden yazar. Payment tarihinden dönem atanmaz. Onaylı v1–v5 gross snapshot ve mevcut vardiya/çalışma kayıtları korunur.
+- **Ekran:** Kazanç sekmesine brüt tahminden ayrı Net Ödeme Takibi eklendi; bordro neti bilinmiyorsa fark NULL/bilinmiyor. Ayrı yönetim akışı Türkçe tutar/tarih, banka/elden/diğer, ödeme edit/confirm soft-delete, bir ödemeyi dönemlere bölme, ödeme geçmişi/bakiye ve bordro neti revision geçmişi sağlar. NET_ONLY/SKIP'te bölüm açık; brüt UI eski mode gate'te kalır. Tema tokenları, durum metinleri ve erişilebilir etiketler kullanıldı.
+- **Beceriler:** `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-pay-calculation`, `vardiyam-ui-quality`, `vardiyam-test-gate` okundu/uygulandı. UI Skills CLI `npx --no-install ui-skills categories` çağrısı sonuç vermeyip beklediği için iptal edildi; harici UI becerisi iddia edilmiyor. Kullanılan Expo/SQLite API'leri mevcut SDK58 repository pattern'iyle aynı.
+- **Ajanlar:** `vdy006_specialist`, net/bordro/ödeme semantiği ve ledger risklerine (hukuk mütalaası değildir) danışmanlık verdi. Gerçek bağımsız `vdy006_independent_reviewer` R3 final **APPROVE**, P0–P2 yok; ilk P2 `35.000` tam TL girişi gruplu formatını reddetmeyle ilgiliydi, parser ve regressions düzeltildi. Delta review da immutable period trigger'ları, net tarihçesi UI ve kuruş formatting değişikliklerini onayladı.
+- **Doğrulama:** `npm test` PASS **210/210** (önceki 197 korundu); `npm run typecheck` PASS; `npm run lint` PASS; `npx expo-doctor --verbose` PASS **20/20**; Android JS export PASS (1203 modül, 3 MB Hermes, kısa repo TEMP ile); `git diff --check` PASS. GitHub Actions run #29 `42041568683` on PR #22 head `a8216ecd...`: **SUCCESS** (install, typecheck, lint, unit tests, Expo dependency health). Export/TEMP artifacts cleaned.
+- **Cihaz / Windows:** Yeni cihaz smoke NOT RUN (kapsam dışı); Android bundle cihaz kabul testi sayılmaz. Windows/ADB/firewall işine dönülmedi.
+- **Açık risk:** R08, R13, Ethernet Private profile/policy blocker ve yayın öncesi Türk iş hukuku uzman incelemesi ayrı/açık; ödeme UI/migration kapsamı için blokaj değil.
+- **PR/koruma:** Draft PR [#22](https://github.com/imhollyy/vardiyam/pull/22), PR #20 dalına stacked; open/draft/unmerged, mergeable. No PR/main merged, no release. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` unstaged kaldı.
+- **NEXT ACTION:** MVP'nin uçtan uca kullanıcı kabulü ve eksik ürün özelliklerinin önceliklendirilmesi.
 
 ### 2026-11-05 — VDY-005C2 — IMPLEMENTED / R3 APPROVED / PR #20 CI PASS
 
@@ -474,3 +487,11 @@ NEXT ACTION:
 - **Skills/docs:** `vardiyam-task-flow` v1.0, `vardiyam-data-safety` v1.0, `vardiyam-test-gate` v1.0, `vardiyam-ui-quality` v1.0 and `find-docs` read/applied. Context7 `/expo/expo/expo_58.0.0` verified Expo SQLite transaction queue/rollback, parameter binding, and SDK58 API use.
 - **Plan:** v3 additive migration and domain/time conversion; transaction-safe repository; Today/Calendar entry points and record form/history/edit/confirm-delete; synthetic migration/CRUD/overnight/break/overlap/plan-stability/manual tests; typecheck/lint/tests/Expo Doctor/CI and independent R2 review; draft PR based on PR #11 only.
 - **NEXT ACTION:** Implement the v3 migration and typed work-record domain/repository with synthetic migration and overlap tests.
+
+### 2026-11-05 — VDY-006 — START / BASE VERIFIED
+
+- GitHub Issue #21 okundu. PR #20 open/draft/unmerged/mergeable, head `42002fc4a4ac84c9a559847e6a79230db529662b`; yerel branch eşleşti ve `feat/vdy-006-net-payments-reconciliation` bu HEAD'den açıldı.
+- Başlangıç dirty state yalnız `docs/tasks/VDY-004.md` ve `expo-env.d.ts`; stage/stash/reset/overwrite yapılmayacak.
+- R3 finansal veri ve SQLite migration. `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-pay-calculation`, `vardiyam-ui-quality`, `vardiyam-test-gate` okundu. Gerçek uzman ajan sınırları ve bağımsız R3 reviewer başlatıldı.
+- Net bordro geçmişi revizyonlu; dönem kimliği sınır ve timezone değerlerini donduracak; ödeme tarihi dönemi belirlemeyecek; allocation ve bakiye kuruş integer; unknown bordro neti farkı NULL. VDY-005C2 snapshotlarına dokunulmayacak.
+- NEXT ACTION: v6 migration, repository/ledger domain ve otomatik sentetik testler.

@@ -150,6 +150,27 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 
 Gerçek doğrulama sonuçları VDY-005C1 kapanış kaydında `docs/progress/PROGRESS.md` içinde tutulur. Bu testler sentetiktir; hukuk mütalaası, gerçek işyeri bordro teyidi veya kalıcı snapshot/SQLite kabulü değildir.
 
+### VDY-006 — Bordro neti ve fiilî ödeme mutabakatı
+
+| ID | Senaryo | Beklenen | Otomatik kanıt |
+|---|---|---|---|
+| PAY01 | v5→v6 migration, mevcut brüt snapshot | v1–v5 verisi ve onaylı brüt snapshot aynı kalır; v6 tabloları eklenir; tekrar migration idempotent | `tests/data/migrations.test.mjs` |
+| PAY02 | 35.000 TL bordro + 30.000 banka + 5.000 elden | Net ödeme farkı 0 TL | `tests/data/paymentRepository.test.mjs` |
+| PAY03 | 35.000 TL bordro + 30.000 atanmış ödeme | Kayıtlı ödeme farkı 5.000 TL; yalnız net kayıtları kıyaslanır | domain + repository testleri |
+| PAY04 | 25.000 TL ödeme iki döneme 15.000 + 10.000 dağıtılır | İki sabit dönem kimliğine bölünür; dağıtım toplamı 25.000 TL | `paymentRepository.test.mjs` |
+| PAY05 | Aynı ödeme fazla dağıtılır / paralel yazım | Üst sınır reddedilir; transaction rollback olur; over-allocation oluşmaz | `paymentRepository.test.mjs` |
+| PAY06 | Ödeme tarihi bordro dönemi dışında | Dönem otomatik atanmaz; yalnız kullanıcı açık dağıtımı mutabakata girer | repository ve ekran akışı |
+| PAY07 | Bordro neti bilinmiyor | Ödeme kaydı olsa bile fark bilinmiyor/null kalır; 0 varsayılmaz | `payments.test.mjs` |
+| PAY08 | Bordro neti revizyonu / ödeme düzenleme / silme | Bordro neti append-only versiyon; ödeme silme onaylı soft-delete, eski dağıtımlar audit için korunur ve aktif toplamdan çıkarılır | `paymentRepository.test.mjs` |
+| PAY09 | Dönem ayarı değişir | Eski dönem sınır ve timezone kimliği sabit kalır; kayıtlar yeni döneme taşınmaz | `period.test.mjs` + repository tests |
+| PAY10 | 40.000 TL tahmini brüt, 32.000 TL alınan net | Brüt-net farkından ödeme açığı üretilmez; ödeme farkı yalnız bilinen bordro netine göre hesaplanır | `payments.test.mjs` |
+| PAY11 | TR para girişi / kuruş / overflow | `35.000,50` ve `35000.50` aynı integer kuruşa; belirsiz format, negatif ve unsafe değer reddedilir | `payments.test.mjs` |
+| PAY12 | NET_ONLY / SKIP | Net bordro ve ödeme bölümü kullanılabilir; tahmini brüt kart/tutar yok | `earningsPresentation.test.mjs` + ekran koşulu |
+| PAY13 | SQLite cold reopen | Bordro, ödeme, dağıtım ve fark korunur | `paymentRepository.test.mjs` (sentetik file DB) |
+| PAY14 | GitHub PR CI | Locked install, typecheck, lint, unit test, Expo dependency health | PR #22 Actions run #29 `42041568683` SUCCESS |
+
+VDY-006 son gerçek komut ve PR/CI/reviewer kanıtları kapanışta `docs/progress/PROGRESS.md` içindeki görev kaydına eklenecek. Cihaz smoke bu görevde yapılmayacak.
+
 Son çalıştırma: `npm test` PASS 184/184 (57 yeni domain testi, 40 ayrı sayı fixture'ı); focused kazanç testi 57/57; `npm run typecheck` PASS; `npm run lint` PASS; `npx expo-doctor --verbose` PASS 20/20 (ağ erişimli yeniden deneme); `git diff --check` PASS; taslak PR #18 code CI run #22 (`42029068508`) ve docs-closure run #23 (`42029467408`) PASS.
 
 ## Yasal uyarı / ürün davranışı
