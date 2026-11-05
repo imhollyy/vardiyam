@@ -6,25 +6,55 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-004 — Fiilî Çalışma ve Mesai Kayıtları
-- **Durum:** VDY-004 READY_FOR_REVIEW; local verification, independent R2 review, and GitHub CI PASS. Draft PR #12 is open against PR #11 head `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`. PR #4/#6/#7/#9/#11 remain open and unmerged.
-- **Aktif branch:** feat/vdy-004-work-records
+- **Aktif aşama:** VDY-005A — Çalışma Zamanı Segmentasyon Motoru
+- **Durum:** VDY-005A READY_FOR_REVIEW; draft PR #14 open, CI PASS, R2 APPROVE. Implementation commit `42a0fe3d6ab38ba05d1f597b80d69521e5a3b766`; current PR head `adf790ca6aacab066651704b1d834c82005a36d0` (documentation closure), stacked on PR #12 at `f3d5bc571058120334d0355287bbcaafea31edc5`. PR #14 and all earlier PRs remain unmerged. Local user changes and `expo-env.d.ts` are preserved and unstaged.
+- **Aktif branch:** feat/vdy-005a-work-segmentation
 - **Ana depo:** `imhollyy/vardiyam`
-- **Ürün kodu:** VDY-003C schedules/calendar/Today complete; VDY-004 work-record implementation in progress
+- **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records complete; VDY-005A pure UTC/IANA segmentation in progress
 - **Expo/SQLite scaffold:** READY_FOR_PR
 - **Gerçek alt ajan çağrısı:** Implementer + bağımsız reviewer önceki preflight'te; R2 reviewer son diff'i ayrıca inceledi ve düzeltmelerden sonra bulgu bırakmadı. Uzman ajan denemesi repo erişimi olmadığı için sayılmadı; R2 sınıfında uzman zorunlu değil.
 - **Repo skill kullanımı:** 6 Vardiyam skill'i + Context7 `find-docs` vendor skill'i mevcut; UI Skills CLI on-demand gerçek fetch doğrulandı.
 - **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
 - **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **Typecheck / lint / unit test / Expo Doctor:** VDY-004 local PASS: typecheck, lint, 103/103 tests, Expo Doctor 20/20, Android export, diff check. GitHub CI run 42004833540 PASS on final PR head `edd2e6b`. R13 remains OPEN.
+- **Typecheck / lint / unit test / Expo Doctor:** VDY-005A `npm run typecheck` PASS, `npm run lint` PASS, `npm test` PASS 114/114, `npx expo-doctor --verbose` PASS 20/20, `git diff --check` PASS. GitHub CI run `42016969104` (#17) PASS on implementation head and run `42017401511` (#18) PASS on documentation closure head. R08, R13 and Ethernet profile remain separate/open.
 - **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. Founder/reviewer review of draft PR #12; wait for a separate explicit merge decision. Do not merge or release.
+1. Await founder/reviewer decision on draft PR #14; separately authorize any merge. Next coding target: VDY-005B timed-break data model. Do not merge or release.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-005A — LOCAL VERIFY / R2 APPROVED
+
+- **Başlangıç doğrulaması:** PR #12 açık/draft/unmerged; remote head ve yerel HEAD `f3d5bc571058120334d0355287bbcaafea31edc5`. Yeni `feat/vdy-005a-work-segmentation` dalı bu SHA'dan açıldı. Başlangıçta `docs/progress/PROGRESS.md`, `docs/tasks/VDY-004.md`, `expo-env.d.ts` dirty ve `docs/tasks/VDY-005.md` untracked idi; hepsi korundu. `expo-env.d.ts` içeriği/stage edilmedi.
+- **Görev/ürün sınırı:** Issue #13 açık; anayasa v1.1 §§5–6/12, PRODUCT_SPEC §§3–6, ADR-013/014 ve QA matrisi incelendi. R2: saf zaman segmentasyonu; tutar, katsayı, hukuk önceliği, SQLite migration, UI ve cihaz testi yok. OFF hafta tatili diye türetilmiyor.
+- **Beceriler ve kaynak:** `vardiyam-task-flow` v1.0 ve `vardiyam-pay-calculation` v1.0 okundu/uygulandı; Context7 `/mdn/content` ile `Intl.DateTimeFormat` `timeZone`/`formatToParts` doğrulandı. Graphify `update . --no-cluster` yerel AST işlemi (no LLM) 75 dosyadan 764 node/1380 edge üretti; `work-segmentation.ts` yalnız saf `addCalendarDays` domain bağımlılığı ve kendi test import'u gösterdi. İncelenen generated graph artefact'ı kaldırıldı ve PR'a alınmayacak. Playwright/UI Skills bu görevde UI/tarayıcı kapsamı olmadığından kullanılmadı. Bağımsız R2 reviewer aynı ajan oturumunda dar final diff'i inceliyor.
+- **Veri kararı:** VDY-004 yalnız toplam `breakMinutes` taşır. Açık timed break intervals optional domain input olarak kullanılır, toplamla tutarlılığı doğrulanır; aggregate-only mola için global `totalWorkedMinutes` toplamdan hesaplanır ancak segment `workedMinutes` her durumda null, `breakTiming=AGGREGATE_ONLY` ve mola süresi atanmamış raporlanır. WorkRecord ve SQLite v1–v3 değiştirilmiyor.
+- **Uygulama:** `src/domain/work-segmentation.ts` saf UTC/IANA fonksiyonu. Yerel takvim günü/hafta/ay/yıl/pay period; explicit source windows (`PUBLIC_HOLIDAY`, `HALF_DAY_HOLIDAY`, `WORKPLACE_RULE_CHANGE`, `CUSTOM`); timed breaks validation/removal; overlapping marker windows; no legal/pay categories. WorkRecord and SQLite v1–v3 unchanged.
+- **Mola kararı:** total-only nonzero break is reported as `AGGREGATE_ONLY`; aggregate `totalWorkedMinutes` remains exact, but every segment `workedMinutes=null` and all break minutes stay unallocated, even for a single segment. Reviewer P2 caught and closed the single-segment relaxation; regression proves no inferred placement.
+- **Test fixtures:** `tests/domain/work-segmentation.test.mjs` covers ordinary known break, overnight unknown break, Oct 28 13:00 parameter boundary, Dec/Jan, Sunday/Monday week start, 15th payroll start, New York spring/fall DST, Sao Paulo local-midnight DST gap, overlapping/adjacent breaks, overlapping boundary windows/no double-count, break total mismatch, invalid inputs. Full existing+new tests: 114/114.
+- **Verification:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS (114/114); `npx expo-doctor --verbose` PASS (20/20, network-enabled retry after initial offline 18/20); `git diff --check` PASS (CRLF normalization notices only). No Android/iOS device test requested/needed.
+- **Independent reviewer:** actual R2 reviewer found P2 one-bucket aggregate break allocation; implementation now leaves all aggregate-only break minutes unallocated. Follow-up **APPROVE**, no remaining finding; focused tests 11/11 and full suite 114/114.
+- **Graphify/Context7:** local Graphify AST, `--no-cluster` (no LLM) produced 764 nodes/1380 edges from 75 source files; `work-segmentation.ts` imports only `addCalendarDays` from domain and its own test imports it. Generated output removed and not staged. Context7 `/mdn/content` confirms explicit IANA `timeZone` and `formatToParts` use. Playwright/UI Skills skipped because no browser/UI surface is in scope. One independent reviewer agent only; no task implementation delegation.
+- **NEXT ACTION:** Commit/push VDY-005A files only (leave existing `docs/tasks/VDY-004.md` and `expo-env.d.ts` unstaged), open draft PR against `feat/vdy-004-work-records`, verify CI. After PR review, the smallest safe coding next task is **VDY-005B: timed-break data model**. No merge/release.
+
+### 2026-11-05 — VDY-005A — DRAFT PR / CI PASS
+
+- **PR:** [#14](https://github.com/imhollyy/vardiyam/pull/14), open + draft + unmerged; base `feat/vdy-004-work-records` at `f3d5bc571058120334d0355287bbcaafea31edc5`; implementation commit `42a0fe3d6ab38ba05d1f597b80d69521e5a3b766`; documentation closure head `adf790ca6aacab066651704b1d834c82005a36d0`.
+- **Remote CI:** Actions run `42016969104` (#17) passed on implementation head; run `42017401511` (#18) completed `success` on the pushed documentation closure head.
+- **Final local state:** branch tracks origin with no task files pending; pre-existing `docs/tasks/VDY-004.md` and `expo-env.d.ts` remain modified and unstaged, not in the VDY-005A commit. No PR merge or release.
+- **NEXT ACTION:** Founder/reviewer decision on PR #14; next coding target VDY-005B timed-break data model. R08/R13/Ethernet remain separate, and device acceptance was not run.
+
+### 2026-11-05 — PR #12 REVIEW / VDY-005 PLAN
+
+- **Scope/risk:** Read-only independent review of PR #12 plus planning VDY-005; R2/R3 for future pay engine. `expo-env.d.ts` remains untouched and modified locally. No tests were run in this review turn; no merge, release, PR comment, or GitHub review was submitted.
+- **Live PR evidence:** PR #12 open/draft/unmerged, base PR #11 at `e024f5a2ee99dbe20ba9d78c01d1e2c96fb22489`, head `f3d5bc571058120334d0355287bbcaafea31edc5`, 13 files (+1547/-12). GitHub Actions run `42005207984`, job `127170102564`, `Verify Expo scaffold` SUCCESS, zero annotations on the exact head.
+- **Review evidence:** Actual independent reviewer agent found no P0/P1 and one P2: v3 `work_records` MANUAL-row CHECK does not require `planned_cycle_id IS NULL`. Repository/domain paths do not currently insert such a value, so this is low-priority storage-integrity hardening. GitHub review submissions and inline threads are empty; prior R2 APPROVE exists in local task/progress text and PR body, not as a submitted GitHub review object.
+- **Skills:** `vardiyam-task-flow` v1.0 and `vardiyam-pay-calculation` v1.0 read/applied. Q1–Q3 and Product Spec/constitution boundaries captured in `docs/tasks/VDY-005.md`.
+- **Plan:** VDY-005A contract/fixtures; 005B pure segmenter; 005C rule classification (R3 + legal expert review); 005D gross estimate/snapshot (R3 calculation review); 005E earnings UI separately. Key prerequisite to resolve: VDY-004 stores only aggregate break minutes, not break instants; do not invent historical placement.
+- **NEXT ACTION:** Founder/reviewer PR #12 decision and P2 disposition; then start VDY-005A on a separate feature branch. No pay implementation or tests in this turn.
 
 ### 2026-11-05 — VDY-004 — LOCAL VERIFY / R2 APPROVED
 
