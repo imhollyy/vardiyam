@@ -48,6 +48,8 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 
 ## VDY-005C2 — Kalıcı ücret ayarları ve Kazanç
 
+**Çalıştırma sonucu (2026-11-05):** `npm test` PASS 196/196; typecheck/lint/diff-check PASS; Expo Doctor PASS 20/20; Android bundle PASS (Hermes 2.9 MB); bağımsız R3 reviewer APPROVE (P0–P2 yok); GitHub Actions run #25 (`42035205541`) SUCCESS. Gerçek Android/iOS cihaz testi NOT RUN (görev önkoşulu değil).
+
 | ID | Senaryo | Beklenen | Kanıt |
 |---|---|---|---|
 | EC201 | Temiz veritabanı v0→v5 ve mevcut v4→v5 | earnings profile/rule/snapshot tabloları additive transaction ile eklenir | `tests/data/migrations.test.mjs` |
