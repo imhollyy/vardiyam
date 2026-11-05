@@ -19,7 +19,7 @@
 - `npx expo-doctor --verbose`: local dependency/peer checks pass after installing Expo-compatible `expo-font`; two remote metadata checks FAIL with DNS/network errors (`exp.host` and React Native Directory).
 - Android JS export: PASS; iOS JS export: PASS. These are bundle checks, not app launch or device acceptance.
 - iOS simulator/physical-device open, time picker interaction, Dynamic Type XL, TalkBack/VoiceOver and visual screenshot loop: NOT RUN (Windows environment has no iOS runtime; no device was attached).
-- GitHub CI: pending until a draft PR is opened.
+- GitHub Actions run `42120510298`: PASS on PR #30 head `1f431410309e7350c9c3ee94dae4c2babcce8c90` (`Verify Expo scaffold`).
 
 ## Remaining review and risks
 

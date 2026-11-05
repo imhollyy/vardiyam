@@ -13,7 +13,7 @@
 | Native time picker and start/end interaction | Android and iOS JS exports only | NOT RUN | Bundle PASS; interaction NOT RUN |
 | Small screen, large text, VoiceOver/TalkBack and light/dark visuals | static accessibility labels and theme implementation | NOT RUN | SKIP pending device acceptance |
 
-**Final VDY-010B verification:** typecheck PASS; lint PASS; tests 269/269 PASS; Android JS export PASS; iOS JS export PASS; Expo Doctor 18/20 (2 remote metadata checks FAIL due DNS/server connectivity); `git diff --check` PASS. Independent R2 UI/accessibility reviewer APPROVE after P2 report-range fix. Device visual acceptance NOT RUN. No merge/release.
+**Final VDY-010B verification:** typecheck PASS; lint PASS; tests 269/269 PASS; Android JS export PASS; iOS JS export PASS; Expo Doctor 18/20 (2 remote metadata checks FAIL due DNS/server connectivity); `git diff --check` PASS. GitHub Actions run `42120510298` PASS on PR #30 head `1f431410309e7350c9c3ee94dae4c2babcce8c90`. Independent R2 UI/accessibility reviewer APPROVE after P2 report-range fix. Device visual acceptance NOT RUN. No merge/release.
 
 ## VDY-007 — MVP uçtan uca kabul (2026-11-05)
 
