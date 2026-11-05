@@ -246,7 +246,7 @@ export default function EarningsSettingsScreen() {
     <View style={[styles.dateList, { borderColor: theme.border }]}><Text style={[styles.label, { color: theme.muted }]}>Gerçek işyeri hafta tatili günleri · YYYY-AA-GG (yerel tam gün)</Text><TextInput accessibilityLabel="İşyeri hafta tatili günleri" multiline value={restDates} onChangeText={setRestDates} style={[styles.input, styles.multiline, { color: theme.foreground }]} /></View>
     <View style={[styles.dateList, { borderColor: theme.border }]}><Text style={[styles.label, { color: theme.muted }]}>İşyeri özel tatil günleri · YYYY-AA-GG (yerel tam gün)</Text><TextInput accessibilityLabel="İşyeri özel tatil günleri" multiline value={workplaceHolidayDates} onChangeText={setWorkplaceHolidayDates} style={[styles.input, styles.multiline, { color: theme.foreground }]} /></View>
     {toggle('İşyeri hafta tatili ve özel gün listesini doğruladım; girilmeyen sınıf bulunmuyor', settings.workplaceWindowCoverageConfirmed, () => update({ workplaceWindowCoverageConfirmed: !settings.workplaceWindowCoverageConfirmed }))}
-    <Pressable accessibilityRole="button" disabled={saving || Boolean(loadError)} onPress={save} style={[styles.save, { backgroundColor: theme.accent, opacity: loadError ? 0.5 : 1 }]}>{saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Sürümlü ayarları kaydet</Text>}</Pressable>
+    <Pressable accessibilityRole="button" disabled={saving || Boolean(loadError)} onPress={save} style={[styles.save, { backgroundColor: theme.primaryAction, opacity: loadError ? 0.5 : 1 }]}>{saving ? <ActivityIndicator color={theme.onPrimaryAction} /> : <Text style={[styles.saveText, { color: theme.onPrimaryAction }]}>Sürümlü ayarları kaydet</Text>}</Pressable>
   </ScrollView>;
 }
 

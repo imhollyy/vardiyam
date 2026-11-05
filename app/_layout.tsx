@@ -1,8 +1,11 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-
+import * as SplashScreen from 'expo-splash-screen';
 import { AppDatabaseProvider } from '@/src/data/AppDatabaseProvider';
 import { AppThemeProvider, useAppTheme } from '@/src/theme/AppThemeProvider';
+
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function RootLayout() {
   return (
@@ -15,7 +18,14 @@ export default function RootLayout() {
 }
 
 function ThemedRouter() {
-  const { mode, theme } = useAppTheme();
+  const { mode, ready, theme } = useAppTheme();
+
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync().catch(() => undefined);
+  }, [ready]);
+
+  if (!ready) return null;
+
   return (
     <>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />

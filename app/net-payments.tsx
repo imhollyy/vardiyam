@@ -12,6 +12,7 @@ import { getLocalToday, shiftYearMonth } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
 
 const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: 'BANK', label: 'Banka' }, { id: 'CASH', label: 'Elden' }, { id: 'OTHER', label: 'Diğer' },
@@ -39,6 +40,7 @@ export default function NetPaymentsScreen() {
   const [statementValue, setStatementValue] = useState('');
   const [statementNote, setStatementNote] = useState('');
   const [paymentDate, setPaymentDate] = useState(getLocalToday('Europe/Istanbul'));
+  const [timezone, setTimezone] = useState('Europe/Istanbul');
   const [paymentValue, setPaymentValue] = useState('');
   const [paymentDescription, setPaymentDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK');
@@ -53,6 +55,7 @@ export default function NetPaymentsScreen() {
     try {
       const profile = await loadProfile(database);
       const settings = profile?.profile;
+      setTimezone(settings && isEarningsSettings(settings) ? settings.timezone : 'Europe/Istanbul');
       const identity = payrollPeriodForMonth(periodMonth,
         settings && isEarningsSettings(settings) ? settings.payrollPeriodStartDay : 1,
         settings && isEarningsSettings(settings) ? settings.timezone : 'Europe/Istanbul');
@@ -135,17 +138,17 @@ export default function NetPaymentsScreen() {
       <Text style={[styles.heading, { color: theme.foreground }]}>Bordroda yazan net</Text>
       <TextInput accessibilityLabel="Bordro net tutarı" keyboardType="decimal-pad" value={statementValue} onChangeText={setStatementValue} placeholder="35.000,50" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
       <TextInput accessibilityLabel="Bordro notu" value={statementNote} onChangeText={setStatementNote} placeholder="İsteğe bağlı not" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
-      <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveStatement()} style={[styles.primary, { backgroundColor: theme.accent }]}><Text style={styles.primaryText}>{saving ? 'Kaydediliyor…' : ledger?.statement ? 'Bordro netini düzenle' : 'Bordro netini kaydet'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveStatement()} style={[styles.primary, { backgroundColor: theme.primaryAction }]}><Text style={[styles.primaryText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : ledger?.statement ? 'Bordro netini düzenle' : 'Bordro netini kaydet'}</Text></Pressable>
       {ledger?.statement ? <Text style={[styles.caption, { color: theme.muted }]}>Son kayıt v{ledger.statement.version} · Önceki tutarlar değişiklik geçmişinde saklanır.</Text> : <Text style={[styles.caption, { color: theme.muted }]}>Bordro neti girilmezse dönem farkı bilinmiyor kalır.</Text>}
       {statementHistory.length > 1 ? <View style={styles.history}><Text style={[styles.caption, { color: theme.muted, fontWeight: '700' }]}>Bordro neti değişiklik geçmişi</Text>{statementHistory.map((entry) => <Text key={entry.version} style={[styles.caption, { color: theme.muted }]}>v{entry.version} · {formatTryMinor(entry.amountMinor)} · {entry.createdAtUtc.slice(0, 10)}{entry.note ? ` · ${entry.note}` : ''}</Text>)}</View> : null}
     </View>
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
       <Text style={[styles.heading, { color: theme.foreground }]}>{editingPayment ? 'Ödemeyi düzenle' : 'Gerçek ödeme ekle'}</Text>
-      <TextInput accessibilityLabel="Ödeme tarihi, yıl ay gün" value={paymentDate} onChangeText={setPaymentDate} placeholder="YYYY-AA-GG" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
+      <DateTimePickerField mode="date" label="Ödeme tarihi" value={paymentDate} timezone={timezone} onChange={setPaymentDate} onError={setError} />
       <TextInput accessibilityLabel="Gerçek ödeme tutarı" keyboardType="decimal-pad" value={paymentValue} onChangeText={setPaymentValue} placeholder="30.000,00" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
       <View style={styles.wrap}>{METHODS.map((method) => <Pressable key={method.id} accessibilityRole="radio" accessibilityState={{ selected: paymentMethod === method.id }} onPress={() => setPaymentMethod(method.id)} style={[styles.chip, { borderColor: paymentMethod === method.id ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground }}>{method.label}</Text></Pressable>)}</View>
       <TextInput accessibilityLabel="Ödeme açıklaması" value={paymentDescription} onChangeText={setPaymentDescription} placeholder="Açıklama (isteğe bağlı)" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
-      <Pressable accessibilityRole="button" disabled={saving} onPress={() => void savePayment()} style={[styles.primary, { backgroundColor: theme.accent }]}><Text style={styles.primaryText}>{saving ? 'Kaydediliyor…' : editingPayment ? 'Ödeme değişikliklerini kaydet' : 'Ödemeyi kaydet'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={saving} onPress={() => void savePayment()} style={[styles.primary, { backgroundColor: theme.primaryAction }]}><Text style={[styles.primaryText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : editingPayment ? 'Ödeme değişikliklerini kaydet' : 'Ödemeyi kaydet'}</Text></Pressable>
       {editingPayment ? <Pressable accessibilityRole="button" onPress={() => { setEditingPayment(null); setPaymentValue(''); setPaymentDescription(''); }}><Text style={{ color: theme.accent }}>Düzenlemeyi iptal et</Text></Pressable> : null}
     </View>
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>

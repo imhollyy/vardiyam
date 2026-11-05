@@ -7,6 +7,8 @@ export const colors = {
     border: '#DCE4EF',
     accent: '#365CD6',
     accentSurface: '#E9EEFF',
+    primaryAction: '#365CD6',
+    onPrimaryAction: '#FFFFFF',
     success: '#13875B',
     successSurface: '#E4F5EC',
     danger: '#C43D44',
@@ -22,6 +24,8 @@ export const colors = {
     border: '#33445D',
     accent: '#93ABFF',
     accentSurface: '#243251',
+    primaryAction: '#93ABFF',
+    onPrimaryAction: '#0D1625',
     success: '#66D9A4',
     successSurface: '#1D3B35',
     danger: '#FF858A',
@@ -29,4 +33,12 @@ export const colors = {
     warning: '#FFD080',
     warningSurface: '#45351F',
   },
+} as const;
+
+export const layout = {
+  space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, section: 32 },
+  radius: { input: 12, control: 14, card: 20, sheet: 24, pill: 999 },
+  control: { minHeight: 48, touchTarget: 44 },
+  screen: { horizontal: 18, top: 22, bottom: 32 },
+  type: { caption: 12, body: 15, section: 18, title: 29 },
 } as const;

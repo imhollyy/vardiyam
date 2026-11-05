@@ -370,3 +370,27 @@ Final UI/a11y review: bağımsız reviewer APPROVE; statik P0/P1/P2 yok. 44 dp d
 
 
 GitHub: draft PR #29 (eat/vdy-010a-home-ui → PR #25 head dalı), commit 39e318bbd19816f00a3e590dfe5d2ae71619176; Actions run #36 (42106943665) PASS. PR merge edilmedi.
+
+## VDY-010C — UI/UX regression checkpoint (2026-11-06)
+
+| Check | Result | Evidence |
+|---|---|---|
+| Completed same-day record blocks primary clock-in; active session remains blocked | PASS | `canStartClockIn` focused regression |
+| Calendar plan draft warns before discard | PASS | `hasUnsavedPlanDraft` focused regression; Alert confirmation wired to close/back |
+| Work trend splits local-midnight/timed-break intervals and preserves aggregate-break uncertainty | PASS | `tests/features/workTrend.test.mjs`; trend calls existing `segmentWorkRecord` |
+| Work trend labels known time as partial when bucket also contains unknown-break work | PASS | Mixed-period regression; UI shows “En az … + belirsiz süre” |
+| DST-gap picker draft matches the valid time actually shown | PASS | `tests/features/nativePicker.test.mjs`; Berlin 2026-03-29 02:30 normalizes to 03:00 |
+| Theme preference defaults/persists without system following | PASS | Existing preference repository regression retained; routed content waits until preference load resolves |
+| WorkRecord, timed-break, shift-template, schedule-start, and payment date/time input | PASS (code/export) | Shared native DateTimePickerField integrated; calendar/payroll period date assignment semantics unchanged |
+| TypeScript | PASS | `npm run typecheck` |
+| ESLint | PASS | `npm run lint` |
+| Full automated tests | PASS | `npm test`, 276/276 (269 baseline + 7 focused tests) |
+| Android JS bundle/Hermes bytecode | PASS | `npx.cmd expo export --platform android`, `.hbc` generated, 1,306 modules |
+| iOS JS bundle/Hermes bytecode | PASS | `npx.cmd expo export --platform ios`, `.hbc` generated, 1,304 modules |
+| Expo Doctor | PASS | `npx.cmd expo-doctor`, 20/20 |
+| Diff whitespace | PASS | `git diff --check` |
+| iPhone/Android visual, screen reader, large font, small-screen acceptance/screenshots | NOT RUN | No device acceptance performed in this task |
+| GitHub Actions | PENDING | No PR exists yet; run after stacked draft PR creation |
+| Independent R2 UI/accessibility review | PASS | APPROVE; initial P1 and P2 findings fixed; re-review found no remaining static P0–P2 |
+
+No SQLite schema/migrations, recovery/backup flow, financial calculations, or payment reconciliation rules were changed.

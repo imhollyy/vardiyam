@@ -2,6 +2,14 @@ export type ShiftIconName = 'sunny-outline' | 'partly-sunny-outline' | 'moon-out
   | 'medkit-outline' | 'close-circle' | 'checkmark-circle' | 'remove-outline';
 export type CalendarTone = 'accent' | 'muted' | 'warning' | 'danger' | 'success';
 
+export function canStartClockIn(hasActiveSession: boolean, hasCompletedRecordToday: boolean): boolean {
+  return !hasActiveSession && !hasCompletedRecordToday;
+}
+
+export function hasUnsavedPlanDraft(baseline: string, draft: string): boolean {
+  return baseline !== draft;
+}
+
 export function shiftIconForStartTime(localTime: string): ShiftIconName {
   const match = /^(\d{2}):([0-5]\d)$/.exec(localTime);
   if (!match || Number(match[1]) > 23) return 'sunny-outline';

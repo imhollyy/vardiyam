@@ -6,6 +6,7 @@ import { colors } from './tokens';
 
 type AppThemeContextValue = {
   mode: ThemePreference;
+  ready: boolean;
   theme: (typeof colors)['light'] | (typeof colors)['dark'];
   setMode: (mode: ThemePreference) => Promise<void>;
   toggleMode: () => Promise<void>;
@@ -16,6 +17,7 @@ const AppThemeContext = createContext<AppThemeContextValue | null>(null);
 export function AppThemeProvider({ children }: PropsWithChildren) {
   const database = useAppDatabase();
   const [mode, setModeState] = useState<ThemePreference>('light');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -23,7 +25,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
       if (active) setModeState(preference);
     }).catch(() => {
       if (active) setModeState('light');
-    });
+    }).finally(() => { if (active) setReady(true); });
     return () => { active = false; };
   }, [database]);
 
@@ -32,7 +34,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     setModeState(next);
   }, [database]);
   const toggleMode = useCallback(() => setMode(mode === 'light' ? 'dark' : 'light'), [mode, setMode]);
-  const value = useMemo(() => ({ mode, theme: colors[mode], setMode, toggleMode }), [mode, setMode, toggleMode]);
+  const value = useMemo(() => ({ mode, ready, theme: colors[mode], setMode, toggleMode }), [mode, ready, setMode, toggleMode]);
 
   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;
 }
