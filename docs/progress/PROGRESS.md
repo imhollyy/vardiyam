@@ -6,9 +6,9 @@
 
 - **Tarih:** 2026-11-05
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-005C1 — Mesai ve brüt kazanç hesaplama motoru
-- **Durum:** READY_FOR_REVIEW; taslak PR #18 açık, PR #16'nın güncel başlangıç head'i `f3184a349d0dd2d34fae2d41c0a45275b4d0bb68` üzerine stack edildi. Kod commit `ef3694b1df3615c62eef88e049cf104b4f5b7c58`; code CI run #22 `42029068508` ve docs-closure head `af0cee9297f9a296caed0e1a2ea5d47b39b367ee` CI run #23 `42029467408` SUCCESS. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` değişiklikleri unstaged ve korunuyor.
-- **Aktif branch:** feat/vdy-005c1-earnings-engine
+- **Aktif aşama:** VDY-005C2 — Gerçek Kazanç ekranı ve kalıcı ücret ayarları
+- **Durum:** IN_PROGRESS; C1 başlangıç SHA `44dcbd563004c43eec224e8fa3a6db5aa156da97` doğrulandı; yeni branch `feat/vdy-005c2-earnings-ui-persistence` bu SHA'dan açıldı. Yerel `docs/tasks/VDY-004.md` ve `expo-env.d.ts` dirty olarak koruma altında.
+- **Aktif branch:** feat/vdy-005c2-earnings-ui-persistence
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,9 +22,19 @@
 
 ## NEXT ACTION
 
-1. VDY-005C2 — ücret ayarları, sürümlü hesap kayıtları ve gerçek Kazanç ekranı; VDY-005C1 taslak PR #18'in founder/reviewer kararından sonra. Merge/release yok.
+1. VDY-005C2 uygulama, R3 inceleme, doğrulama ve PR #18'e taslak PR; merge/release yok.
 
 ## OLAY GÜNLÜĞÜ
+
+### 2026-11-05 — VDY-005C2 — START / BASE VERIFIED
+
+- PR #18 güncel HEAD `44dcbd563004c43eec224e8fa3a6db5aa156da97`, yerel HEAD eşleşti; base PR #16 dalı `feat/vdy-005b-timed-breaks`. Yeni dal bu SHA'dan açıldı.
+- Başlangıç dirty state: yalnız `docs/tasks/VDY-004.md` ve `expo-env.d.ts`; stage/overwrite/stash/reset yapılmayacak.
+- R3 risk: tahmini brüt ve kişisel ücret verisi + migration + snapshot. Uzman pay/data ajanı verdiği danışmanlıkta aylık baz ile ek tutarı ayırma, tam hafta kullanıcı teyidi, tatil kaynak kapsamı, açık denkleştirme belirsizliği, immutable tam provenance ve preview-write ayrımı gereğini belirtti.
+- Beceriler: `vardiyam-data-safety`, `vardiyam-pay-calculation`, `vardiyam-ui-quality`, `vardiyam-test-gate`, `vardiyam-task-flow` uygulandı. Başlangıç kodu, migration v4, repository queue, mevcut C1 hesap motoru, placeholder ve test altyapısı incelendi.
+- Kısa uygulama sırası: (1) additive v5 tablo/trigger ve repository; (2) test-first migration/profile/snapshot ve preview invariants; (3) ücret ayar ekranı ve gerçek dönemli Kazanç ekranı, net-only gizleme; (4) kalite kapıları, R3 review/fix, QA/PROGRESS, PR #18'e stacked taslak.
+- Başlangıç test/CI sonuçları bu görev için henüz alınmadı.
+- **NEXT ACTION:** v5 migration, sürümlü repository ve ekran akışını uygula.
 
 ### 2026-11-05 — VDY-005C1 — IMPLEMENTED / R3 APPROVED / PR #18 CI PASS
 

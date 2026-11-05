@@ -46,6 +46,26 @@ Son çalıştırma sonucu ve CI kanıtı ilgili görev günlüğünde kaydedilir
 | WB09 | Legacy aggregate-only mola | eski `break_minutes` değişmez, timed rows oluşturulmaz, segment bazında `workedMinutes=null`; arayüz “saati belirtilmemiş” gösterir | `tests/data/workRecordRepository.test.mjs`; UI cihaz testi ayrı raporlanır |
 | WB10 | WorkRecord başlangıç/bitiş veya mola toplamı değişikliği | mevcut timed interval'lar yeni kayıtla hâlâ tutarlı değilse tüm update reddedilir; geçerli ortak düzenleme tek transaction'da kaydedilir | `tests/data/workRecordRepository.test.mjs` |
 
+## VDY-005C2 — Kalıcı ücret ayarları ve Kazanç
+
+| ID | Senaryo | Beklenen | Kanıt |
+|---|---|---|---|
+| EC201 | Temiz veritabanı v0→v5 ve mevcut v4→v5 | earnings profile/rule/snapshot tabloları additive transaction ile eklenir | `tests/data/migrations.test.mjs` |
+| EC202 | v5 DDL rollback | başarısız DDL kısmi tablo bırakmaz; v4 `user_version` ve metadata korunur | `tests/data/migrations.test.mjs` |
+| EC203 | v1–v4 varlıkları korunumu | WorkRecord ve timed-break satırları/saatleri değişmeden kalır | `tests/data/migrations.test.mjs` |
+| EC204 | Ücret/kural ayarı sürümleme | her değişiklik yeni profil ve kural sürümü ekler; eski sürüm değişmez; transaction hatası rollback olur | `tests/data/earningsRepository.test.mjs` |
+| EC205 | Snapshot yazma kapısı | yalnız COMPLETE + integer kuruş + satır toplamı eşleşen + kullanıcı onayı çağrısı ile yazılır; PARTIAL/WITHHELD reddedilir | `tests/data/earningsRepository.test.mjs` |
+| EC206 | Önizleme ve kaynak fingerprint | onaysız preview yazmaz; kayıt/mola değişmişse approval STALE_SOURCE ile reddedilir | `tests/data/earningsRepository.test.mjs`; `app/(tabs)/earnings.tsx` |
+| EC207 | Snapshot değişmezliği/soğuk açılış | UPDATE/DELETE trigger ile reddedilir; kaynak payload, ücret ve sonuç kapanıp açılınca aynı kalır | `tests/data/earningsRepository.test.mjs` |
+| EC208 | Profil/rule değişimi sonrası eski hesap | eski approved total/provenance değişmez; stale preview yeni kaydedilemez | `tests/data/earningsRepository.test.mjs` |
+| EC209 | NET_ONLY/SKIP ekranı | tahmini brüt kartı, tutarı ve geçmiş brüt tutarları render edilmez | `tests/domain/earningsPresentation.test.mjs` |
+| EC210 | 225 saat böleni | varsayılan öneri 225 saat ama `confirmed=false`; hesap girişi açık onay gerektirir | `tests/domain/earningsPresentation.test.mjs`; C1 `tests/domain/earnings.test.mjs` |
+| EC211 | Haftalık kayıt tamlığı | her seçili yerel hafta kullanıcı tarafından ayrı teyit edilmeden tam dönem tutarı gösterilmez | `app/(tabs)/earnings.tsx`; C1 `tests/domain/earnings.test.mjs` |
+| EC212 | Tatil kaynak/kapsam | kaynak/sürüm ve tam IANA yerel tarih kapsamı doğrulanmadan tatil sınıflaması kesinleşmez; yarım gün başlangıcı kullanıcı verisidir | `app/earnings-settings.tsx`; C1 `tests/domain/earnings.test.mjs` |
+| EC213 | Gerçek plan/fiilî karşılaştırma | plan süresi yalnız linkli kayıt snapshot'ları için etiketlenir; bilinmeyen dönem sınırı molası net sürede belirsiz kalır | `app/(tabs)/earnings.tsx` |
+| EC214 | 15–14 dönem ve tüm hafta sorgusu | döneme kesişen tam haftalar sorgulanır, dönem satırları motorun `payrollPeriodStartDate` ile filtrelenir | `app/(tabs)/earnings.tsx`; C1 segmentasyon testleri |
+| EC215 | Tema/erişilebilirlik/yükleme/hata/boş | light/dark token, checkbox/radio/button rolleri, erişilebilir adlar ve boş/yükleme/hata metinleri mevcut | kod incelemesi; gerçek cihaz NOT TESTED |
+
 > Aşağıdaki VDY-004 satırları uygulanmış otomatik senaryoları ve dosya kanıtlarını listeler. Diğer hesap ve cihaz satırları planlanan kapsamdır; her görev kendi gerçek PASS/FAIL/SKIP sonucunu `docs/progress/PROGRESS.md` içinde kaydeder.
 
 ## Zaman ve vardiya

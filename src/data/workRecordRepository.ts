@@ -340,6 +340,44 @@ export async function listWorkRecordsWithTimedBreaks(
   });
 }
 
+/** Returns records overlapping an explicit half-open UTC window (workweeks are queried in full). */
+export async function listWorkRecordsWithTimedBreaksInRange(
+  database: WorkRecordDatabase,
+  startedBeforeUtc: string,
+  endedAfterUtc: string,
+): Promise<WorkRecordWithTimedBreaks[]> {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(startedBeforeUtc) ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(endedAfterUtc) ||
+      Date.parse(startedBeforeUtc) <= Date.parse(endedAfterUtc)) {
+    throw new Error('A valid non-empty UTC query range is required.');
+  }
+  return withDatabaseOperation(database, async () => {
+    await assertForeignKeysEnabled(database);
+    const rows = await database.getAllAsync<WorkRecordWithBreaksRow>(
+      `SELECT ${SELECT_COLUMNS.split(', ').map((column) => `w.${column}`).join(', ')},
+        b.id AS break_id, b.started_at_utc AS break_started_at_utc, b.ended_at_utc AS break_ended_at_utc
+       FROM (SELECT * FROM work_records WHERE started_at_utc < ? AND ended_at_utc > ? ORDER BY started_at_utc, id) w
+       LEFT JOIN break_intervals b ON b.work_record_id = w.id
+       ORDER BY w.started_at_utc, w.id, b.started_at_utc, b.id;`,
+      startedBeforeUtc,
+      endedAfterUtc,
+    );
+    const records = new Map<string, WorkRecordWithTimedBreaks>();
+    for (const row of rows) {
+      let entry = records.get(row.id);
+      if (!entry) {
+        entry = { record: fromRow(row), timedBreaks: [] };
+        records.set(row.id, entry);
+      }
+      if (row.break_id !== null && row.break_started_at_utc !== null && row.break_ended_at_utc !== null) {
+        entry.timedBreaks.push({ id: row.break_id, workRecordId: row.id, startedAtUtc: row.break_started_at_utc, endedAtUtc: row.break_ended_at_utc });
+      }
+    }
+    for (const entry of records.values()) validateBreaks(entry.record, entry.timedBreaks);
+    return [...records.values()];
+  });
+}
+
 export async function getWorkRecord(database: WorkRecordDatabase, id: string): Promise<WorkRecord | null> {
   return withDatabaseOperation(database, async () => {
     await assertForeignKeysEnabled(database);

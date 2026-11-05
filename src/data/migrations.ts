@@ -281,6 +281,58 @@ export const migrations: readonly Migration[] = [
       END;
     `,
   },
+  {
+    version: 5,
+    sql: `
+      CREATE TABLE earnings_profiles (
+        id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+        version INTEGER NOT NULL CHECK (version > 0),
+        created_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('created_at_utc')}),
+        profile_json TEXT NOT NULL CHECK (json_valid(profile_json)),
+        PRIMARY KEY(id, version)
+      );
+      CREATE INDEX earnings_profiles_latest_idx ON earnings_profiles(id, version DESC);
+
+      CREATE TABLE earnings_rule_versions (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        profile_id TEXT NOT NULL,
+        profile_version INTEGER NOT NULL CHECK (profile_version > 0),
+        version INTEGER NOT NULL CHECK (version > 0),
+        created_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('created_at_utc')}),
+        rules_json TEXT NOT NULL CHECK (json_valid(rules_json)),
+        FOREIGN KEY(profile_id, profile_version) REFERENCES earnings_profiles(id, version) ON DELETE RESTRICT,
+        UNIQUE(profile_id, version)
+      );
+      CREATE INDEX earnings_rule_versions_latest_idx ON earnings_rule_versions(profile_id, version DESC);
+
+      CREATE TABLE earnings_snapshots (
+        calculation_id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(calculation_id)) > 0),
+        created_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('created_at_utc')}),
+        profile_id TEXT NOT NULL,
+        profile_version INTEGER NOT NULL CHECK (profile_version > 0),
+        rule_version_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status = 'COMPLETE'),
+        total_amount_minor INTEGER NOT NULL CHECK (total_amount_minor >= 0),
+        input_json TEXT NOT NULL CHECK (json_valid(input_json)),
+        snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+        FOREIGN KEY(profile_id, profile_version) REFERENCES earnings_profiles(id, version) ON DELETE RESTRICT,
+        FOREIGN KEY(rule_version_id) REFERENCES earnings_rule_versions(id) ON DELETE RESTRICT
+      );
+      CREATE INDEX earnings_snapshots_period_idx ON earnings_snapshots(created_at_utc DESC, calculation_id);
+      CREATE TRIGGER earnings_snapshots_no_update
+        BEFORE UPDATE ON earnings_snapshots BEGIN SELECT RAISE(ABORT, 'earnings snapshots are immutable'); END;
+      CREATE TRIGGER earnings_snapshots_no_delete
+        BEFORE DELETE ON earnings_snapshots BEGIN SELECT RAISE(ABORT, 'earnings snapshots are immutable'); END;
+      CREATE TRIGGER earnings_profiles_no_update
+        BEFORE UPDATE ON earnings_profiles BEGIN SELECT RAISE(ABORT, 'earnings profile versions are immutable'); END;
+      CREATE TRIGGER earnings_profiles_no_delete
+        BEFORE DELETE ON earnings_profiles BEGIN SELECT RAISE(ABORT, 'earnings profile versions are immutable'); END;
+      CREATE TRIGGER earnings_rules_no_update
+        BEFORE UPDATE ON earnings_rule_versions BEGIN SELECT RAISE(ABORT, 'earnings rule versions are immutable'); END;
+      CREATE TRIGGER earnings_rules_no_delete
+        BEFORE DELETE ON earnings_rule_versions BEGIN SELECT RAISE(ABORT, 'earnings rule versions are immutable'); END;
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;

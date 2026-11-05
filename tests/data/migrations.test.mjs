@@ -46,7 +46,7 @@ test('initial migration creates only additive app metadata and sets schema versi
     );
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
     assert.equal(sqlite.prepare('PRAGMA foreign_keys;').get().foreign_keys, 1);
-    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals']) {
+    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots']) {
       assert.equal(
         sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name=?;").get(table).count,
         1,
@@ -148,7 +148,7 @@ test('v2 to v4 adds work records and timed-break storage while preserving shift 
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
 
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 4);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 5);
     assert.deepEqual({ ...sqlite.prepare('SELECT id, name FROM shift_cycles;').get() }, { id: 'cycle', name: 'Synthetic' });
     assert.deepEqual({ ...sqlite.prepare('SELECT * FROM cycle_entries;').get() }, {
       cycle_id: 'cycle', position: 0, kind: 'SHIFT', template_id: 'day',
@@ -178,13 +178,50 @@ test('v3 to v4 leaves historical aggregate-only work records unchanged', async (
     await initializeDatabase(adapter);
     await initializeDatabase(adapter);
 
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 4);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 5);
     assert.deepEqual({ ...sqlite.prepare('SELECT id, started_at_utc, ended_at_utc, break_minutes, note FROM work_records WHERE id = ?;').get('legacy-work') }, {
       id: 'legacy-work', started_at_utc: '2026-10-28T07:00:00.000Z', ended_at_utc: '2026-10-28T15:00:00.000Z',
       break_minutes: 30, note: 'synthetic legacy record',
     });
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM break_intervals WHERE work_record_id = ?;').get('legacy-work').count, 0);
     assert.equal(sqlite.prepare('PRAGMA foreign_key_list(break_intervals);').get().on_delete, 'CASCADE');
+  } finally { sqlite.close(); }
+});
+
+test('v4 to v5 preserves actual work and timed breaks and adds append-only earnings tables', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of migrations.filter(({ version }) => version <= 4)) sqlite.exec(migration.sql);
+    sqlite.exec(`
+      INSERT INTO work_records(id, record_source, started_at_utc, ended_at_utc, timezone, break_minutes, note)
+      VALUES ('synthetic-v4-work', 'MANUAL', '2026-01-05T05:00:00.000Z', '2026-01-05T13:00:00.000Z', 'Europe/Istanbul', 30, 'synthetic');
+      INSERT INTO break_intervals(id, work_record_id, started_at_utc, ended_at_utc)
+      VALUES ('synthetic-break', 'synthetic-v4-work', '2026-01-05T09:00:00.000Z', '2026-01-05T09:30:00.000Z');
+      PRAGMA user_version = 4;
+    `);
+    await initializeDatabase(createExpoSqliteAdapter(sqlite));
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 5);
+    assert.equal(sqlite.prepare('SELECT note FROM work_records WHERE id=?').get('synthetic-v4-work').note, 'synthetic');
+    assert.deepEqual({ ...sqlite.prepare('SELECT id, work_record_id, started_at_utc, ended_at_utc FROM break_intervals').get() }, {
+      id: 'synthetic-break', work_record_id: 'synthetic-v4-work', started_at_utc: '2026-01-05T09:00:00.000Z', ended_at_utc: '2026-01-05T09:30:00.000Z',
+    });
+    for (const table of ['earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots']) {
+      assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name=?").get(table).count, 1);
+    }
+  } finally { sqlite.close(); }
+});
+
+test('failed v5 DDL rolls back partially-created earnings tables and preserves v4 version and data', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of migrations.filter(({ version }) => version <= 4)) sqlite.exec(migration.sql);
+    sqlite.exec("INSERT INTO app_metadata(key, value) VALUES ('keep', 'v4'); PRAGMA user_version = 4; CREATE TABLE earnings_rule_versions(conflict TEXT);");
+    await assert.rejects(initializeDatabase(createExpoSqliteAdapter(sqlite)), /already exists/);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 4);
+    assert.equal(sqlite.prepare("SELECT value FROM app_metadata WHERE key='keep'").get().value, 'v4');
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='earnings_profiles'").get().n, 0);
   } finally { sqlite.close(); }
 });
 
