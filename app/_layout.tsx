@@ -25,6 +25,7 @@ function ThemedRouter() {
         <Stack.Screen name="earnings-settings" />
         <Stack.Screen name="net-payments" />
         <Stack.Screen name="backup" />
+        <Stack.Screen name="onboarding" />
       </Stack>
     </>
   );

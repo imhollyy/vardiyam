@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type { PlannedShift, ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { calendarMarker } from '@/src/features/shifts/presentation';
 
 type ShiftKindBadgeProps = {
   kind: PlannedShift['kind'];
@@ -10,14 +12,15 @@ type ShiftKindBadgeProps = {
 };
 
 const kindCopy = {
-  SHIFT: { glyph: '●', title: 'Vardiya', token: 'accent' as const, background: 'accentSurface' as const },
-  OFF: { glyph: '○', title: 'OFF', token: 'muted' as const, background: 'background' as const },
-  LEAVE: { glyph: '◇', title: 'İzin', token: 'accent' as const, background: 'accentSurface' as const },
+  SHIFT: { title: 'Vardiya', token: 'accent' as const, background: 'accentSurface' as const },
+  OFF: { title: 'OFF', token: 'muted' as const, background: 'background' as const },
+  LEAVE: { title: 'İzin', token: 'warning' as const, background: 'warningSurface' as const },
 };
 
 export function ShiftKindBadge({ kind, template, compact = false }: ShiftKindBadgeProps) {
   const { theme } = useAppTheme();
   const copy = kindCopy[kind];
+  const shiftIcon = calendarMarker({ planKind: kind, startLocalTime: template?.startLocalTime }).icon;
   const title = kind === 'SHIFT' ? template?.name ?? 'Vardiya' : copy.title;
   const detail = kind === 'SHIFT' ? template?.code ?? 'V' : kind === 'OFF' ? 'Planlı boş gün' : 'İzin günü';
   const visibleTitle = compact && kind === 'SHIFT' ? detail : title;
@@ -32,7 +35,7 @@ export function ShiftKindBadge({ kind, template, compact = false }: ShiftKindBad
       accessibilityLabel={accessibleTitle}
       style={[styles.badge, compact && styles.compact, { backgroundColor: theme[copy.background] }]}
     >
-      <Text accessible={false} style={[styles.glyph, { color: theme[copy.token] }]}>{copy.glyph}</Text>
+      <Ionicons accessible={false} name={shiftIcon} size={compact ? 13 : 17} color={theme[copy.token]} />
       <View style={styles.copy}>
         <Text numberOfLines={1} style={[styles.title, { color: theme.foreground }]}>{visibleTitle}</Text>
         {!compact ? <Text style={[styles.detail, { color: theme.muted }]}>{detail}</Text> : null}
@@ -44,7 +47,6 @@ export function ShiftKindBadge({ kind, template, compact = false }: ShiftKindBad
 const styles = StyleSheet.create({
   badge: { minHeight: 42, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   compact: { minHeight: 27, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 4 },
-  glyph: { fontSize: 14, fontWeight: '800' },
   copy: { flexShrink: 1 },
   title: { fontSize: 13, fontWeight: '700' },
   detail: { marginTop: 1, fontSize: 11 },

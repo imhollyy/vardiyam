@@ -21,6 +21,7 @@ import { applyDataWipe, applyPreparedRestore, createBackupFile, createEmptyDatab
 import { MAX_BACKUP_BYTES, validateBackupPassword } from '@/src/features/backup/backupContainer';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 
@@ -186,7 +187,7 @@ export default function BackupScreen() {
       <Pressable accessibilityRole="button" accessibilityLabel="Ayarlar ekranına dön" onPress={() => router.back()} style={styles.back}>
         <Text style={{ color: theme.accent, fontWeight: '700' }}>‹ Ayarlar</Text>
       </Pressable>
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.foreground }]}>Yedekleme ve veriler</Text>
+      <PageHeading eyebrow="VERİ GÜVENLİĞİ" title="Yedekleme ve veriler" subtitle="Dosyan cihazında oluşturulur; dışa aktarırken güvenli konum seç." />
       <Text style={[styles.body, { color: theme.muted }]}>Yedek cihazında oluşturulur. Vardiya, çalışma, ücret, bordro ve ödeme kayıtların içeride şifrelenir. Parolanı bu dosyadan ayrı ve güvenli yerde sakla; unutursan yedek açılamaz.</Text>
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>

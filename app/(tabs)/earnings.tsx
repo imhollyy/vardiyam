@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -191,8 +193,7 @@ export default function EarningsScreen() {
 
   if (loading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator color={theme.accent} /><Text style={{ color: theme.muted }}>Kazanç dönemi yükleniyor</Text></View>;
   return <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.container}>
-    <Text style={[styles.eyebrow, { color: theme.accent }]}>DÖNEM ÖZETİ</Text>
-    <Text style={[styles.title, { color: theme.foreground }]}>Kazanç</Text>
+    <PageHeading eyebrow="DÖNEM ÖZETİ" title="Kazanç" subtitle="Tahmini brüt, bordro neti ve alınan ödeme ayrı gösterilir" />
     <View style={styles.periodRow}>
       <Pressable accessibilityRole="button" accessibilityLabel="Önceki bordro dönemi" onPress={() => { setPeriodMonth((month) => shiftYearMonth(month, -1)); setWeekChoicesChecked([]); }}><Text style={[styles.arrow, { color: theme.accent }]}>‹</Text></Pressable>
       <Text accessibilityLiveRegion="polite" style={[styles.periodTitle, { color: theme.foreground }]}>{formatLocalDate(period.start, { month: 'short' })} – {formatLocalDate(addCalendarDays(period.end, -1), { month: 'short' })}</Text>
@@ -225,7 +226,7 @@ export default function EarningsScreen() {
     {showGross && weekChoices.length > 0 ? <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Text style={[styles.cardTitle, { color: theme.foreground }]}>Haftalık kayıt kapsamı</Text>
       <Text style={[styles.body, { color: theme.muted }]}>Her yerel hafta için tüm fiilî çalışma kayıtlarının girildiğini ayrı ayrı doğrula. Kayıtların veritabanında bulunması tek başına tamlık kanıtı değildir.</Text>
-      {weekChoices.map((week) => { const checked = weekChoicesChecked.includes(week); return <Pressable key={week} accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => setWeekChoicesChecked((current) => checked ? current.filter((item) => item !== week) : [...current, week])} style={[styles.week, { borderColor: theme.border }]}><Text style={{ color: checked ? theme.accent : theme.muted, fontWeight: '800' }}>{checked ? '✓' : '○'}</Text><Text style={[styles.body, { color: theme.foreground }]}>{week} haftasındaki tüm kayıtlarımı girdim</Text></Pressable>; })}
+      {weekChoices.map((week) => { const checked = weekChoicesChecked.includes(week); return <Pressable key={week} accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => setWeekChoicesChecked((current) => checked ? current.filter((item) => item !== week) : [...current, week])} style={[styles.week, { borderColor: theme.border }]}><Ionicons name={checked ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={checked ? theme.accent : theme.muted} /><Text style={[styles.body, { color: theme.foreground }]}>{week} haftasındaki tüm kayıtlarımı girdim</Text></Pressable>; })}
       <Pressable accessibilityRole="button" disabled={calculating} onPress={() => void calculate()} style={[styles.primary, { backgroundColor: theme.accent }]}>{calculating ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Brüt tahmin önizlemesi oluştur</Text>}</Pressable>
     </View> : null}
     {preview ? <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
