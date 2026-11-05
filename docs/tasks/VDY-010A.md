@@ -42,3 +42,5 @@ Küçük ekran ve büyük yazıda taşma; açık/koyu tema tercihini yeniden aç
 - Bağımsız UI/erişilebilirlik incelemesi önceki statik onayı koruyor; native erişilebilirlik doğrulaması ayrıca NOT RUN. GitHub CI, draft PR açıldıktan sonra yeni commit için bekleniyor.
 
 - **Bağımsız UI/a11y final review:** APPROVE; statik P0/P1/P2 yok. İncelemede bulunan 44 dp altı butonlar güncellendi; takvim hücrelerine hitSlop eklendi. Gün paneli açıkken ana içerik erişilebilirlik ağacından gizleniyor, sheet modal olarak işaretli; haftalık gün etiketleri tam gün adı, vardiya adı ve başlangıç/bitiş saatini içeriyor. Android TalkBack/VoiceOver ve gerçek ekran doğrulaması yine NOT RUN.
+
+- **GitHub teslimatı:** Draft PR #29 (`https://github.com/imhollyy/vardiyam/pull/29`), `feat/vdy-010a-home-ui` → `feat/vdy-008-backup-restore-data-wipe`; commit `f39e318bbd19816f00a3e590dfe5d2ae71619176`. GitHub Actions CI run #36 (`42106943665`) PASS; typecheck, lint, unit tests, Expo dependency health ve workflow tamamlandı.

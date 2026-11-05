@@ -560,3 +560,25 @@ NEXT ACTION:
 - **NEXT ACTION:** Kurucu tasarım mockup'ını onayladıktan sonra VDY-010B Takvim ve Kazanç UI/UX yenilemesini ayrı dalda başlat.
 
 - **Bağımsız UI/a11y final review:** APPROVE; statik P0/P1/P2 yok. İncelemede bulunan 44 dp altı butonlar güncellendi; takvim hücrelerine hitSlop eklendi. Gün paneli açıkken ana içerik erişilebilirlik ağacından gizleniyor, sheet modal olarak işaretli; haftalık gün etiketleri tam gün adı, vardiya adı ve başlangıç/bitiş saatini içeriyor. Android TalkBack/VoiceOver ve gerçek ekran doğrulaması yine NOT RUN.
+
+### 2026-11-05 — VDY-010A — HOME DASHBOARD IMPLEMENTED / R2 REVIEW APPROVED
+
+- **Branch/base:** Local branch `feat/vdy-010a-home-ui` created from PR #25 head `f60739928590aaa0c5b55978cd758b94d26b9937`. No merge, rebase, push, release, or existing PR modification. Protected user changes (`docs/tasks/VDY-004.md`, `expo-env.d.ts`) remain unstaged and untouched; pre-existing VDY-007/009 and QA/progress changes were preserved.
+- **UI:** Rebuilt Today as a localized date/time dashboard with persistent light/dark toggle (default light), profile/notification menus, weekly planned-shift summary, editable start/end clocks, monthly indicators, and a tab-preserving scrollable day panel. The panel edits SHIFT/OFF/LEAVE plus existing shift templates/start-end times and can reset to the cycle; WorkRecord edits open the existing editor. Earnings and payment business logic was not rewritten.
+- **Data:** Additive SQLite v7 adds `active_work_sessions` and user-only `work_day_statuses`; theme preference uses queued `app_metadata`. Clock-out converts the active row into a WorkRecord in one repository transaction. If the referenced cycle/template was deleted after clock-in, the historical plan name/time remain and only absent FK IDs become null. Day annotations do not enter earnings classification. Backup schema validation includes v7; no test data or diagnostics entered production sources.
+- **Skills/review:** `vardiyam-task-flow` v1.0, `vardiyam-ui-quality` v1.0 and `vardiyam-data-safety` v1.0 applied; Expo/RN SQLite and UI APIs checked via current docs. Independent R2 data-safety reviewer **APPROVE**, no P0/P1/P2 after fixes. Review found and closed a stranded planned-session P1; date constraints were also hardened after a P2 note. Separate UI/accessibility static reviewer found no remaining P0–P2; real device a11y/visual verification remains NOT RUN.
+- **Verification:** typecheck PASS; lint PASS; tests PASS **256/256**; Android JS export PASS with `--no-bytecode` (1,255 modules). Normal Hermes bytecode generation failed (`hermesc` exit 6; cause not conclusively diagnosed); JS export succeeded without bytecode. Expo Doctor 18/20; two remote metadata checks failed from DNS/service responses. `git diff --check` PASS (line-ending notices only). No Android/iOS device UI, large-text, TalkBack, screenshots or CI run for this uncommitted local branch.
+- **Product limits:** Per-day planned hours continue through the existing calendar/template flow; this task adds no per-day time-override rule. Notifications menu is an empty state because no notification service exists. Small-screen, font scaling, TalkBack and both themes require user acceptance.
+- **NEXT ACTION:** Run one focused Android user-acceptance pass on this dashboard: saved theme/reopen, narrow and large-font layouts, TalkBack, weekly/month status markers, clock-in/out across midnight, day panel and bottom-tab visibility.
+
+### 2026-11-05 — VDY-010A — KAPANIŞ DOĞRULAMASI
+
+- Hermes için önceki `exit 6` kök nedeni doğrulanamadı; tek odaklı Android export tekrarı PASS oldu: bytecode açık, 1.255 modül, 3.3 MB `.hbc`. Hata bu turda tekrarlanmadı. Kalıcı bir düzeltme iddia edilmiyor.
+- Typecheck PASS; lint PASS; tests 256/256 PASS; Expo Doctor 20/20 PASS; diff check PASS. Önceki 18/20 uzaktan metadata kontrolü sorunu güncel koşuda oluşmadı; sürüm değişikliği yapılmadı.
+- Expo web önizlemesi SQLite web WASM/COOP/COEP gereksinimleri nedeniyle uygulama UI'sına ulaşmadı. Fiziksel Android/iOS ve gerçek screenshot NOT RUN. Beş panelli görsel yalnızca belirgin MOCKUP'tır.
+- VDY-010A taslak PR, PR #25 head dalına hedeflenmek üzere hazırlanıyor. Merge/rebase/force-push/release yok. Cihaz ve gerçek görsel kabulü kullanıcı onayı sonrası ayrı kalır.
+- **NEXT ACTION:** Kurucu tasarım mockup'ını onayladıktan sonra VDY-010B Takvim ve Kazanç UI/UX yenilemesini ayrı dalda başlat.
+
+- **Bağımsız UI/a11y final review:** APPROVE; statik P0/P1/P2 yok. İncelemede bulunan 44 dp altı butonlar güncellendi; takvim hücrelerine hitSlop eklendi. Gün paneli açıkken ana içerik erişilebilirlik ağacından gizleniyor, sheet modal olarak işaretli; haftalık gün etiketleri tam gün adı, vardiya adı ve başlangıç/bitiş saatini içeriyor. Android TalkBack/VoiceOver ve gerçek ekran doğrulaması yine NOT RUN.
+
+- **GitHub teslimatı:** Draft PR #29 (`https://github.com/imhollyy/vardiyam/pull/29`), `feat/vdy-010a-home-ui` → `feat/vdy-008-backup-restore-data-wipe`; commit `f39e318bbd19816f00a3e590dfe5d2ae71619176`. GitHub Actions CI run #36 (`42106943665`) PASS; typecheck, lint, unit tests, Expo dependency health ve workflow tamamlandı.
