@@ -352,7 +352,7 @@ Independent UI/accessibility static review: **no remaining P0–P2 findings** af
 | iOS JS export with Hermes bytecode | PASS | Worktree-local temp path; 1,306 modules, 3.5 MB `.hbc`. |
 | Expo Doctor | PARTIAL (18/20) | Expo config schema check could not reach `exp.host` (DNS `ENOTFOUND`); React Native Directory metadata endpoint returned an unexpected server response. |
 | Device screenshots, large text, TalkBack/VoiceOver | NOT RUN | No physical device interaction or visual acceptance in this task. |
-| GitHub CI | PENDING | Requires publishing the reviewed branch and creating the requested draft PR. |
+| GitHub CI | PASS | Draft PR #35, Actions run #46 (`42284884830`); install, typecheck, lint, unit tests, Expo dependency health all succeeded. |
 
 No wage/payment calculations, SQLite migrations, backup cryptography, recovery, or destructive data flow was changed.
 
