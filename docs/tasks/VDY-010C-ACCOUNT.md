@@ -42,4 +42,4 @@ Bu tur UI tekrarları ve statik kod işaretleriyle sınırlıdır. Tam dosya-baz
 - `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS **278/278**; `git diff --check` PASS. Form doğrulamasına iki yeni test eklendi.
 - Bağımsız R2 UI/a11y reviewer: ilk turdaki takvim çağrısı, doğrulama ve koyu tema kontrastı bulguları düzeltildi; final **APPROVE**, açık P0/P1/P2 yok.
 - Expo Doctor/JS export, gerçek cihaz, TalkBack/VoiceOver ve GitHub CI bu turda çalıştırılmadı. R13 kapsamında bilinen 12 moderate npm advisory değişmedi.
-- Dal taslak PR olarak PR #31'e stack edilecek; merge/release yok.
+- Taslak PR #32 (`feat/vdy-account-entry-cleanup` → `feat/vdy-010c-product-ux-polish`); implementation commit `bb89b96bb4e39f47793649d9806c2ceb434a318f`. GitHub Actions CI run #44 PASS. Merge/release yok.

@@ -31,6 +31,7 @@
 - **Doğrulama:** typecheck PASS; lint PASS; testler PASS 278/278 (account form doğrulaması için 2 yeni test); `git diff --check` PASS. İlk deneme node_modules eksik olduğu için araç/test hatası verdi; kilit dosyasından `npm ci --ignore-scripts --prefer-offline` ile kurulum tamamlandı. Expo Doctor, Android/iOS export, gerçek cihaz ve GitHub CI bu UI-only görevde çalıştırılmadı.
 - **Bağımlılık durumu:** `npm ci` mevcut R13 takibiyle aynı 12 moderate advisory bildirdi; manifest ve lockfile değiştirilmedi.
 - **Bağımsız R2 UI/a11y review:** APPROVE; düzeltmeler sonrası P0/P1/P2 bulgusu yok. Cihaz görseli/TalkBack/VoiceOver testleri NOT RUN.
+- **Teslim:** Draft PR #32 (`feat/vdy-account-entry-cleanup` → PR #31 dalı), commit `bb89b96bb4e39f47793649d9806c2ceb434a318f`; GitHub Actions run #44 PASS. Merge/release yok.
 - **Dosya ayrıntısı ve kurucu ayar listesi:** `docs/tasks/VDY-010C-ACCOUNT.md`.
 
 ## OLAY GÜNLÜĞÜ
