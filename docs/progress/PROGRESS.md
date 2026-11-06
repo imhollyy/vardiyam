@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-07
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-013 — Codex Skills kurulumu ve gerçek kullanım doğrulaması
-- **Durum:** LOCAL SKILL + SMOKE PASS; PR #37 için yalnız dokümantasyon ve UI UX Pro Max beceri paketi commit edilecek. Başlangıç HEAD `5bd957fd6325199ed6c2c1d38f86c11d8f55e9b2` doğrulandı; izole worktree `C:\Users\emrey\Documents\Codex\vdy-013-skills-routing`, dal `chore/vdy-013-skills-routing`. Vercel Skills CLI 1.7.6, Codex `find-skills` algısı, resmi UI UX Pro Max 2.15.0 kurulumu, Python 3.12.10 katalog araması ve ayrı Codex oturumunda UI becerilerinin gerçek kullanımı PASS. Uygulama ekran kodu değiştirilmedi.
+- **Durum:** DONE / beceri kurulumu, gerçek smoke ve CI PASS. Başlangıç HEAD `5bd957fd6325199ed6c2c1d38f86c11d8f55e9b2` doğrulandı; izole worktree `C:\Users\emrey\Documents\Codex\vdy-013-skills-routing`, dal `chore/vdy-013-skills-routing`. Vercel Skills CLI 1.7.6, Codex `find-skills` algısı, resmi UI UX Pro Max 2.15.0 kurulumu, Python 3.12.10 katalog araması ve ayrı Codex oturumunda UI becerilerinin gerçek kullanımı PASS. Commit `21335b96b9215209e50b808281c63c53c9bc873c`; PR #37 draft. GitHub Actions run #49 `42304155575` SUCCESS. Uygulama ekran kodu değiştirilmedi.
 - **Aktif branch:** chore/vdy-013-skills-routing
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
@@ -22,8 +22,16 @@
 
 ## NEXT ACTION
 
-1. `.agents/skills/ui-ux-pro-max/**`, `docs/tasks/VDY-013.md` ve bu kısa ilerleme kaydını seçerek commit et; resmi init tarafından üretilen kapsam dışı skill dizinlerini stage etme.
-2. PR #37 draft durumunu koru, commit'i push et ve GitHub CI sonucunu doğrula; başarılı doğrulamadan sonra VDY-013'te dur.
+1. PR #37 incelemesini bekle; VDY-014 bu görev kapsamında başlatılmadı.
+
+### 2026-11-07 — VDY-013 — DONE / SKILLS + SMOKE + CI PASS
+
+- `chore/vdy-013-skills-routing` başlangıç HEAD'i `5bd957fd6325199ed6c2c1d38f86c11d8f55e9b2` idi. Ayrı worktree kullanıldı; ana kullanıcı worktree'si değiştirilmedi.
+- Vercel Skills CLI 1.7.6 help/list/find komutları PASS. `find-skills` zaten proje dalındaydı ve Codex tarafından görüldü; tekrar kurulmadı. Resmî UI UX Pro Max CLI 2.15.0, `.agents/skills/ui-ux-pro-max` altına 68 dosya/3,566,531 bayt scripts+data paketi kurdu. Python 3.12.10.
+- Gerçek design-system ve React Native erişilebilirlik aramaları exit 0; katalog validator PASS (12 domain, 22 stack ve reasoning verisi). Ayrı Codex oturumu iki UI skill'ini okudu ve üç Vardiyam token uyumlu takvim önerisi üretti. Gerçek app UI değiştirilmedi.
+- Seçili commit `21335b96b9215209e50b808281c63c53c9bc873c`; draft PR #37 güncellendi ve merge edilmedi. GitHub Actions CI run #49 `42304155575` SUCCESS. `git diff --cached --check` PASS.
+- Resmî installer'ın ürettiği ek altı skill dizini lokal worktree'de bırakıldı ama PR'a alınmadı. İleri CI sonucu dışında açık test blokajı yok.
+- **NEXT ACTION:** PR #37 incelemesini bekle; VDY-014 henüz başlatılmayacak.
 
 ## GÜNCEL DURUM — 2026-11-06
 
