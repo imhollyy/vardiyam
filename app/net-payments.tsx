@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -129,13 +130,13 @@ export default function NetPaymentsScreen() {
     <PageHeading eyebrow="BORDRO VE ÖDEMELER" title="Net ödeme takibi" subtitle="Bordro neti ve gerçekten alınan ödeme ayrı kaydedilir." />
     {error ? <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.body, { color: theme.foreground }]}>{error}</Text><Pressable onPress={() => void reload()}><Text style={{ color: theme.accent }}>Yeniden dene</Text></Pressable></View> : null}
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-      <Text style={[styles.heading, { color: theme.foreground }]}>Bordro dönemi</Text>
+      <SectionHeading icon="calendar-outline" title="Bordro dönemi" theme={theme} />
       <View style={styles.row}><Pressable accessibilityRole="button" accessibilityLabel="Önceki dönem" onPress={() => { setSelectedPeriodId(null); setPeriodMonth((value) => shiftYearMonth(value, -1)); }}><Text style={[styles.arrow, { color: theme.accent }]}>‹</Text></Pressable><Text style={[styles.body, { color: theme.foreground }]}>{period ? periodLabel(period) : periodMonth}</Text><Pressable accessibilityRole="button" accessibilityLabel="Sonraki dönem" onPress={() => { setSelectedPeriodId(null); setPeriodMonth((value) => shiftYearMonth(value, 1)); }}><Text style={[styles.arrow, { color: theme.accent }]}>›</Text></Pressable></View>
       {displayPeriods.length > 1 ? <><Text style={[styles.caption, { color: theme.muted }]}>Kayıtlı dönemler (sınırlar değiştirilmeden saklanır)</Text><View style={styles.wrap}>{displayPeriods.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === period?.id }} onPress={() => { setSelectedPeriodId(item.id); setPeriodMonth(monthOf(item.startLocalDate)); }} style={[styles.chip, { borderColor: theme.border }]}><Text style={[styles.caption, { color: theme.foreground }]}>{periodLabel(item)}</Text></Pressable>)}</View></> : null}
       <Text style={[styles.caption, { color: theme.muted }]}>Ödeme tarihinden dönem otomatik belirlenmez. Ödeme dağıtımı aşağıdan ayrıca seçilir.</Text>
     </View>
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-      <Text style={[styles.heading, { color: theme.foreground }]}>Bordroda yazan net</Text>
+      <SectionHeading icon="document-text-outline" title="Bordroda yazan net" theme={theme} />
       <TextInput accessibilityLabel="Bordro net tutarı" keyboardType="decimal-pad" value={statementValue} onChangeText={setStatementValue} placeholder="35.000,50" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
       <TextInput accessibilityLabel="Bordro notu" value={statementNote} onChangeText={setStatementNote} placeholder="İsteğe bağlı not" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
       <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveStatement()} style={[styles.primary, { backgroundColor: theme.primaryAction }]}><Text style={[styles.primaryText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : ledger?.statement ? 'Bordro netini düzenle' : 'Bordro netini kaydet'}</Text></Pressable>
@@ -143,7 +144,7 @@ export default function NetPaymentsScreen() {
       {statementHistory.length > 1 ? <View style={styles.history}><Text style={[styles.caption, { color: theme.muted, fontWeight: '700' }]}>Bordro neti değişiklik geçmişi</Text>{statementHistory.map((entry) => <Text key={entry.version} style={[styles.caption, { color: theme.muted }]}>v{entry.version} · {formatTryMinor(entry.amountMinor)} · {entry.createdAtUtc.slice(0, 10)}{entry.note ? ` · ${entry.note}` : ''}</Text>)}</View> : null}
     </View>
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-      <Text style={[styles.heading, { color: theme.foreground }]}>{editingPayment ? 'Ödemeyi düzenle' : 'Gerçek ödeme ekle'}</Text>
+      <SectionHeading icon="card-outline" title={editingPayment ? 'Ödemeyi düzenle' : 'Gerçek ödeme ekle'} theme={theme} />
       <DateTimePickerField mode="date" label="Ödeme tarihi" value={paymentDate} timezone={timezone} onChange={setPaymentDate} onError={setError} />
       <TextInput accessibilityLabel="Gerçek ödeme tutarı" keyboardType="decimal-pad" value={paymentValue} onChangeText={setPaymentValue} placeholder="30.000,00" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground, borderColor: theme.border }]} />
       <View style={styles.wrap}>{METHODS.map((method) => <Pressable key={method.id} accessibilityRole="radio" accessibilityState={{ selected: paymentMethod === method.id }} onPress={() => setPaymentMethod(method.id)} style={[styles.chip, { borderColor: paymentMethod === method.id ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground }}>{method.label}</Text></Pressable>)}</View>
@@ -152,7 +153,7 @@ export default function NetPaymentsScreen() {
       {editingPayment ? <Pressable accessibilityRole="button" onPress={() => { setEditingPayment(null); setPaymentValue(''); setPaymentDescription(''); }}><Text style={{ color: theme.accent }}>Düzenlemeyi iptal et</Text></Pressable> : null}
     </View>
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-      <Text style={[styles.heading, { color: theme.foreground }]}>Bu dönem mutabakatı</Text>
+      <SectionHeading icon="git-compare-outline" title="Bu dönem mutabakatı" theme={theme} />
       <Summary label="Bordro neti" value={ledger?.statement ? formatTryMinor(ledger.statement.amountMinor) : 'Bilinmiyor'} theme={theme} />
       <Summary label="Bu döneme atanmış net ödeme" value={formatTryMinor(ledger?.reconciliation.allocatedPaymentMinor ?? 0)} theme={theme} />
       <Summary label="Kayıtlı ödeme farkı" value={differenceLabel(ledger?.reconciliation.differenceMinor ?? null)} theme={theme} />
@@ -160,7 +161,7 @@ export default function NetPaymentsScreen() {
       <Text style={[styles.caption, { color: theme.muted }]}>Fark yalnızca bordro neti ile açıkça bu döneme ayrılmış net ödemeleri karşılaştırır. Tahmini brütle kıyaslanmaz.</Text>
     </View>
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-      <Text style={[styles.heading, { color: theme.foreground }]}>Ödeme geçmişi ve dönem dağılımı</Text>
+      <SectionHeading icon="time-outline" title="Ödeme geçmişi ve dönem dağılımı" theme={theme} />
       {payments.length === 0 ? <Text style={[styles.body, { color: theme.muted }]}>Henüz ödeme kaydı yok.</Text> : null}
       {payments.map((payment) => {
         const row = ledger?.rows.find((item) => item.id === payment.id);
@@ -178,6 +179,10 @@ export default function NetPaymentsScreen() {
   </ScrollView>;
 }
 
+function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; theme: typeof colors.light | typeof colors.dark }) {
+  return <View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: theme.accentSurface }]}><Ionicons name={icon} size={18} color={theme.accent} /></View><Text style={[styles.heading, styles.sectionTitle, { color: theme.foreground }]}>{title}</Text></View>;
+}
+
 function Summary({ label, value, theme }: { label: string; value: string; theme: typeof colors.light | typeof colors.dark }) {
   return <View style={styles.row}><Text style={[styles.body, styles.flex, { color: theme.muted }]}>{label}</Text><Text accessibilityLiveRegion="polite" style={[styles.body, { color: theme.foreground, fontWeight: '800' }]}>{value}</Text></View>;
 }
@@ -190,5 +195,5 @@ function differenceLabel(value: number | null): string {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 18, paddingBottom: 48, gap: 12 }, center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 }, title: { fontSize: 27, fontWeight: '800' }, card: { padding: 16, borderWidth: 1, borderRadius: 16, gap: 12 }, heading: { fontSize: 17, fontWeight: '800' }, body: { fontSize: 14, lineHeight: 20 }, caption: { fontSize: 12, lineHeight: 17 }, row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9, minHeight: 40 }, arrow: { fontSize: 30, paddingHorizontal: 12 }, input: { minHeight: 48, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, fontSize: 15 }, flex: { flex: 1 }, wrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }, chip: { minHeight: 42, justifyContent: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 12 }, primary: { minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 13, paddingHorizontal: 12 }, primaryText: { color: '#fff', fontWeight: '800' }, payment: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, gap: 8 }, history: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 5 },
+  container: { padding: 18, paddingBottom: 48, gap: 12 }, center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 }, title: { fontSize: 27, fontWeight: '800' }, card: { padding: 16, borderWidth: 1, borderRadius: 16, gap: 12 }, heading: { fontSize: 17, fontWeight: '800' }, sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sectionIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, sectionTitle: { flexShrink: 1 }, body: { fontSize: 14, lineHeight: 20 }, caption: { fontSize: 12, lineHeight: 17 }, row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9, minHeight: 40 }, arrow: { fontSize: 30, paddingHorizontal: 12 }, input: { minHeight: 48, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, fontSize: 15 }, flex: { flex: 1 }, wrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }, chip: { minHeight: 42, justifyContent: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 12 }, primary: { minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 13, paddingHorizontal: 12 }, primaryText: { color: '#fff', fontWeight: '800' }, payment: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, gap: 8 }, history: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 5 },
 });

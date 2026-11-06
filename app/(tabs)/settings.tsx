@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -221,6 +222,10 @@ function Chip({ label, selected, onPress, theme, accessibilityLabel }: {
   );
 }
 
+function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; theme: Theme }) {
+  return <View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: theme.accentSurface }]}><Ionicons name={icon} size={18} color={theme.accent} /></View><Text style={[styles.sectionTitle, { color: theme.foreground }]}>{title}</Text></View>;
+}
+
 export default function SettingsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
@@ -378,7 +383,7 @@ export default function SettingsScreen() {
       <PageHeading eyebrow="TERCİHLER" title="Ayarlar" subtitle="Vardiya düzenin cihazında saklanır. Kaydetmeden önce örneğini kontrol edebilirsin." />
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Görünüm ve hızlı erişim</Text>
+        <SectionHeading icon="color-palette-outline" title="Görünüm ve hızlı erişim" theme={theme} />
         <Action label={mode === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} onPress={() => void toggleMode()} theme={theme} secondary />
         <Action label="Hesap: giriş veya kayıt seçenekleri" onPress={() => router.push('/account' as never)} theme={theme} secondary />
         <Action label="Ücret ve işyeri ayarları" onPress={() => router.push('/earnings-settings' as never)} theme={theme} secondary />
@@ -386,13 +391,13 @@ export default function SettingsScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Veri güvenliği</Text>
+        <SectionHeading icon="shield-checkmark-outline" title="Veri güvenliği" theme={theme} />
         <Text style={[styles.body, { color: theme.muted }]}>Şifreli yedeklerini dışa aktar, eski yedeğini geri yükle veya cihazındaki verileri kaldır.</Text>
         <Action label="Yedekleme ve veri silme" onPress={() => router.push('/backup' as never)} theme={theme} />
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.sectionTitle, { color: theme.foreground }]}>İlk kurulum</Text>
+        <SectionHeading icon="sparkles-outline" title="İlk kurulum" theme={theme} />
         <Text style={[styles.body, { color: theme.muted }]}>Vardiya, işyeri ve isteğe bağlı ücret adımlarını daha sonra yeniden gözden geçirebilirsin.</Text>
         <Action label="Kurulum adımlarını yeniden aç" onPress={() => {
           void saveOnboardingState(database, { step: 0, completed: false }).then(() => router.push('/onboarding' as never))
@@ -428,7 +433,7 @@ export default function SettingsScreen() {
       ) : (
         <>
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Döngü bilgileri</Text>
+            <SectionHeading icon="repeat-outline" title="Döngü bilgileri" theme={theme} />
             <Field label="Düzen adı" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} theme={theme} placeholder="Örn. Üretim vardiyam" />
             <Field label="Zaman dilimi (IANA)" value={draft.timezone} onChangeText={(timezone) => setDraft({ ...draft, timezone })} theme={theme} placeholder="Europe/Istanbul" />
             <DateTimePickerField mode="date" label="Döngü başlangıç tarihi" value={draft.anchorLocalDate} timezone={draft.timezone} onChange={(anchorLocalDate) => setDraft({ ...draft, anchorLocalDate })} onError={setError} />
@@ -440,7 +445,7 @@ export default function SettingsScreen() {
           </View>
 
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Vardiya şablonları</Text>
+            <SectionHeading icon="time-outline" title="Vardiya şablonları" theme={theme} />
             {draft.templates.map((template, index) => (
               <View key={template.id} style={[styles.templateBox, { borderColor: theme.border }]}>
                 <Text style={[styles.templateHeading, { color: theme.foreground }]}>Şablon {index + 1}</Text>
@@ -487,7 +492,7 @@ export default function SettingsScreen() {
           </View>
 
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.sectionTitle, { color: theme.foreground }]}>14 günlük önizleme</Text>
+            <SectionHeading icon="calendar-outline" title="14 günlük önizleme" theme={theme} />
             {preview.length ? renderCyclePreview(preview) : (
               <Text accessibilityRole="alert" style={{ color: theme.muted }}>Önizleme için vardiya bilgilerini ve başlangıç tarihini kontrol et.</Text>
             )}
@@ -511,7 +516,9 @@ const styles = StyleSheet.create({
   title: { marginTop: -10, fontSize: 30, lineHeight: 38, fontWeight: '800' },
   intro: { marginTop: -8, fontSize: 15, lineHeight: 22 },
   card: { borderWidth: 1, borderRadius: 20, padding: 16, gap: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '800' },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sectionIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
   cardTitle: { fontSize: 21, fontWeight: '800' },
   body: { fontSize: 15, lineHeight: 22 },
   field: { gap: 6 },

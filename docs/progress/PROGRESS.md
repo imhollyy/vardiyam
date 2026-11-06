@@ -6,9 +6,9 @@
 
 - **Tarih:** 2026-11-06
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-010C hesap ekranı ve sınırlı kod temizliği
-- **Durum:** REVIEWED / R2. `feat/vdy-account-entry-cleanup`, PR #31 head `36e3f0f9032569a66fc52c71b80e83ad15fccfc0` tabanında. E-posta/Google/Apple seçenekleri yalnız UI; gerçek auth servisi yok ve yerel kullanım girişsiz sürüyor.
-- **Aktif branch:** feat/vdy-account-entry-cleanup
+- **Aktif aşama:** VDY-012 — ikincil ekranların UI/UX yenilemesi
+- **Durum:** IN PROGRESS / R2 UI ve finansal/veri ekranı sunumu. PR #32 son HEAD `234d4582a392f1d346e095f8db233488d845a587` doğrulandı. Ayrı `C:\Users\emrey\Documents\Codex\vdy-012-secondary-screens` worktree ve `feat/vdy-012-secondary-screens-redesign` dalı açıldı. Ana worktree'deki `.gitignore`, QA/PROGRESS, VDY-004, VDY-007, VDY-009 ve `expo-env.d.ts` değişiklikleri aynen korunuyor. Takvim, kayıtlar, kazanç, ödeme, raporlar, ayarlar ve yedekleme sunum katmanları tamamlandı; bağımsız reviewer APPROVE, açık P0–P2 yok.
+- **Aktif branch:** feat/vdy-012-secondary-screens-redesign
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,9 +22,22 @@
 
 ## NEXT ACTION
 
-1. Auth sağlayıcısı ve OAuth/e-posta, uygulama kimliği, veri eşitleme/gizlilik kararları kurucu tarafından belirlendikten sonra gerçek hesap altyapısını ayrı görevde bağla. Bu dal için merge/release yapılmadı.
+1. İzole temp klasöründeki iOS Hermes export sonucunu al; son typecheck/lint/test/diff çıktısını ve reviewer onayını kaydet.
+2. Dalı PR #32 hedefli draft PR olarak sun, CI durumunu doğrula; cihaz/ büyük metin / TalkBack kabulini NOT RUN olarak bırak.
 
 ## GÜNCEL DURUM — 2026-11-06
+
+### VDY-012 — uygulama aşamaları ve son kapılar
+
+- PR #32 SHA `234d4582a392f1d346e095f8db233488d845a587` tabanında ayrı worktree/branch kullanıldı; ana kullanıcı worktree dosyaları değiştirilmedi.
+- Takvim + çalışma geçmişi: gerçek kayıt süreleri ve mola bilgisi ayrı sunuldu. Takvim delta etiketindeki mola belirsizliği reviewer P2'si düzeltildi (“vardiya aralığı (mola dahil)”) ve APPROVE alındı.
+- Kazanç + Net Ödemeler: dönem/kart başlıkları simgeli ortak tasarıma taşındı; business logic diff'i yok. Reviewer APPROVE.
+- Raporlar, Ayarlar ve Yedekleme: bölüm başlıkları tema tokenlarıyla ortaklaştırıldı. Raporlar başlık/ok sıkışması P2'si `flex:1/minWidth:0` ile kapatılıp tekrar onaylandı. Veri silme kopyasındaki schema v6 sabiti güncel schema sürümüne bağlandı. Hesap ve onboarding preview'ları tema uyumlu olarak korundu.
+- Risk sınıfı R2 UI; `vardiyam-task-flow`, `vardiyam-ui-quality`, `vardiyam-test-gate`, backup sunumu için `vardiyam-data-safety` kullanıldı. Gerçek bağımsız UI reviewer her aşamayı kontrol etti; tüm düzeltmeler sonrası APPROVE ve açık P0–P2 yok.
+- Final komut seti: typecheck PASS; lint PASS; test 278/278 PASS; `git diff --check` PASS. Expo Doctor 18/20 PARTIAL: exp.host DNS ve React Native Directory metadata erişimi. Standart Android+iOS export, hermesc exit 6 ve izole Windows temp dosyası izin reddi ile FAIL oldu; temp'i worktree `.expo/vdy012-temp` konumuna alan final exportlar Android PASS, 1,308 modül ve 3.4 MB `.hbc`; iOS PASS, 1,306 modül ve 3.5 MB `.hbc`.
+- CI henüz çalıştırılmadı; draft PR oluşturulduktan sonra durum kontrol edilecek. Fiziksel cihaz, screenshot, büyük yazı, TalkBack/VoiceOver NOT RUN. Hesap motoru, ödeme ledger, migration ve backup recovery/crypto değiştirilmedi.
+- Draft PR #35 created: `feat/vdy-012-secondary-screens-redesign` → `feat/vdy-account-entry-cleanup` (PR #32 head); commit `08f84560df7971ec8528287730cbae2b1f3e474d`. GitHub Actions run #46 (`42284884830`) PASS; install, typecheck, lint, unit tests and Expo dependency health succeeded.
+- **NEXT ACTION:** PR #35 taslak incelemesi ve gerçek kullanıcı ekran kabulini bekle; merge/rebase/force-push/release yapma.
 
 - **VDY-010C account entry:** İsteğe bağlı e-posta giriş/kayıt ekranı, Google/Apple sağlayıcı CTA'ları ve yerel kullanıma devam yolu eklendi. Gerçek auth olmadığı UI'da açıkça belirtiliyor; hiçbir ağ isteği veya credential persistence yok.
 - **Kod taraması:** Today, Calendar, WorkRecords yerel butonları ortak `ActionButton` kullanıyor. Debug `console.log`, `console.debug`, `debugger`, TODO/FIXME işareti bulunmadı. Uygulama ekranlarında doğrudan SQLite query çağrısı bulunmadı; DB erişimi repository'lerde. Ana ekran/takvim/çalışma kayıt ekranları sırasıyla 573/521/653 satır; daha kapsamlı bölme ayrı, düşük riskli bakım işi olarak kalıyor. Bugün ekran saati 30 saniyede bir güncelleniyor; agresif saniyelik timer bulunmadı.
@@ -33,6 +46,13 @@
 - **Bağımsız R2 UI/a11y review:** APPROVE; düzeltmeler sonrası P0/P1/P2 bulgusu yok. Cihaz görseli/TalkBack/VoiceOver testleri NOT RUN.
 - **Teslim:** Draft PR #32 (`feat/vdy-account-entry-cleanup` → PR #31 dalı), commit `bb89b96bb4e39f47793649d9806c2ceb434a318f`; GitHub Actions run #44 PASS. Merge/release yok.
 - **Dosya ayrıntısı ve kurucu ayar listesi:** `docs/tasks/VDY-010C-ACCOUNT.md`.
+
+### 2026-11-06 — VDY-012 — START / BASE VERIFIED
+
+- PR #32 branch head `234d4582a392f1d346e095f8db233488d845a587`; target `feat/vdy-account-entry-cleanup`. Ana `C:\Users\emrey\vardiyam` worktree'sindeki mevcut kullanıcı değişikliklerine dokunulmadı.
+- Kapsam: altı kullanıcı aşaması, ana ekran görünümünü koruma; yalnız ekran sunumu/navigasyonu ve ortak görsel öğeler. Çalışma/ücret/ödeme algoritmaları, SQLite migrasyonları ve backup/recovery motoru kapsam dışı.
+- Beceriler: `vardiyam-task-flow` v1.0, `vardiyam-ui-quality` v1.0, `vardiyam-test-gate` v1.0 ve yedek ekranı sunumu için `vardiyam-data-safety` v1.0 okundu. UI Skills CLI `appllama-app-design-skill` v1.3.0 ve `callstackincubator/react-native-best-practices` dökümlerini verdi. Appllama MCP bağlı değil; gerçek cihaz veya profiler erişimi yok. Ölçülmemiş `useMemo`/state değişikliği veya perf kazanımı iddia edilmeyecek.
+- Plan: (1) Calendar+WorkRecords; (2) Earnings+Payments; (3) Reports; (4) Settings+Onboarding; (5) Account+Backup sunum koruması; (6) tema/erişilebilirlik/regresyon ve final review. Her aşamada ilgili UI reviewer ve odaklı regresyon.
 
 ## OLAY GÜNLÜĞÜ
 

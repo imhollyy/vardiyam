@@ -340,6 +340,22 @@ Independent R2 data-safety review: **APPROVE; no remaining P0/P1/P2**. The initi
 
 Independent UI/accessibility static review: **no remaining P0–P2 findings** after inline plan editing, truthful settings naming, platform-aware exit guidance and clearer icons. Device rendering and screen-reader behavior remain NOT RUN.
 
+## VDY-012 — Secondary screens redesign
+
+| Check | Result | Evidence |
+|---|---|---|
+| Calendar + Work Records UI-only changes | PASS | Independent UI reviewer APPROVE. Calendar interval delta explicitly says break is included; record history separates elapsed span, breaks and worked minutes. |
+| Earnings + Net Payments UI-only changes | PASS | Independent UI reviewer APPROVE. Calculation, snapshot approval, allocation, ledger and repository calls unchanged. |
+| Reports, Settings, Onboarding, Account preview, Backup UI consistency | PASS (static) | Independent UI reviewer APPROVE. Reports narrow-row title P2 fixed and re-reviewed. Pro/ads/account integrations remain disclosed previews. |
+| TypeScript / lint / full test suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` (278/278); `git diff --check`. |
+| Android JS export with Hermes bytecode | PASS | Standard temp path failed with `hermesc exit 6` / temp-file permission denied; final retry used worktree-local `.expo/vdy012-temp`. 1,308 modules, 3.4 MB `.hbc`. |
+| iOS JS export with Hermes bytecode | PASS | Worktree-local temp path; 1,306 modules, 3.5 MB `.hbc`. |
+| Expo Doctor | PARTIAL (18/20) | Expo config schema check could not reach `exp.host` (DNS `ENOTFOUND`); React Native Directory metadata endpoint returned an unexpected server response. |
+| Device screenshots, large text, TalkBack/VoiceOver | NOT RUN | No physical device interaction or visual acceptance in this task. |
+| GitHub CI | PASS | Draft PR #35, Actions run #46 (`42284884830`); install, typecheck, lint, unit tests, Expo dependency health all succeeded. |
+
+No wage/payment calculations, SQLite migrations, backup cryptography, recovery, or destructive data flow was changed.
+
 VDY-010A kapanış güncellemesi: Android export bu turda bytecode açık biçimde PASS (1.255 modül; `.hbc` 3.3 MB); kök nedeni bilinmeyen önceki exit 6 tekrarlanmadı. Typecheck/lint PASS, test 256/256 PASS, Expo Doctor 20/20 PASS, diff check PASS. Önceki uzak metadata 18/20 sonucu artık tekrarlanmadı. Web önizleme SQLite web kurulumu yüzünden açılmadı; gerçek cihaz/screenshot NOT RUN. Beş panel kullanıcıya sunulan görsel gerçek ekran görüntüsü değil, açıkça etiketlenmiş MOCKUP'tır. UI statik reviewer onayı mevcut; TalkBack, büyük yazı ve native ekran kabulü NOT RUN. Draft PR CI yeni commit için bekliyor.
 
 Final UI/a11y review: bağımsız reviewer APPROVE; statik P0/P1/P2 yok. 44 dp dokunma alanları, takvim hitSlop, panel ekran okuyucu izolasyonu ve haftalık tam vardiya saat etiketleri düzeltildi. Gerçek TalkBack/VoiceOver, küçük ekran, büyük yazı, tema görüntüsü ve alt tab görünürlüğü NOT RUN.
