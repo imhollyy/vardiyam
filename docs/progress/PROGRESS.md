@@ -4,11 +4,11 @@
 
 ## CURRENT STATE
 
-- **Tarih:** 2026-11-06
+- **Tarih:** 2026-11-07
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-012 — ikincil ekranların UI/UX yenilemesi
-- **Durum:** IN PROGRESS / R2 UI ve finansal/veri ekranı sunumu. PR #32 son HEAD `234d4582a392f1d346e095f8db233488d845a587` doğrulandı. Ayrı `C:\Users\emrey\Documents\Codex\vdy-012-secondary-screens` worktree ve `feat/vdy-012-secondary-screens-redesign` dalı açıldı. Ana worktree'deki `.gitignore`, QA/PROGRESS, VDY-004, VDY-007, VDY-009 ve `expo-env.d.ts` değişiklikleri aynen korunuyor. Takvim, kayıtlar, kazanç, ödeme, raporlar, ayarlar ve yedekleme sunum katmanları tamamlandı; bağımsız reviewer APPROVE, açık P0–P2 yok.
-- **Aktif branch:** feat/vdy-012-secondary-screens-redesign
+- **Aktif aşama:** VDY-013 — Codex Skills kurulumu ve gerçek kullanım doğrulaması
+- **Durum:** LOCAL SKILL + SMOKE PASS; PR #37 için yalnız dokümantasyon ve UI UX Pro Max beceri paketi commit edilecek. Başlangıç HEAD `5bd957fd6325199ed6c2c1d38f86c11d8f55e9b2` doğrulandı; izole worktree `C:\Users\emrey\Documents\Codex\vdy-013-skills-routing`, dal `chore/vdy-013-skills-routing`. Vercel Skills CLI 1.7.6, Codex `find-skills` algısı, resmi UI UX Pro Max 2.15.0 kurulumu, Python 3.12.10 katalog araması ve ayrı Codex oturumunda UI becerilerinin gerçek kullanımı PASS. Uygulama ekran kodu değiştirilmedi.
+- **Aktif branch:** chore/vdy-013-skills-routing
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,8 +22,8 @@
 
 ## NEXT ACTION
 
-1. İzole temp klasöründeki iOS Hermes export sonucunu al; son typecheck/lint/test/diff çıktısını ve reviewer onayını kaydet.
-2. Dalı PR #32 hedefli draft PR olarak sun, CI durumunu doğrula; cihaz/ büyük metin / TalkBack kabulini NOT RUN olarak bırak.
+1. `.agents/skills/ui-ux-pro-max/**`, `docs/tasks/VDY-013.md` ve bu kısa ilerleme kaydını seçerek commit et; resmi init tarafından üretilen kapsam dışı skill dizinlerini stage etme.
+2. PR #37 draft durumunu koru, commit'i push et ve GitHub CI sonucunu doğrula; başarılı doğrulamadan sonra VDY-013'te dur.
 
 ## GÜNCEL DURUM — 2026-11-06
 
