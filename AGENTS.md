@@ -33,6 +33,15 @@
 
 **Kritik:** İşlem token/süre/bağlantı nedeniyle kesilirse ilk sonraki oturum PROGRESS'teki `NEXT ACTION` ile devam eder. Sadece sohbet geçmişine güvenme.
 
+## VDY-013 — Becerileri görevde seçme ve kanıtlama
+
+- **Her görev başlangıcında** önce kurulu proje ve Codex becerilerini incele; işin gerektirdiği en uygun mevcut beceriyi gerçekten oku ve kullan. Bu, her seferinde ağdan arama/kurulum yapmak anlamına gelmez.
+- İstenen görev için uygun bir beceri bulunmuyorsa veya özel araç gerekliyse, `find-skills` becerisini aç; `npx.cmd skills find <odaklı-anahtar-kelimeler>` ile aday araştır. Kaynak, sürüm, güvenlik, ek komutlar, bağımlılıklar ve veri paylaşımı kontrol edilmeden beceri yükleme. Otomatik/kör `--all` kullanma.
+- **Tüm Vardiyam UI/UX görevlerinde** mevcut `vardiyam-ui-quality` ile birlikte `ui-ux-pro-max` becerisini oku ve **gerçekten uygula**. React Native/Expo ve Vardiyam'ın onaylanmış tasarım sistemi, genel web tavsiyelerine üstün gelir. Skill'in arama betiği mevcutsa en az bir somut UX/erişilebilirlik veya tasarım aramasını çalıştır; önerileri olduğu gibi kopyalamak yerine mevcut ürünle karşılaştır.
+- Görev raporunda `Skill kanıtı: <skill> | kaynak/sürüm | dosya yolu | çalıştırılan gerçek komut/çıktı | uygulanan karar` kaydı bulunsun. Dosyanın varlığını veya 'skill yüklendi' sözünü **çalışan smoke test** yerine koyma. Erişim yoksa `NOT RUN` / `BLOCKED_SKILL_UNAVAILABLE` yaz.
+- Dış skill'ler kullanıcı verisini, kodu, secret'ları dış servise göndermek ya da ek yazılım kurmak için kendiliğinden yetki vermez. VDY-013 kapsamındaki kurulum ve smoke testler ayrı belgelenir; sonraki projelerde kurulum yerine normal beceri seçimi yapılır.
+- R2/R3 bağımsız reviewer zorunluluğu, `PROJECT_CONSTITUTION.md` ve mevcut güvenlik/merge sınırları aynen geçerlidir.
+
 ## Teknik kırmızı çizgiler
 
 - Expo + React Native + TypeScript strict + Expo Router + SQLite, npm; kesin paket sürümleri scaffold'da doğrulanır.
