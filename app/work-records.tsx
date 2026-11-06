@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 
@@ -36,7 +37,7 @@ import {
   type WorkRecordSource,
 } from '@/src/domain/work-record';
 import { getNominalShiftWindow } from '@/src/domain/shift-cycle';
-import { getLocalToday } from '@/src/features/shifts/dates';
+import { formatMonthTitle, getLocalToday, monthForLocalDate } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
@@ -115,6 +116,10 @@ function actualSpanMinutes(record: WorkRecord): number {
   return (Date.parse(record.endedAtUtc) - Date.parse(record.startedAtUtc)) / 60_000;
 }
 
+function workedMinutes(record: WorkRecord): number {
+  return Math.max(0, Math.floor(actualSpanMinutes(record)) - record.breakMinutes);
+}
+
 function breakDurationLabel(minutes: number): string {
   return minutes < 60 ? `${minutes} dk` : formatDuration(minutes);
 }
@@ -181,6 +186,14 @@ function OccurrenceChoices({ label, value, timezone, selected, onSelect, theme }
   );
 }
 
+function PeriodTab({ label, selected, onPress, theme }: { label: string; selected: boolean; onPress: () => void; theme: Theme }) {
+  return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} onPress={onPress} style={[styles.periodTab, selected && { backgroundColor: theme.accentSurface }]}><Text style={{ color: selected ? theme.accent : theme.muted, fontSize: 13, fontWeight: '800' }}>{label}</Text></Pressable>;
+}
+
+function SummaryMetric({ label, value, theme, emphasized = false }: { label: string; value: string; theme: Theme; emphasized?: boolean }) {
+  return <View style={styles.summaryMetric}><Text style={[styles.summaryMetricLabel, { color: theme.muted }]}>{label}</Text><Text style={[styles.summaryMetricValue, { color: emphasized ? theme.accent : theme.foreground }]}>{value}</Text></View>;
+}
+
 export default function WorkRecordsScreen() {
   const database = useAppDatabase();
   const router = useRouter();
@@ -199,6 +212,8 @@ export default function WorkRecordsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [view, setView] = useState<'history' | 'form'>('history');
+  const [historyPeriod, setHistoryPeriod] = useState<'ALL' | 'THIS_MONTH'>('ALL');
+  const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
   const [record, setRecord] = useState<WorkRecord | null>(null);
   const [source, setSource] = useState<WorkRecordSource>('MANUAL');
   const [planned, setPlanned] = useState<PlannedWorkSnapshot | null>(null);
@@ -356,6 +371,19 @@ export default function WorkRecordsScreen() {
     }
   }, [breakDrafts, draft, elapsedMinutes]);
 
+  const currentMonth = monthForLocalDate(getLocalToday('Europe/Istanbul'));
+  const visibleRecords = useMemo(() => historyPeriod === 'ALL' ? records : records.filter(({ record: item }) =>
+    utcToLocalDateTime(item.startedAtUtc, item.timezone).slice(0, 7) === currentMonth,
+  ), [currentMonth, historyPeriod, records]);
+  const historyTotals = useMemo(() => visibleRecords.reduce((totals, { record: item }) => {
+    const span = Math.floor(actualSpanMinutes(item));
+    return {
+      spanMinutes: totals.spanMinutes + span,
+      breakMinutes: totals.breakMinutes + item.breakMinutes,
+      workedMinutes: totals.workedMinutes + Math.max(0, span - item.breakMinutes),
+    };
+  }, { spanMinutes: 0, breakMinutes: 0, workedMinutes: 0 }), [visibleRecords]);
+
   const updateBreakDraft = (id: string, patch: Partial<BreakDraft>) => {
     setBreakDrafts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
   };
@@ -443,18 +471,28 @@ export default function WorkRecordsScreen() {
         <View style={styles.rowBetween}>
           <View style={styles.flex}>
             <Text style={[styles.dateTitle, { color: theme.foreground }]}>{recordDateLabel(workRecord)}</Text>
-            <Text style={[styles.kind, { color: theme.accent }]}>{workRecord.source === 'PLANNED' ? 'PLANLI KAYIT' : 'PLANSIZ KAYIT'}</Text>
+            <View style={[styles.sourceBadge, { backgroundColor: workRecord.source === 'PLANNED' ? theme.accentSurface : theme.surface }]}>
+              <Ionicons accessible={false} name={workRecord.source === 'PLANNED' ? 'calendar-outline' : 'create-outline'} size={13} color={theme.accent} />
+              <Text style={[styles.kind, { color: theme.accent }]}>{workRecord.source === 'PLANNED' ? 'Planlı' : 'Plansız'}</Text>
+            </View>
           </View>
-          <Text style={[styles.duration, { color: theme.foreground }]}>{formatDuration(actualSpanMinutes(workRecord))}</Text>
+          <View style={styles.durationValue}><Text style={[styles.duration, { color: theme.foreground }]}>{formatDuration(workedMinutes(workRecord))}</Text><Text style={[styles.hint, { color: theme.muted }]}>çalışılan</Text></View>
         </View>
-        <Text style={[styles.body, { color: theme.foreground }]}>{localLabel(start, workRecord.timezone)} → {localLabel(end, workRecord.timezone)}</Text>
-        <Text style={[styles.detail, { color: theme.muted }]}>{breakSummary}</Text>
-        {timedBreaks.map((interval, index) => (
-          <Text key={interval.id} style={[styles.detail, { color: theme.muted }]}>
-            Mola {index + 1}: {localLabel(utcToLocalDateTime(interval.startedAtUtc, workRecord.timezone), workRecord.timezone)} → {localLabel(utcToLocalDateTime(interval.endedAtUtc, workRecord.timezone), workRecord.timezone)}
-          </Text>
-        ))}
-        <Text style={[styles.detail, { color: theme.muted }]}>Zaman dilimi: {workRecord.timezone}</Text>
+        <View style={[styles.recordInfo, { borderColor: theme.border }]}>
+          <View style={styles.recordInfoItem}><Ionicons accessible={false} name="time-outline" size={16} color={theme.accent} /><Text style={[styles.body, { color: theme.foreground }]}>{localLabel(start, workRecord.timezone).split(' ')[1]} → {localLabel(end, workRecord.timezone).split(' ')[1]}{end.slice(0, 10) !== start.slice(0, 10) ? ' · ertesi gün' : ''}</Text></View>
+          <View style={styles.recordInfoItem}><Ionicons accessible={false} name="cafe-outline" size={16} color={theme.muted} /><Text style={[styles.detail, { color: theme.muted }]}>{breakSummary}</Text></View>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: expandedRecordId === workRecord.id }} accessibilityLabel={expandedRecordId === workRecord.id ? 'Kayıt ayrıntılarını gizle' : 'Kayıt ayrıntılarını göster'} onPress={() => setExpandedRecordId((current) => current === workRecord.id ? null : workRecord.id)} style={styles.detailsToggle}>
+          <Text style={[styles.detail, { color: theme.accent }]}>{expandedRecordId === workRecord.id ? 'Ayrıntıları gizle' : 'Ayrıntıları göster'}</Text>
+          <Ionicons accessible={false} name={expandedRecordId === workRecord.id ? 'chevron-up' : 'chevron-down'} size={16} color={theme.accent} />
+        </Pressable>
+        {expandedRecordId === workRecord.id && <>
+          {timedBreaks.map((interval, index) => (
+            <Text key={interval.id} style={[styles.detail, { color: theme.muted }]}>
+              Mola {index + 1}: {localLabel(utcToLocalDateTime(interval.startedAtUtc, workRecord.timezone), workRecord.timezone)} → {localLabel(utcToLocalDateTime(interval.endedAtUtc, workRecord.timezone), workRecord.timezone)}
+            </Text>
+          ))}
+          <Text style={[styles.hint, { color: theme.muted }]}>Zaman dilimi: {workRecord.timezone}</Text>
         {workRecord.planned ? (
           <View style={[styles.planSnapshot, { borderColor: theme.border }]}>
             <Text style={[styles.detailStrong, { color: theme.foreground }]}>Plan anlık görüntüsü · {workRecord.planned.templateName}</Text>
@@ -464,6 +502,7 @@ export default function WorkRecordsScreen() {
           </View>
         ) : null}
         {workRecord.note ? <Text style={[styles.body, { color: theme.muted }]}>{workRecord.note}</Text> : null}
+        </>}
         <View style={styles.actions}>
           <ActionButton label="Düzenle" onPress={() => void openEditForm(workRecord.id)} variant="secondary" />
           <ActionButton label={deleting ? 'Siliniyor…' : 'Sil'} onPress={() => confirmDelete(workRecord)} variant="secondary" disabled={deleting} />
@@ -477,7 +516,21 @@ export default function WorkRecordsScreen() {
       <Pressable accessibilityLabel="Önceki ekrana dön" accessibilityRole="button" hitSlop={8} onPress={() => router.back()} style={styles.backButton}>
         <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '800' }}>‹ Geri</Text>
       </Pressable>
-      <PageHeading eyebrow="FİİLÎ ÇALIŞMA" title={view === 'form' ? (record ? 'Kaydı düzenle' : 'Çalışma ekle') : 'Çalışma geçmişi'} subtitle="Planlanan vardiya ve gerçekleşen çalışma ayrı kayıtlardır. Bu ekranda ücret veya yasal mesai hesabı yapılmaz." />
+      <PageHeading eyebrow="FİİLÎ ÇALIŞMA" title={view === 'form' ? (record ? 'Kaydı düzenle' : 'Çalışma ekle') : 'Çalışma geçmişi'} subtitle={view === 'form' ? 'Saatlerini ve molalarını kontrol et.' : 'Gerçekleşen çalışma kayıtların.'} />
+      {view === 'history' ? <>
+        <View accessibilityRole="tablist" style={[styles.periodTabs, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <PeriodTab label="Tüm geçmiş" selected={historyPeriod === 'ALL'} onPress={() => setHistoryPeriod('ALL')} theme={theme} />
+          <PeriodTab label={formatMonthTitle(currentMonth)} selected={historyPeriod === 'THIS_MONTH'} onPress={() => setHistoryPeriod('THIS_MONTH')} theme={theme} />
+        </View>
+        <View style={[styles.summaryCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.summaryCaption, { color: theme.muted }]}>{visibleRecords.length} kayıt · {historyPeriod === 'ALL' ? 'tüm dönem' : 'bu ay'}</Text>
+          <View style={styles.summaryMetrics}>
+            <SummaryMetric label="Aralık" value={formatDuration(historyTotals.spanMinutes)} theme={theme} />
+            <SummaryMetric label="Mola" value={breakDurationLabel(historyTotals.breakMinutes)} theme={theme} />
+            <SummaryMetric label="Çalışılan" value={formatDuration(historyTotals.workedMinutes)} theme={theme} emphasized />
+          </View>
+        </View>
+      </> : null}
     </View>
   );
 
@@ -593,12 +646,14 @@ export default function WorkRecordsScreen() {
   return (
     <FlatList
       contentContainerStyle={[styles.screen, { backgroundColor: theme.background }, records.length === 0 && styles.emptyScreen]}
-      data={records}
+      data={visibleRecords}
       keyExtractor={(item) => item.record.id}
       ListEmptyComponent={(
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Henüz çalışma kaydı yok</Text>
-          <Text style={[styles.body, { color: theme.muted }]}>İster vardiya planından başlat, ister plansız çalışmanı kendin ekle.</Text>
+          <Ionicons accessible={false} name="journal-outline" size={28} color={theme.accent} />
+          <Text style={[styles.sectionTitle, { color: theme.foreground }]}>{historyPeriod === 'ALL' ? 'Henüz çalışma kaydı yok' : 'Bu ay kayıt yok'}</Text>
+          <Text style={[styles.body, { color: theme.muted }]}>{historyPeriod === 'ALL' ? 'Çalışmanı vardiyandan başlatabilir veya geçmişe dönük ekleyebilirsin.' : 'Başka bir ayı görmek için tüm geçmişe geç.'}</Text>
+          {historyPeriod === 'THIS_MONTH' ? <ActionButton label="Tüm geçmişi gör" variant="secondary" onPress={() => setHistoryPeriod('ALL')} /> : null}
           <ActionButton label="Plansız çalışma ekle" onPress={() => openManualForm()} />
         </View>
       )}
@@ -624,10 +679,23 @@ const styles = StyleSheet.create({
   title: { fontSize: 30, lineHeight: 38, fontWeight: '800' },
   intro: { fontSize: 14, lineHeight: 21 },
   card: { borderWidth: 1, borderRadius: 20, padding: 16, gap: 12, marginBottom: 2 },
+  periodTabs: { minHeight: 48, flexDirection: 'row', padding: 4, borderWidth: 1, borderRadius: 14, gap: 4 },
+  periodTab: { minHeight: 40, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 10, paddingHorizontal: 8 },
+  summaryCard: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 10 },
+  summaryCaption: { fontSize: 12, fontWeight: '700' },
+  summaryMetrics: { flexDirection: 'row', gap: 8 },
+  summaryMetric: { flex: 1, minWidth: 0, gap: 4 },
+  summaryMetricLabel: { fontSize: 11, fontWeight: '700' },
+  summaryMetricValue: { fontSize: 14, lineHeight: 19, fontWeight: '800', fontVariant: ['tabular-nums'] },
   sectionTitle: { fontSize: 18, fontWeight: '800' },
   dateTitle: { fontSize: 17, fontWeight: '800', textTransform: 'capitalize' },
-  kind: { marginTop: 4, fontSize: 11, fontWeight: '800', letterSpacing: 0.9 },
-  duration: { fontSize: 16, fontWeight: '800' },
+  kind: { fontSize: 11, fontWeight: '800' },
+  sourceBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginTop: 5 },
+  durationValue: { alignItems: 'flex-end', gap: 1 },
+  duration: { fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  recordInfo: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 9, gap: 8 },
+  recordInfoItem: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  detailsToggle: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 4 },
   body: { fontSize: 14, lineHeight: 21 },
   detail: { fontSize: 13, lineHeight: 20 },
   detailStrong: { fontSize: 14, fontWeight: '800', lineHeight: 20 },

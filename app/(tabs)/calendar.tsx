@@ -48,7 +48,7 @@ import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
 import { listWorkDayStatuses, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
-import { getRecordRangeDifferenceMinutes } from '@/src/domain/work-record';
+import { formatDuration, getRecordRangeDifferenceMinutes } from '@/src/domain/work-record';
 import { calendarMarker, hasUnsavedPlanDraft } from '@/src/features/shifts/presentation';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { ActionButton } from '@/src/components/ui/ActionButton';
@@ -112,7 +112,7 @@ function Cell({
   const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
   return (
     <Pressable
-      accessibilityLabel={`${formatLocalDate(date)}, ${record ? 'Çalışma tamamlandı, ' : ''}${shiftLabel}${difference === null || difference === 0 ? '' : `, süre farkı ${difference > 0 ? 'artı ' : 'eksi '}${Math.abs(difference)} dakika`}`}
+      accessibilityLabel={`${formatLocalDate(date)}, ${record ? 'Çalışma tamamlandı, ' : ''}${shiftLabel}${difference === null || difference === 0 ? '' : `, mola dahil vardiya aralığı farkı ${difference > 0 ? 'artı ' : 'eksi '}${Math.abs(difference)} dakika`}`}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       hitSlop={{ left: 3, right: 3 }}
@@ -339,6 +339,12 @@ export default function CalendarScreen() {
             <Text accessible={false} style={{ color: theme.foreground, fontSize: 20, fontWeight: '800' }}>›</Text>
           </Pressable>
         </View>
+        {month !== monthForLocalDate(today) ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Bugünün tarihine dön" onPress={() => { setMonth(monthForLocalDate(today)); setSelectedDate(today); setMessage(null); }} style={styles.todayLink}>
+            <Ionicons accessible={false} name="today-outline" size={16} color={theme.accent} />
+            <Text style={[styles.todayLinkText, { color: theme.accent }]}>Bugüne dön</Text>
+          </Pressable>
+        ) : null}
 
         {loading ? (
           <View accessibilityLiveRegion="polite" style={styles.loading}>
@@ -397,10 +403,22 @@ export default function CalendarScreen() {
                 <ShiftKindBadge compact kind="OFF" />
                 <ShiftKindBadge compact kind="LEAVE" />
               </View>
+              <View style={[styles.statusLegend, { borderTopColor: theme.border }]}>
+                <LegendMark icon="checkmark-circle" label="Çalışıldı" color={theme.success} theme={theme} />
+                <LegendMark icon="medkit-outline" label="Rapor" color={theme.warning} theme={theme} />
+                <LegendMark icon="alert-circle-outline" label="Gidilmedi" color={theme.danger} theme={theme} />
+                <Text style={[styles.deltaLegend, { color: theme.muted }]}>+ / − vardiya aralığı (mola dahil)</Text>
+              </View>
             </View>
 
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.selectedDate, { color: theme.muted }]}>{formatLocalDate(selectedDate)}</Text>
+              <View style={styles.selectedHeader}>
+                <View style={styles.flex}>
+                  <Text style={[styles.selectedDate, { color: theme.muted }]}>{formatLocalDate(selectedDate)}</Text>
+                  <Text accessibilityRole="header" style={[styles.cardTitle, { color: theme.foreground }]}>{selectedDate === today ? 'Bugün' : 'Seçili gün'}</Text>
+                </View>
+                {selectedPlan || selectedRecords.length || selectedStatus ? <Ionicons accessible={false} name={selectedRecords.length ? 'checkmark-circle' : selectedStatus?.status === 'NOT_WORKED' ? 'alert-circle-outline' : 'calendar-outline'} size={23} color={selectedRecords.length ? theme.success : selectedStatus?.status === 'NOT_WORKED' ? theme.danger : theme.accent} /> : null}
+              </View>
               {selectedPlan ? (
                 <>
                   <ShiftKindBadge kind={selectedPlan.kind} template={selectedTemplate} />
@@ -411,9 +429,15 @@ export default function CalendarScreen() {
                   {selectedPlan.source === 'OVERRIDE' ? <Text style={[styles.overrideHint, { color: theme.accent }]}>Tek günlük istisna · diğer döngü günleri değişmez</Text> : null}
                 </>
               ) : null}
-              {selectedRecords.length ? <View style={[styles.actualRecords, { borderTopColor: theme.border }]}><Text style={[styles.fieldLabel, { color: theme.success }]}>Fiilî çalışma</Text>{selectedRecords.map((entry) => <Pressable key={entry.record.id} accessibilityRole="button" accessibilityLabel="Çalışma kaydını düzenle" onPress={() => router.push({ pathname: '/work-records', params: { recordId: entry.record.id } })} style={styles.actualRecord}><Ionicons name="checkmark-circle" size={17} color={theme.success} /><Text style={[styles.body, { color: theme.foreground }]}>{new Intl.DateTimeFormat('tr-TR', { timeZone: entry.record.timezone, hour: '2-digit', minute: '2-digit' }).format(new Date(entry.record.startedAtUtc))}–{new Intl.DateTimeFormat('tr-TR', { timeZone: entry.record.timezone, hour: '2-digit', minute: '2-digit' }).format(new Date(entry.record.endedAtUtc))} · {entry.record.breakMinutes} dk mola</Text><Ionicons name="chevron-forward" size={16} color={theme.muted} /></Pressable>)}</View> : null}
-              {selectedStatus ? <Text style={[styles.overrideHint, { color: theme.warning }]}>{selectedStatus.status === 'LEAVE' ? 'İzin' : selectedStatus.status === 'SICK_REPORT' ? 'Rapor' : 'Gidilmedi'}{selectedStatus.note ? ` · ${selectedStatus.note}` : ''}</Text> : null}
-              {cycle ? <ActionButton label={selectedPlan?.source === 'OVERRIDE' ? 'Gün istisnasını düzenle' : 'Bu günü değiştir'} onPress={() => void openOverrideEditor()} /> : null}
+              {selectedRecords.length ? <View style={[styles.actualRecords, { borderTopColor: theme.border }]}><Text style={[styles.fieldLabel, { color: theme.success }]}>Fiilî çalışma</Text>{selectedRecords.map((entry) => {
+                const startAt = new Date(entry.record.startedAtUtc);
+                const endAt = new Date(entry.record.endedAtUtc);
+                const actualMinutes = Math.max(0, Math.floor((endAt.getTime() - startAt.getTime()) / 60_000) - entry.record.breakMinutes);
+                const time = (value: Date) => new Intl.DateTimeFormat('tr-TR', { timeZone: entry.record.timezone, hour: '2-digit', minute: '2-digit' }).format(value);
+                return <Pressable key={entry.record.id} accessibilityRole="button" accessibilityLabel={`Çalışma kaydını düzenle: ${time(startAt)} ile ${time(endAt)}, ${formatDuration(actualMinutes)} çalışıldı, ${entry.record.breakMinutes} dakika mola`} onPress={() => router.push({ pathname: '/work-records', params: { recordId: entry.record.id } })} style={[styles.actualRecord, { backgroundColor: theme.successSurface }]}><Ionicons accessible={false} name="checkmark-circle" size={19} color={theme.success} /><View style={styles.flex}><Text style={[styles.body, { color: theme.foreground }]}>{time(startAt)}–{time(endAt)}</Text><Text style={[styles.actualSummary, { color: theme.muted }]}>{formatDuration(actualMinutes)} çalışıldı · {entry.record.breakMinutes} dk mola</Text></View><Ionicons accessible={false} name="chevron-forward" size={17} color={theme.muted} /></Pressable>;
+              })}</View> : null}
+              {selectedStatus ? <View style={styles.dayStatus}><Ionicons accessible={false} name={selectedStatus.status === 'NOT_WORKED' ? 'alert-circle-outline' : selectedStatus.status === 'SICK_REPORT' ? 'medkit-outline' : 'sunny-outline'} size={17} color={selectedStatus.status === 'NOT_WORKED' ? theme.danger : theme.warning} /><Text style={[styles.overrideHint, { color: theme.foreground }]}>{selectedStatus.status === 'LEAVE' ? 'İzin' : selectedStatus.status === 'SICK_REPORT' ? 'Rapor' : 'Gidilmedi'}{selectedStatus.note ? ` · ${selectedStatus.note}` : ''}</Text></View> : null}
+              {cycle ? <ActionButton label={selectedPlan?.source === 'OVERRIDE' ? 'Gün planını düzenle' : 'Gün planını değiştir'} onPress={() => void openOverrideEditor()} variant="secondary" /> : null}
               {selectedPlan?.kind === 'SHIFT' && cycle ? (
                 <ActionButton
                   label="Planlı vardiyadan kayıt ekle"
@@ -421,7 +445,7 @@ export default function CalendarScreen() {
                 />
               ) : null}
               <ActionButton label="Plansız çalışma kaydı ekle" onPress={() => router.push({ pathname: '/work-records', params: { action: 'manual', localDate: selectedDate } })} variant="secondary" />
-              <ActionButton label="Çalışma geçmişi" onPress={() => router.push('/work-records')} variant="secondary" />
+              <ActionButton label="Tüm çalışma geçmişi" onPress={() => router.push('/work-records')} variant="quiet" />
             </View>
           </>
         )}
@@ -479,6 +503,10 @@ export default function CalendarScreen() {
   );
 }
 
+function LegendMark({ icon, label, color, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; color: string; theme: Theme }) {
+  return <View style={styles.legendMark}><Ionicons accessible={false} name={icon} size={13} color={color} /><Text style={[styles.legendMarkText, { color: theme.muted }]}>{label}</Text></View>;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 22, paddingBottom: 28, gap: 16 },
@@ -487,6 +515,8 @@ const styles = StyleSheet.create({
   monthBar: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   monthArrow: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   monthTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', textTransform: 'capitalize' },
+  todayLink: { alignSelf: 'flex-end', minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8 },
+  todayLinkText: { fontSize: 13, fontWeight: '800' },
   calendarCard: { borderWidth: 1, borderRadius: 18, padding: 10, gap: 8 },
   weekRow: { flexDirection: 'row' },
   weekday: { width: '14.2857%', textAlign: 'center', paddingVertical: 5, fontSize: 12, fontWeight: '700' },
@@ -495,8 +525,13 @@ const styles = StyleSheet.create({
   dayCell: { width: '13.8%', minHeight: 66, marginHorizontal: '0.2%', padding: 4, borderWidth: 1, borderRadius: 9, gap: 5, alignItems: 'flex-start' },
   dayNumber: { fontSize: 13, fontWeight: '600' },
   legend: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 5, paddingTop: 6 },
+  statusLegend: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  legendMark: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 3 },
+  legendMarkText: { fontSize: 10, fontWeight: '700' },
+  deltaLegend: { fontSize: 10, fontWeight: '700' },
   card: { borderWidth: 1, borderRadius: 18, padding: 16, gap: 12 },
   cardTitle: { fontSize: 19, fontWeight: '800' },
+  selectedHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   body: { fontSize: 15, lineHeight: 22 },
   selectedDate: { fontSize: 15, fontWeight: '700', textTransform: 'capitalize' },
   shiftTime: { fontSize: 18, fontWeight: '800' },
@@ -516,6 +551,8 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 13, fontWeight: '700' },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 16 },
   actualRecords: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 8 },
-  actualRecord: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actualRecord: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 9, borderRadius: 12 },
+  actualSummary: { fontSize: 12, lineHeight: 17 },
+  dayStatus: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   flex: { flex: 1 },
 });

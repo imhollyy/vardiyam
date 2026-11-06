@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
@@ -191,7 +192,7 @@ export default function BackupScreen() {
       <Text style={[styles.body, { color: theme.muted }]}>Yedek cihazında oluşturulur. Vardiya, çalışma, ücret, bordro ve ödeme kayıtların içeride şifrelenir. Parolanı bu dosyadan ayrı ve güvenli yerde sakla; unutursan yedek açılamaz.</Text>
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text accessibilityRole="header" style={[styles.heading, { color: theme.foreground }]}>Şifreli yedek oluştur</Text>
+        <SectionHeading icon="lock-closed-outline" title="Şifreli yedek oluştur" theme={theme} />
         <Text style={[styles.body, { color: theme.muted }]}>En az 12 karakterlik bir parola belirle. Sonraki sistem menüsünde Dosyalar veya başka bir konuma kaydedebilirsin.</Text>
         <TextInput accessibilityLabel="Yeni yedek parolası" value={exportPassword} onChangeText={setExportPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
         <TextInput accessibilityLabel="Yedek parolası onayı" value={exportConfirm} onChangeText={setExportConfirm} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Parolayı tekrar yaz" placeholderTextColor={theme.muted} />
@@ -199,7 +200,7 @@ export default function BackupScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text accessibilityRole="header" style={[styles.heading, { color: theme.foreground }]}>Yedekten geri yükle</Text>
+        <SectionHeading icon="cloud-download-outline" title="Yedekten geri yükle" theme={theme} />
         <Text style={[styles.body, { color: theme.muted }]}>Yedek dosyanı seçip parolasını gir. Dosya doğrulanmadan mevcut veriler değişmez.</Text>
         <TextInput accessibilityLabel="Yedek dosyasının parolası" value={restorePassword} onChangeText={setRestorePassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
         <Action label="Yedek dosyası seç ve doğrula" disabled={busy || maintenanceBusy} onPress={() => void chooseBackup()} theme={theme} />
@@ -215,8 +216,8 @@ export default function BackupScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text accessibilityRole="header" style={[styles.heading, { color: theme.foreground }]}>Tüm verilerimi sil</Text>
-        <Text style={[styles.body, { color: theme.muted }]}>Yerel veritabanı kapatılır, uygulama verileri ve SQLite yan dosyaları kaldırılır, ardından boş v6 veritabanı açılır. Telefon hafızasındaki fiziksel blokların adli düzeyde üzerine yazılacağı garanti edilemez.</Text>
+        <SectionHeading icon="trash-outline" title="Tüm verilerimi sil" theme={theme} />
+        <Text style={[styles.body, { color: theme.muted }]}>Yerel veritabanı kapatılır, uygulama verileri ve SQLite yan dosyaları kaldırılır, ardından boş v{CURRENT_SCHEMA_VERSION} veritabanı açılır. Telefon hafızasındaki fiziksel blokların adli düzeyde üzerine yazılacağı garanti edilemez.</Text>
         <Action label="Tüm verilerimi sil…" disabled={busy || maintenanceBusy} onPress={startWipe} theme={theme} destructive />
       </View>
 
@@ -241,11 +242,18 @@ function Action({ label, disabled, onPress, theme, destructive = false }: {
   );
 }
 
+function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; theme: Theme }) {
+  return <View style={styles.sectionHeading} accessibilityRole="header"><View style={[styles.sectionIcon, { backgroundColor: theme.accentSurface }]}><Ionicons accessible={false} name={icon} size={19} color={theme.accent} /></View><Text style={[styles.heading, styles.sectionTitle, { color: theme.foreground }]}>{title}</Text></View>;
+}
+
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 16, paddingBottom: 36 },
   back: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
   title: { fontSize: 27, lineHeight: 34, fontWeight: '800' },
   heading: { fontSize: 18, lineHeight: 24, fontWeight: '800' },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sectionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { flexShrink: 1 },
   body: { fontSize: 14, lineHeight: 21 },
   card: { borderWidth: 1, borderRadius: 18, padding: 16, gap: 12 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 16 },
