@@ -41,6 +41,7 @@ import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
+import { ActionButton } from '@/src/components/ui/ActionButton';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 type FormDraft = {
@@ -67,31 +68,6 @@ type BreakDraft = {
 
 function routeValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function Button({ label, onPress, theme, secondary = false, disabled = false }: {
-  label: string;
-  onPress: () => void;
-  theme: Theme;
-  secondary?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [styles.button, {
-        backgroundColor: secondary ? theme.surface : theme.accent,
-        borderColor: secondary ? theme.border : theme.accent,
-        opacity: disabled ? 0.5 : pressed ? 0.72 : 1,
-      }]}
-    >
-      <Text style={{ color: secondary ? theme.foreground : theme.surface, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
-    </Pressable>
-  );
 }
 
 function Field({ label, value, onChangeText, theme, keyboardType = 'default', multiline = false, editable = true, hint }: {
@@ -489,8 +465,8 @@ export default function WorkRecordsScreen() {
         ) : null}
         {workRecord.note ? <Text style={[styles.body, { color: theme.muted }]}>{workRecord.note}</Text> : null}
         <View style={styles.actions}>
-          <Button label="Düzenle" onPress={() => void openEditForm(workRecord.id)} theme={theme} secondary />
-          <Button label={deleting ? 'Siliniyor…' : 'Sil'} onPress={() => confirmDelete(workRecord)} theme={theme} secondary disabled={deleting} />
+          <ActionButton label="Düzenle" onPress={() => void openEditForm(workRecord.id)} variant="secondary" />
+          <ActionButton label={deleting ? 'Siliniyor…' : 'Sil'} onPress={() => confirmDelete(workRecord)} variant="secondary" disabled={deleting} />
         </View>
       </View>
     );
@@ -592,7 +568,7 @@ export default function WorkRecordsScreen() {
                 />
               </View>
             ))}
-            <Button label="Zamanlı mola ekle" onPress={addBreakDraft} theme={theme} secondary />
+            <ActionButton label="Zamanlı mola ekle" onPress={addBreakDraft} variant="secondary" />
           </View>
           <Field label="Not (isteğe bağlı)" value={draft.note} onChangeText={(note) => setDraft({ ...draft, note })} theme={theme} multiline />
           <Text style={[styles.detail, { color: theme.muted }]}>{elapsedMinutes === null ? 'Zaman aralığını kontrol et.' : elapsedMinutes > 0 ? `Toplam aralık: ${formatDuration(elapsedMinutes)} · Mola sonrası: ${formatDuration(elapsedMinutes - Number(draft.breakMinutes || 0))}` : 'Bitiş, başlangıçtan sonra olmalıdır.'}</Text>
@@ -603,13 +579,12 @@ export default function WorkRecordsScreen() {
             </Text>
           ) : null}
           {error ? <Text accessibilityRole="alert" style={[styles.error, { color: errorColor }]}>{error}</Text> : null}
-          <Button
+          <ActionButton
             label={saving ? 'Kaydediliyor…' : record ? 'Değişiklikleri kaydet' : 'Çalışma kaydını kaydet'}
             onPress={() => void save()}
-            theme={theme}
             disabled={saving || (candidateCount(`${draft.startDate}T${draft.startTime}`, draft.timezone) > 1 && !draft.startOccurrence) || (candidateCount(`${draft.endDate}T${draft.endTime}`, draft.timezone) > 1 && !draft.endOccurrence)}
           />
-          <Button label="Vazgeç" onPress={cancelForm} theme={theme} secondary disabled={saving} />
+          <ActionButton label="Vazgeç" onPress={cancelForm} variant="secondary" disabled={saving} />
         </View>
       </ScrollView>
     );
@@ -624,7 +599,7 @@ export default function WorkRecordsScreen() {
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Henüz çalışma kaydı yok</Text>
           <Text style={[styles.body, { color: theme.muted }]}>İster vardiya planından başlat, ister plansız çalışmanı kendin ekle.</Text>
-          <Button label="Plansız çalışma ekle" onPress={() => openManualForm()} theme={theme} />
+          <ActionButton label="Plansız çalışma ekle" onPress={() => openManualForm()} />
         </View>
       )}
       ListHeaderComponent={(
@@ -632,7 +607,7 @@ export default function WorkRecordsScreen() {
           {header}
           {error ? <Text accessibilityRole="alert" style={[styles.error, { color: errorColor }]}>{error}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{message}</Text> : null}
-          <Button label="Plansız çalışma ekle" onPress={() => openManualForm()} theme={theme} />
+          <ActionButton label="Plansız çalışma ekle" onPress={() => openManualForm()} />
         </>
       )}
       renderItem={renderRecord}
@@ -671,7 +646,6 @@ const styles = StyleSheet.create({
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   occurrenceChoice: { minHeight: 44, paddingHorizontal: 12, borderWidth: 1, borderRadius: 12, justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 10 },
-  button: { minHeight: 48, flexGrow: 1, paddingHorizontal: 14, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   success: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 24 },

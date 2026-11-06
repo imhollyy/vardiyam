@@ -380,6 +380,7 @@ export default function SettingsScreen() {
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Görünüm ve hızlı erişim</Text>
         <Action label={mode === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} onPress={() => void toggleMode()} theme={theme} secondary />
+        <Action label="Hesap: giriş veya kayıt seçenekleri" onPress={() => router.push('/account' as never)} theme={theme} secondary />
         <Action label="Ücret ve işyeri ayarları" onPress={() => router.push('/earnings-settings' as never)} theme={theme} secondary />
         <Action label="Net ödemeler" onPress={() => router.push('/net-payments' as never)} theme={theme} secondary />
       </View>

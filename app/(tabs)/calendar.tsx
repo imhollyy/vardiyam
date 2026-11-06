@@ -51,36 +51,12 @@ import { listWorkDayStatuses, type WorkDayStatusEntry } from '@/src/data/workSes
 import { getRecordRangeDifferenceMinutes } from '@/src/domain/work-record';
 import { calendarMarker, hasUnsavedPlanDraft } from '@/src/features/shifts/presentation';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { ActionButton } from '@/src/components/ui/ActionButton';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 type OverrideKind = PlanOverride['kind'];
 
 const WEEKDAYS = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
-
-function Button({ label, onPress, theme, secondary = false, disabled = false }: {
-  label: string;
-  onPress: () => void;
-  theme: Theme;
-  secondary?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [styles.button, {
-        backgroundColor: secondary ? theme.surface : theme.accent,
-        borderColor: secondary ? theme.border : theme.accent,
-        opacity: disabled ? 0.5 : pressed ? 0.72 : 1,
-      }]}
-    >
-      <Text style={{ color: secondary ? theme.foreground : theme.surface, fontWeight: '800', fontSize: 15, textAlign: 'center' }}>{label}</Text>
-    </Pressable>
-  );
-}
 
 function Choice({ label, selected, onPress, theme }: {
   label: string;
@@ -372,18 +348,18 @@ export default function CalendarScreen() {
         ) : error && !cycle ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text accessibilityRole="alert" style={[styles.body, { color: theme.foreground }]}>{error}</Text>
-            <Button label="Tekrar dene" onPress={() => void load()} theme={theme} />
+            <ActionButton label="Tekrar dene" onPress={() => void load()} />
           </View>
         ) : !cycle && !records.length && !statuses.length ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.cardTitle, { color: theme.foreground }]}>Henüz vardiya düzeni yok</Text>
             <Text style={[styles.body, { color: theme.muted }]}>Takvimini görmek için önce vardiya şablonlarını ve döngünü oluştur.</Text>
-            <Button label="Vardiya düzeni oluştur" onPress={() => router.push('/(tabs)/settings')} theme={theme} />
+            <ActionButton label="Vardiya düzeni oluştur" onPress={() => router.push('/(tabs)/settings')} />
           </View>
         ) : error ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text accessibilityRole="alert" style={[styles.body, { color: theme.foreground }]}>{error}</Text>
-            <Button label="Tekrar dene" onPress={() => void load()} theme={theme} />
+            <ActionButton label="Tekrar dene" onPress={() => void load()} />
           </View>
         ) : (
           <>
@@ -437,16 +413,15 @@ export default function CalendarScreen() {
               ) : null}
               {selectedRecords.length ? <View style={[styles.actualRecords, { borderTopColor: theme.border }]}><Text style={[styles.fieldLabel, { color: theme.success }]}>Fiilî çalışma</Text>{selectedRecords.map((entry) => <Pressable key={entry.record.id} accessibilityRole="button" accessibilityLabel="Çalışma kaydını düzenle" onPress={() => router.push({ pathname: '/work-records', params: { recordId: entry.record.id } })} style={styles.actualRecord}><Ionicons name="checkmark-circle" size={17} color={theme.success} /><Text style={[styles.body, { color: theme.foreground }]}>{new Intl.DateTimeFormat('tr-TR', { timeZone: entry.record.timezone, hour: '2-digit', minute: '2-digit' }).format(new Date(entry.record.startedAtUtc))}–{new Intl.DateTimeFormat('tr-TR', { timeZone: entry.record.timezone, hour: '2-digit', minute: '2-digit' }).format(new Date(entry.record.endedAtUtc))} · {entry.record.breakMinutes} dk mola</Text><Ionicons name="chevron-forward" size={16} color={theme.muted} /></Pressable>)}</View> : null}
               {selectedStatus ? <Text style={[styles.overrideHint, { color: theme.warning }]}>{selectedStatus.status === 'LEAVE' ? 'İzin' : selectedStatus.status === 'SICK_REPORT' ? 'Rapor' : 'Gidilmedi'}{selectedStatus.note ? ` · ${selectedStatus.note}` : ''}</Text> : null}
-              {cycle ? <Button label={selectedPlan?.source === 'OVERRIDE' ? 'Gün istisnasını düzenle' : 'Bu günü değiştir'} onPress={() => void openOverrideEditor()} theme={theme} /> : null}
+              {cycle ? <ActionButton label={selectedPlan?.source === 'OVERRIDE' ? 'Gün istisnasını düzenle' : 'Bu günü değiştir'} onPress={() => void openOverrideEditor()} /> : null}
               {selectedPlan?.kind === 'SHIFT' && cycle ? (
-                <Button
+                <ActionButton
                   label="Planlı vardiyadan kayıt ekle"
                   onPress={() => router.push({ pathname: '/work-records', params: { action: 'planned', cycleId: cycle.id, localDate: selectedDate } })}
-                  theme={theme}
                 />
               ) : null}
-              <Button label="Plansız çalışma kaydı ekle" onPress={() => router.push({ pathname: '/work-records', params: { action: 'manual', localDate: selectedDate } })} theme={theme} secondary />
-              <Button label="Çalışma geçmişi" onPress={() => router.push('/work-records')} theme={theme} secondary />
+              <ActionButton label="Plansız çalışma kaydı ekle" onPress={() => router.push({ pathname: '/work-records', params: { action: 'manual', localDate: selectedDate } })} variant="secondary" />
+              <ActionButton label="Çalışma geçmişi" onPress={() => router.push('/work-records')} variant="secondary" />
             </View>
           </>
         )}
@@ -494,8 +469,8 @@ export default function CalendarScreen() {
               </View>
               <Text style={[styles.overrideHint, { color: theme.muted }]}>Bu değişiklik yalnız seçili günü etkiler. OFF, yasal hafta tatili anlamına gelmez.</Text>
               {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
-              <Button label={saving ? 'Kaydediliyor…' : editingOverride ? 'Değişikliği kaydet' : 'Gün istisnasını kaydet'} onPress={() => void saveOverride()} theme={theme} disabled={saving} />
-              {editingOverride ? <Button label="İstisnayı kaldır" onPress={removeOverride} theme={theme} secondary={true} disabled={saving} /> : null}
+              <ActionButton label={saving ? 'Kaydediliyor…' : editingOverride ? 'Değişikliği kaydet' : 'Gün istisnasını kaydet'} onPress={() => void saveOverride()} disabled={saving} />
+              {editingOverride ? <ActionButton label="İstisnayı kaldır" onPress={removeOverride} variant="secondary" disabled={saving} /> : null}
             </ScrollView>
           </View>
         </View>
@@ -526,7 +501,6 @@ const styles = StyleSheet.create({
   selectedDate: { fontSize: 15, fontWeight: '700', textTransform: 'capitalize' },
   shiftTime: { fontSize: 18, fontWeight: '800' },
   overrideHint: { fontSize: 13, lineHeight: 19 },
-  button: { minHeight: 48, paddingHorizontal: 16, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   loading: { minHeight: 160, alignItems: 'center', justifyContent: 'center', gap: 12 },
   success: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   error: { fontSize: 14, fontWeight: '700', lineHeight: 20 },

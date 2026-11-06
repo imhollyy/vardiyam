@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -15,6 +15,7 @@ import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalT
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { colors } from '@/src/theme/tokens';
 import { calendarMarker, canStartClockIn } from '@/src/features/shifts/presentation';
+import { ActionButton as SharedActionButton } from '@/src/components/ui/ActionButton';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 const ZONE = 'Europe/Istanbul';
@@ -72,19 +73,6 @@ function durationShort(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
   return hours > 0 ? `${hours}sa${remainder ? ` ${remainder}dk` : ''}` : `${remainder}dk`;
-}
-
-function ActionButton({ label, icon, color, disabled, onPress, theme, accessibilityLabel }: {
-  label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; disabled: boolean; onPress: () => void; theme: Theme; accessibilityLabel: string;
-}) {
-  const actionText = theme === colors.dark ? theme.background : '#FFFFFF';
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled}
-      onPress={onPress} style={({ pressed }) => [styles.actionCard, { backgroundColor: disabled ? theme.surface : color, borderColor: disabled ? theme.border : color, opacity: pressed ? 0.82 : 1 }]}>
-      <Ionicons accessible={false} name={icon} size={20} color={disabled ? theme.muted : actionText} />
-      <Text style={[styles.actionLabel, { color: disabled ? theme.muted : actionText }]}>{label}</Text>
-    </Pressable>
-  );
 }
 
 function MiniCell({ date, plan, template, status, record, selected, onPress, theme }: {
@@ -329,13 +317,9 @@ export default function TodayScreen() {
     finally { setSaving(false); }
   };
 
-  const openAccountSettings = () => { setMenu(null); router.push('/earnings-settings'); };
+  const openAccount = () => { setMenu(null); router.push('/account'); };
+  const openEarningsSettings = () => { setMenu(null); router.push('/earnings-settings'); };
   const openAppSettings = () => { setMenu(null); router.push('/(tabs)/settings'); };
-  const exitApp = () => {
-    setMenu(null);
-    if (Platform.OS === 'android') BackHandler.exitApp();
-    else Alert.alert('Çıkış', 'Bu sürümde kullanıcı hesabı bulunmuyor. Uygulamadan cihazının ana ekranına dönerek çıkabilirsin.');
-  };
 
   const statusForDate = (date: string) => recordsByDate.has(date) ? undefined : statuses.get(date)?.status;
   const openTimePicker = (field: 'start' | 'end') => {
@@ -418,12 +402,12 @@ export default function TodayScreen() {
             <View style={[styles.actionColumn, styles.flex]}>
               <Text style={[styles.timeLabel, { color: theme.muted }]}>Başlangıç</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={`Başlangıç saatini seç, ${visibleStartTime}`} accessibilityState={{ disabled: Boolean(active) || saving }} disabled={Boolean(active) || saving} onPress={() => openTimePicker('start')} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: theme.border }]}><Ionicons name="time-outline" size={17} color={theme.accent} /><Text style={{ color: theme.foreground, fontSize: 16, fontWeight: '800' }}>{visibleStartTime}</Text><Ionicons name="chevron-down" size={15} color={theme.muted} /></Pressable>
-              <ActionButton accessibilityLabel={active ? 'Mesai zaten başladı' : todayRecordAlreadyCompleted ? 'Bugünün çalışması tamamlandı' : 'Mesaiye başla'} label={todayRecordAlreadyCompleted ? 'Bugün tamamlandı' : 'Mesaiye Başla'} icon={todayRecordAlreadyCompleted ? 'checkmark-circle-outline' : 'play-circle-outline'} color={theme.success} disabled={!canStartClockIn(Boolean(active) || saving, todayRecordAlreadyCompleted)} onPress={() => void startShift()} theme={theme} />
+              <SharedActionButton accessibilityLabel={active ? 'Mesai zaten başladı' : todayRecordAlreadyCompleted ? 'Bugünün çalışması tamamlandı' : 'Mesaiye başla'} label={todayRecordAlreadyCompleted ? 'Bugün tamamlandı' : 'Mesaiye Başla'} icon={todayRecordAlreadyCompleted ? 'checkmark-circle-outline' : 'play-circle-outline'} variant="success" compact neutralWhenDisabled disabled={!canStartClockIn(Boolean(active) || saving, todayRecordAlreadyCompleted)} onPress={() => void startShift()} />
             </View>
             <View style={[styles.actionColumn, styles.flex]}>
               <Text style={[styles.timeLabel, { color: theme.muted }]}>Bitiş</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={`Bitiş saatini seç, ${visibleEndTime}`} accessibilityState={{ disabled: !active || saving }} disabled={!active || saving} onPress={() => openTimePicker('end')} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: theme.border }]}><Ionicons name="time-outline" size={17} color={theme.accent} /><Text style={{ color: theme.foreground, fontSize: 16, fontWeight: '800' }}>{visibleEndTime}</Text><Ionicons name="chevron-down" size={15} color={theme.muted} /></Pressable>
-              <ActionButton accessibilityLabel={active ? 'Mesaiyi bitir' : 'Mesai başlamadan bitirme kapalı'} label="Mesaiyi Bitir" icon="stop-circle-outline" color={theme.danger} disabled={!active || saving} onPress={() => void finishShift()} theme={theme} />
+              <SharedActionButton accessibilityLabel={active ? 'Mesaiyi bitir' : 'Mesai başlamadan bitirme kapalı'} label="Mesaiyi Bitir" icon="stop-circle-outline" variant="destructive" compact neutralWhenDisabled disabled={!active || saving} onPress={() => void finishShift()} />
             </View>
           </View>
           {active && activeStartLocal ? <Text style={[styles.clockCaption, { color: theme.muted }]}>Başlangıç kaydı {shortDate(active.startedLocalDate)} · {activeStartLocal.slice(11)} · {active.timezone}</Text> : null}
@@ -546,10 +530,10 @@ export default function TodayScreen() {
             <Text style={{ color: theme.muted, lineHeight: 21 }}>Henüz bildirimin yok.</Text>
             <MenuRow label="Kapat" onPress={() => setMenu(null)} theme={theme} />
           </> : <>
-            <Text accessibilityRole="header" style={[styles.menuTitle, { color: theme.foreground }]}>Yerel profil</Text>
-            <MenuRow label="Ücret ve işyeri ayarları" onPress={openAccountSettings} theme={theme} />
+            <Text accessibilityRole="header" style={[styles.menuTitle, { color: theme.foreground }]}>Hesap ve ayarlar</Text>
+            <MenuRow label="Giriş yap veya hesap oluştur" onPress={openAccount} theme={theme} />
+            <MenuRow label="Ücret ve işyeri ayarları" onPress={openEarningsSettings} theme={theme} />
             <MenuRow label="Uygulama Ayarları" onPress={openAppSettings} theme={theme} />
-            <MenuRow label="Çıkış" onPress={exitApp} theme={theme} destructive />
           </>}
         </View>
       </View> : null}
@@ -579,7 +563,7 @@ const styles = StyleSheet.create({
   iconButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, iconText: { fontSize: 21, fontWeight: '700' }, avatarButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 17 },
   weekCard: { borderWidth: 1, borderRadius: 22, padding: 16, gap: 12 }, weekHeadingRow: { flexDirection: 'row', alignItems: 'flex-start' }, cardEyebrow: { color: '#B9CBFF', fontSize: 11, letterSpacing: 1.4, fontWeight: '800' }, weekTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginTop: 3 }, weekRange: { color: '#D4DEFA', fontSize: 13, textTransform: 'capitalize', marginTop: 3 }, weekIcon: { color: '#C7D5FF', fontSize: 36, padding: 5 },
   weekStrip: { flexDirection: 'row', gap: 6 }, weekDay: { flex: 1, minHeight: 47, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF1A' }, weekDayToday: { backgroundColor: '#FFFFFF' }, weekDayName: { color: '#D4DEFA', fontSize: 11, fontWeight: '700' }, weekDayTodayText: { color: '#233A72' }, weekSummary: { borderTopWidth: 1, borderTopColor: '#FFFFFF2A', paddingTop: 10, gap: 4 }, weekSummaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 }, todayShiftLabel: { color: '#D4DEFA', fontSize: 13, lineHeight: 19 },
-  actionSection: { gap: 12 }, sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sectionTitle: { fontSize: 21, fontWeight: '800' }, sectionCaption: { fontSize: 13, lineHeight: 19 }, livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, fontSize: 10 }, liveDot: { width: 7, height: 7, borderRadius: 4 }, actionsRow: { flexDirection: 'row', gap: 10 }, actionColumn: { gap: 8, minWidth: 0 }, timeLabel: { fontSize: 12, fontWeight: '700' }, timeInput: { minHeight: 42, borderWidth: 1, borderRadius: 12, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, actionCard: { minHeight: 64, borderWidth: 1, borderRadius: 16, justifyContent: 'center', alignItems: 'center', padding: 8, gap: 3 }, actionIcon: { fontSize: 19, fontWeight: '900' }, actionLabel: { fontSize: 13, fontWeight: '800', textAlign: 'center' }, clockCaption: { fontSize: 12, lineHeight: 18 }, saving: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 6 }, feedback: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  actionSection: { gap: 12 }, sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sectionTitle: { fontSize: 21, fontWeight: '800' }, sectionCaption: { fontSize: 13, lineHeight: 19 }, livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, fontSize: 10 }, liveDot: { width: 7, height: 7, borderRadius: 4 }, actionsRow: { flexDirection: 'row', gap: 10 }, actionColumn: { gap: 8, minWidth: 0 }, timeLabel: { fontSize: 12, fontWeight: '700' }, timeInput: { minHeight: 42, borderWidth: 1, borderRadius: 12, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, clockCaption: { fontSize: 12, lineHeight: 18 }, saving: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 6 }, feedback: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
   choicesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, choice: { minHeight: 44, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, justifyContent: 'center' },
   calendarHeader: { gap: 10 }, monthControls: { flexDirection: 'row', alignItems: 'center', gap: 7 }, monthButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, monthTitle: { flex: 1, minWidth: 94, fontSize: 15, fontWeight: '800', textAlign: 'center', textTransform: 'capitalize' }, calendarCard: { borderWidth: 1, borderRadius: 20, padding: 10, gap: 9 }, calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.2857%', textAlign: 'center', fontSize: 11, fontWeight: '700', paddingVertical: 6 }, dayCell: { width: '14.2857%', minHeight: 53, alignItems: 'center', justifyContent: 'flex-start', paddingVertical: 4, gap: 1, borderWidth: 1, borderColor: 'transparent', borderRadius: 10 }, dayNumber: { fontSize: 13, fontWeight: '700' }, dayMarker: { fontSize: 13, fontWeight: '900', lineHeight: 16 }, markerSpacer: { height: 16 }, delta: { fontSize: 9, fontWeight: '800' }, legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 5 }, legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 }, legendDot: { width: 8, height: 8, borderRadius: 4 },
   loading: { minHeight: 140, alignItems: 'center', justifyContent: 'center', gap: 10 }, emptyCard: { borderWidth: 1, borderRadius: 18, padding: 17, gap: 10 }, cardTitle: { fontSize: 17, fontWeight: '800' }, linkButton: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 }, linkButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' }, secondaryLink: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
