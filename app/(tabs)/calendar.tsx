@@ -25,7 +25,6 @@ import {
   listShiftTemplates,
 } from '@/src/data/shiftCycleRepository';
 import {
-  daysInMonth,
   formatLocalDate,
   formatMonthTitle,
   getLocalToday,
@@ -33,7 +32,6 @@ import {
   localDateForMonthDay,
   monthForLocalDate,
   monthRange,
-  mondayFirstOffset,
   shiftYearMonth,
 } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
@@ -41,7 +39,7 @@ import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
 import { listWorkDayStatuses, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
 import { formatDuration, getRecordRangeDifferenceMinutes } from '@/src/domain/work-record';
-import { calendarMarker } from '@/src/features/shifts/presentation';
+import { calendarCellAccessibilityLabel, calendarMarker, calendarMonthSlots } from '@/src/features/shifts/presentation';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { DayEditSheet } from '@/src/components/shifts/DayEditSheet';
@@ -80,7 +78,7 @@ function Cell({
   const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
   return (
     <Pressable
-      accessibilityLabel={`${formatLocalDate(date)}, ${record ? 'Çalışma tamamlandı, ' : ''}${shiftLabel}${difference === null || difference === 0 ? '' : `, mola dahil vardiya aralığı farkı ${difference > 0 ? 'artı ' : 'eksi '}${Math.abs(difference)} dakika`}`}
+      accessibilityLabel={calendarCellAccessibilityLabel(formatLocalDate(date), shiftLabel, Boolean(record), difference)}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       hitSlop={{ left: 3, right: 3 }}
@@ -170,8 +168,7 @@ export default function CalendarScreen() {
   const selectedTemplate = selectedPlan?.kind === 'SHIFT'
     ? templates.find((template) => template.id === selectedPlan.templateId)
     : undefined;
-  const blankCells = useMemo(() => Array.from({ length: mondayFirstOffset(month) }, (_, index) => `blank-${index}`), [month]);
-  const monthDays = useMemo(() => Array.from({ length: daysInMonth(month) }, (_, index) => index + 1), [month]);
+  const monthSlots = useMemo(() => calendarMonthSlots(month), [month]);
   const recordsByDate = useMemo(() => {
     const grouped = new Map<string, WorkRecordWithTimedBreaks[]>();
     for (const item of records) {
@@ -248,13 +245,12 @@ export default function CalendarScreen() {
                 {WEEKDAYS.map((label) => <Text key={label} accessibilityLabel={label} style={[styles.weekday, { color: theme.muted }]}>{label}</Text>)}
               </View>
               <View style={styles.grid}>
-                {blankCells.map((key) => <View key={key} style={styles.blankCell} />)}
-                {monthDays.map((dayNumber) => {
-                  const date = localDateForMonthDay(month, dayNumber);
+                {monthSlots.map((slot) => {
+                  if (!slot.interactive) return <View key={slot.key} style={styles.blankCell} />;
+                  const date = slot.date;
                   const item = daysByDate.get(date);
                   const record = recordsByDate.get(date)?.[0];
                   const status = statusesByDate.get(date);
-                  if (!item && !record && !status) return <View key={date} style={styles.blankCell} />;
                   const template = item?.kind === 'SHIFT' ? templates.find((candidate) => candidate.id === item.templateId) : undefined;
                   return (
                     <Cell

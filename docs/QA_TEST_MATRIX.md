@@ -463,3 +463,16 @@ No SQLite schema/migrations, recovery/backup flow, financial calculations, or pa
 | Device UI, VoiceOver/TalkBack, actual unsaved prompt interaction | NOT RUN | No physical-device acceptance in this review pass. |
 | Earnings runtime console error | UNVERIFIED | No device log supplied. Historic Today date stack is separate; do not mark Earnings issue fixed. |
 | GitHub CI for follow-up code commit | PASS | Actions run #42621544548, “Verify Expo scaffold”, SHA `38ec5c412e36062e283c5b6f8d738099c9749734`. |
+
+### VDY-014 PR #39 empty calendar date follow-up (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Every actual day in February 2026 month slots remains interactive even with no data | PASS | `calendarMonthSlots`; all 28 dates are `kind: day, interactive: true`. |
+| Leading Monday-first alignment padding remains noninteractive | PASS | Same test; six February 2026 pad slots remain separate `interactive: false` views. |
+| Empty date accessible name and marker | PASS | “Plan yok” label + muted `remove-outline`; real slot maps to Cell Pressable and opens shared editor. |
+| SQLite v9/schema and repository behavior | PASS (unchanged) | No DB/repository/migration files changed in this follow-up. |
+| TypeScript / ESLint / full unit suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` **294/294**. |
+| Independent UI review | PENDING | Awaiting final reviewer response for this commit. |
+| GitHub CI | PENDING | Awaiting run for the calendar follow-up commit. |
+| Device/TalkBack/VoiceOver | NOT RUN | No physical-device test in this turn. |

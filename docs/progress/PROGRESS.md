@@ -676,3 +676,11 @@ NEXT ACTION:
 - Independent R2 review complete: UI/accessibility reviewer **APPROVE** with no static P0/P1/P2; data-safety reviewer **APPROVE** after v9 compatibility correction with no static P0/P1/P2.
 - GitHub Actions run #42621544548 “Verify Expo scaffold” **PASS** for follow-up code commit `38ec5c412e36062e283c5b6f8d738099c9749734`. Full local validation remains typecheck/lint PASS, tests 291/291, Android/iOS Hermes exports PASS, diff check PASS.
 - NEXT ACTION: Preview the draft PR on iPhone; investigate the separate Earnings runtime report only when its device log is available.
+
+### 2026-11-09 — VDY-014 PR #39 EMPTY CALENDAR DAYS
+
+- Latest PR review found that real dates without plan/record/status rendered as inert blanks. `calendarMonthSlots` now distinguishes alignment padding (`interactive: false`) from every real date (`interactive: true`); Calendar maps real dates to the existing `Cell` Pressable, which opens the shared `DayEditSheet`. Empty dates show the muted marker and screen-reader label “Plan yok”. Padding generation/layout and SQLite v9 are unchanged.
+- Skills: `vardiyam-ui-quality` and `vardiyam-data-safety` v1.0 read/applied; `vardiyam-test-gate` v1.0 used to choose full suite plus typecheck/lint/CI. UI UX Pro Max 2.15.0 local search command: `python .agents/skills/ui-ux-pro-max/scripts/search.py "calendar accessible tappable empty day cells" --domain ux`; results emphasized named interactive controls and nonblank empty state. Applied an accessible date + “Plan yok” label and existing native `Pressable`/theme marker.
+- Regression tests cover all February 2026 real days as interactive slots, six Monday-first alignment cells as noninteractive, and empty-day accessible label/marker.
+- Local verification: typecheck PASS, lint PASS, full tests **294/294 PASS**, `git diff --check` pending commit. Device/TalkBack NOT RUN. Awaiting independent UI re-review and GitHub CI for this follow-up commit.
+- NEXT ACTION: Commit/push the focused calendar selection fix and record PR #39 CI.
