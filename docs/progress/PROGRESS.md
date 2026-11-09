@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-09
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-015B — kolay vardiya kurulumu ve 30 günlük önizleme
-- **Durum:** IMPLEMENTATION DONE / gerçek kullanıcı cihaz kabulini bekliyor. PR #39 head `d58ab0d1c49b1cde4013fe70e01c01988d3e6445` doğrulandı. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`, dal `feat/vdy-015b-easy-shift-onboarding`. Kaynak worktree'deki `.gitignore`, `expo-env.d.ts`, VDY-015A raporu ve kullanıcı değişiklikleri korunuyor. Taslak PR #41 ve GitHub CI run #60 PASS. Fiziksel cihaz kabul testi yapılmadı.
+- **Durum:** VDY-015B P1 kullanıcı durum regresyonu düzeltildi; commit/PR CI teslimatı devam ediyor. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`, dal `feat/vdy-015b-easy-shift-onboarding`. Ana/önceki worktree'nin `.gitignore`, `expo-env.d.ts`, VDY-015A raporu ve kullanıcı değişiklikleri korunuyor. PR #41 taslak kalacak. Fiziksel cihaz kabul testi yapılmadı.
 - **Aktif branch:** feat/vdy-015b-easy-shift-onboarding
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. Taslak PR #41 için iPhone/Expo Go kullanıcı kabulini yap. Takvim önizlemesi, native picker, ücret adımını atlama ve kayıtlı döngüyü düzenleme kabul edilmeden VDY-015C'ye geçme.
+1. PR #41 regresyon düzeltmesi CI'ını doğrula; ardından iPhone/Expo Go kullanıcı kabulini yap. VDY-015C'ye otomatik geçme.
 
 ### 2026-11-07 — VDY-014 — IMPLEMENTATION / VERIFICATION CHECKPOINT
 
@@ -716,3 +716,12 @@ NEXT ACTION:
 - PR #41 is open/draft/unmerged against PR #39's head branch. Implementation commit `f2c81afebca9850dca8edbc1a565652df60a4b53`; GitHub Actions CI run #60 (`42668995724`) PASS (locked install, typecheck, lint, unit tests, dependency health). PR body includes verification and NOT RUN disclosures. No merge/rebase/force-push/release.
 - Real Android/iOS user acceptance, screenshots, large text and TalkBack/VoiceOver NOT RUN. Source worktree local changes remain untouched. The copied VDY-015A report is preserved locally and excluded from selected commit.
 - NEXT ACTION: User performs iPhone/Expo Go acceptance from `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`; do not start VDY-015C until the 30-day preview and save flow are accepted.
+
+### 2026-11-09 — VDY-015B — PR #41 COMPLETION STATE REGRESSION FIX
+
+- Read the latest PR review finding (P1): Settings/onboarding progress writes could persist `completed:false` for an already configured user, causing `app/index.tsx` to route into required onboarding on next launch.
+- Skills for this correction: `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-test-gate` read and applied. Change is metadata state protection, so UI/Pro Max is not applicable to the narrow fix.
+- `app_preferences` metadata now stores completion separately from the wizard step, transactionally. Completion stays true across settings entry, step navigation and abandoning the wizard. A first-run user's false marker and progress step persist; existing legacy installs with a downgraded flag are recovered from stored shift/pay/work data. No database migration or existing product data mutation was added.
+- Regressions cover a legacy downgraded existing user who exits at step 0 then step 2 and cold-starts into tabs, unchanged cycle/template/pay-profile/work-record data, and a first-time user who saves a schedule then resumes at step 5 as incomplete. Existing preview/schedule save tests remain in the full suite.
+- Focused onboarding tests PASS 36/36; full suite **307/307 PASS**; typecheck PASS; lint PASS; Android Hermes export PASS (1311 modules, 3.5 MB); iOS Hermes export PASS (1309 modules, 3.5 MB); `git diff --check` PASS. Independent data-safety reviewer APPROVE, no P0/P1/P2. Real device NOT RUN.
+- NEXT ACTION: commit only the targeted repository/test/task/progress files to PR #41, check CI, and report readiness for real-device acceptance. Never merge/rebase/force-push/release.

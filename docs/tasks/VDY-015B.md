@@ -39,3 +39,12 @@ Günlük/toplu WorkRecord onayı, yıllık izin bakiyesi, ücret geçmişi, çok
 - **Commit:** implementation `f2c81afebca9850dca8edbc1a565652df60a4b53`; CI #60 bu SHA için başarılı. Task/progress kapanış notları bu kayıtta yer alıyor.
 - **Koruma:** Kaynak worktree kullanıcı dosyaları değiştirilmedi. `docs/tasks/VDY-015A-product-flow-analysis.md` ayrı worktree’de korunuyor ve seçili commit’e alınmayacak.
 - **NEXT ACTION:** iPhone/Expo Go’da akışı ve 30 günlük önizlemeyi kabul et; bu gerçek cihaz kabulinden önce VDY-015C’ye başlama.
+
+## PR #41 kullanıcı tamamlanma regresyonu
+
+- **Bulgu:** PR'ın son review'u P1 olarak, `onboarding_state.completed` değerinin ayarlar akışında `false` yazılarak mevcut kullanıcıyı sonraki açılışta zorunlu onboarding'e yönlendirebilmesini saptadı.
+- **Düzeltme:** `onboarding_completed` ayrı ve işlem içinde yazılan metadata olarak eklendi. Başarılı tamamlanma kalıcıdır; adım kaydetmeleri tamamlanmayı düşürmez. Yeni kullanıcı ilk ilerleme kaydında `false` işaretini alır ve kaldığı adıma döner. Önceki sürümde bayrağı yanlışlıkla düşürülmüş fakat hâlâ ürün verisi bulunan legacy kurulumlar tamamlanmış olarak yeniden tanınır. Şema migration'ı yoktur.
+- **Regresyonlar:** mevcut kullanıcı açar/ilerler/çıkar/soğuk açılışta sekmelere döner; eski `false` metadata geri tanınır; vardiya, ücret profili ve WorkRecord korunur; yeni kullanıcı kaydedilmiş plan sonrası tamamlanmamış adımda devam eder. Var olan 30 günlük preview/schedule save testleri korundu.
+- **Doğrulama:** typecheck PASS; lint PASS; tam test paketi **307/307 PASS**; Android Hermes export PASS (1311 modül, 3.5 MB); iOS Hermes export PASS (1309 modül, 3.5 MB); `git diff --check` PASS. Gerçek iPhone/Android testi yapılmadı.
+- **Bağımsız data-safety review:** APPROVE; P0/P1/P2 yok. CI PR'a eklendikten sonra kaydedilecek.
+- **NEXT ACTION:** küçük düzeltme commit'ini PR #41'e push et, CI'ı doğrula ve kullanıcıya cihaz kabuline hazır kod durumunu bildir. Merge/rebase/force-push/release yok.

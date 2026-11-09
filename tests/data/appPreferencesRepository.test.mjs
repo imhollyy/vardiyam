@@ -7,6 +7,7 @@ import test from 'node:test';
 import { initializeDatabase } from '../../src/data/database.ts';
 import { clearOnboardingScheduleDraft, getOnboardingScheduleDraft, getOnboardingState, getReportsRewardState, getThemePreference, saveOnboardingScheduleDraft, saveOnboardingState, saveReportsRewardState, saveThemePreference } from '../../src/data/appPreferencesRepository.ts';
 import { saveShiftSchedule } from '../../src/data/shiftCycleRepository.ts';
+import { appendEarningsProfileVersion } from '../../src/data/earningsRepository.ts';
 import { buildShiftSchedule } from '../../src/features/shifts/schedule.ts';
 import { previewNext30Days } from '../../src/features/onboarding/scheduleDraft.ts';
 
@@ -114,11 +115,70 @@ test('an existing work-only installation skips onboarding and preserves its reco
   } finally { sqlite.close(); }
 });
 
+test('an existing user remains completed when opening and leaving onboarding, including after cold restart', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'vardiyam-onboarding-existing-'));
+  const path = join(directory, 'preferences.db');
+  let sqlite = new DatabaseSync(path);
+  try {
+    let database = adapter(sqlite);
+    await initializeDatabase(database);
+    const template = { id: 'saved-day', code: 'D', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00' };
+    const schedule = buildShiftSchedule({ id: 'saved-cycle', name: 'Kayıtlı düzen', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-11-05', pattern: 'fixed', startTemplateIndex: 0, templates: [template], customEntries: [] });
+    await saveShiftSchedule(database, schedule.templates, schedule.cycle);
+    await appendEarningsProfileVersion(database, 'default', { mode: 'SKIP' }, [], 'saved-rules-v1', '2026-01-01T00:00:00.000Z');
+    sqlite.prepare("INSERT INTO work_records(id,record_source,started_at_utc,ended_at_utc,timezone,break_minutes) VALUES('saved-work','MANUAL','2026-11-05T05:00:00.000Z','2026-11-05T06:00:00.000Z','Europe/Istanbul',0)").run();
+    // Model the previous build's regression: it already changed the legacy flag to false.
+    sqlite.prepare("INSERT INTO app_metadata(key,value) VALUES('onboarding_state', ?)").run(JSON.stringify({ step: 0, completed: false }));
+
+    assert.deepEqual(await getOnboardingState(database), { step: 0, completed: true });
+    await saveOnboardingState(database, { step: 0, completed: false }); // Settings opens the wizard.
+    await saveOnboardingState(database, { step: 2, completed: false }); // User leaves partway through.
+    assert.deepEqual(await getOnboardingState(database), { step: 2, completed: true });
+    sqlite.close();
+
+    sqlite = new DatabaseSync(path);
+    database = adapter(sqlite);
+    assert.deepEqual(await getOnboardingState(database), { step: 2, completed: true });
+    assert.equal(sqlite.prepare("SELECT start_local_time FROM shift_templates WHERE id='saved-day'").get().start_local_time, '08:00');
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM shift_cycles WHERE id='saved-cycle'").get().count, 1);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM earnings_profiles").get().count, 1);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM work_records WHERE id='saved-work'").get().count, 1);
+  } finally {
+    try { sqlite.close(); } catch { /* Database may already be closed before cold reopen. */ }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('first-time onboarding keeps its incomplete step after a schedule is saved and the app restarts', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'vardiyam-onboarding-first-run-'));
+  const path = join(directory, 'preferences.db');
+  let sqlite = new DatabaseSync(path);
+  try {
+    let database = adapter(sqlite);
+    await initializeDatabase(database);
+    await saveOnboardingState(database, { step: 2, completed: false });
+    const template = { id: 'first-day', code: 'D', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00' };
+    const schedule = buildShiftSchedule({ id: 'first-cycle', name: 'Vardiya düzenim', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-11-09', pattern: 'fixed', startTemplateIndex: 0, templates: [template], customEntries: [] });
+    await saveShiftSchedule(database, schedule.templates, schedule.cycle);
+    await saveOnboardingState(database, { step: 5, completed: false });
+    sqlite.close();
+
+    sqlite = new DatabaseSync(path);
+    database = adapter(sqlite);
+    assert.deepEqual(await getOnboardingState(database), { step: 5, completed: false });
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM shift_cycles WHERE id='first-cycle'").get().count, 1);
+  } finally {
+    try { sqlite.close(); } catch { /* Database may already be closed before cold reopen. */ }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('skipping onboarding pay preferences preserves the previously saved shift schedule', async () => {
   const sqlite = new DatabaseSync(':memory:');
   try {
     const database = adapter(sqlite);
     await initializeDatabase(database);
+    await saveOnboardingState(database, { step: 1, completed: false });
     const template = { id: 'onboard-test-day', code: 'D', name: 'Synthetic day', startLocalTime: '08:00', endLocalTime: '16:00' };
     const schedule = buildShiftSchedule({ id: 'onboard-test-cycle', name: 'Vardiya düzenim', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-11-05', pattern: 'fixed', startTemplateIndex: 0, templates: [template], customEntries: [] });
     await saveShiftSchedule(database, schedule.templates, schedule.cycle);
