@@ -473,6 +473,6 @@ No SQLite schema/migrations, recovery/backup flow, financial calculations, or pa
 | Empty date accessible name and marker | PASS | “Plan yok” label + muted `remove-outline`; real slot maps to Cell Pressable and opens shared editor. |
 | SQLite v9/schema and repository behavior | PASS (unchanged) | No DB/repository/migration files changed in this follow-up. |
 | TypeScript / ESLint / full unit suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` **294/294**. |
-| Independent UI review | PENDING | Awaiting final reviewer response for this commit. |
-| GitHub CI | PENDING | Awaiting run for the calendar follow-up commit. |
+| Independent UI review | PASS | Reviewer confirmed no remaining P0–P2; empty dates map to Pressable `Cell`, padding stays noninteractive. |
+| GitHub CI | PASS | Actions run #42627688741, “Verify Expo scaffold”, commit `fb45ed48fad3fdc81dfa914372bf681974f51caf`. |
 | Device/TalkBack/VoiceOver | NOT RUN | No physical-device test in this turn. |
