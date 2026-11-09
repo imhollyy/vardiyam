@@ -491,4 +491,4 @@ No SQLite schema/migrations, recovery/backup flow, financial calculations, or pa
 | Android Hermes export | PASS | `npx.cmd expo export --platform android`; 1,310 modules, 3.5 MB Hermes bundle. Same process-scoped workaround. |
 | Independent UI/accessibility review | PASS | **APPROVE**, no P0/P1. Reviewer noted malformed loaded rules and advanced validation visibility; both addressed. |
 | Physical iPhone/Expo Go matrix: empty/current/custom/NET_ONLY/SKIP profile, save and reopen | NOT RUN | No connected device interaction; first Metro ERROR line remains unavailable. Do not treat export or CI as runtime proof. |
-| GitHub CI | PENDING | Code/docs commit and PR push pending. |
+| GitHub CI | PASS | Run #58 (`42636955848`), final code SHA `06a9adfb9a3cbb886e13b5c78aa154740e70f817`; PR #39 is open/draft/unmerged. |
