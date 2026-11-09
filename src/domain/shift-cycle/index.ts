@@ -33,6 +33,8 @@ export type PlannedShift = {
   cycleId: string;
   cycleIndex: number;
   timezone: string;
+  startLocalTime?: string;
+  endLocalTime?: string;
 };
 
 export type ShiftCycleErrorCode =

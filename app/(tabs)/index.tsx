@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
-import { deleteWorkDayStatus, getActiveWorkSession, listWorkDayStatuses, saveWorkDayStatus, startActiveWorkSession, type WorkDayStatus, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
-import { createPlanOverride, deletePlanOverride, getPlanOverride, getPlannedShiftsForRange, listShiftCycles, listShiftTemplates, updatePlanOverride } from '@/src/data/shiftCycleRepository';
+import { getActiveWorkSession, listWorkDayStatuses, startActiveWorkSession, type WorkDayStatus, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
+import { getPlannedShiftForDate, getPlannedShiftsForRange, listShiftCycles, listShiftTemplates } from '@/src/data/shiftCycleRepository';
+import { listDayEditNotes } from '@/src/data/dayEditRepository';
 import { completeActiveWorkSessionWithRecord, listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
 import { getLocalDateTimeCandidates, getRecordRangeDifferenceMinutes, localDateTimeToUtc, utcToLocalDateTime, type PlannedWorkSnapshot, type WorkRecord } from '@/src/domain/work-record';
-import { getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTemplate } from '@/src/domain/shift-cycle';
+import { dayOrdinal, getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTemplate } from '@/src/domain/shift-cycle';
 import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalToday, localDateForMonthDay, monthForLocalDate, monthRange, mondayFirstOffset, mondayFirstWeekdayOffset, shiftYearMonth } from '@/src/features/shifts/dates';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { colors } from '@/src/theme/tokens';
 import { calendarMarker, canStartClockIn } from '@/src/features/shifts/presentation';
 import { ActionButton as SharedActionButton } from '@/src/components/ui/ActionButton';
+import { DayEditSheet } from '@/src/components/shifts/DayEditSheet';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 const ZONE = 'Europe/Istanbul';
@@ -80,9 +82,9 @@ function MiniCell({ date, plan, template, status, record, selected, onPress, the
   selected: boolean; onPress: () => void; theme: Theme;
 }) {
   const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
-  const markerPresentation = calendarMarker({ planKind: plan?.kind, startLocalTime: template?.startLocalTime, status, completed: Boolean(record) });
+  const markerPresentation = calendarMarker({ planKind: plan?.kind, startLocalTime: plan?.startLocalTime ?? template?.startLocalTime, status, completed: Boolean(record) });
   const markerColor = theme[markerPresentation.tone];
-  const spokenStatus = record ? 'Çalışma tamamlandı' : status ? STATUS_LABELS[status] : plan?.kind === 'OFF' ? 'OFF' : plan?.kind === 'LEAVE' ? 'İzin planı' : plan?.kind === 'SHIFT' ? `${template?.name ?? 'Vardiya'} ${template?.startLocalTime ?? ''} ${template?.endLocalTime ?? ''}` : 'Plan yok';
+  const spokenStatus = record ? 'Çalışma tamamlandı' : status ? STATUS_LABELS[status] : plan?.kind === 'OFF' ? 'OFF' : plan?.kind === 'LEAVE' ? 'İzin planı' : plan?.kind === 'SHIFT' ? `${template?.name ?? 'Vardiya'} ${plan.startLocalTime ?? template?.startLocalTime ?? ''} ${plan.endLocalTime ?? template?.endLocalTime ?? ''}` : 'Plan yok';
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${formatLocalDate(date)}, ${spokenStatus}${difference === null ? '' : `, süre farkı ${difference > 0 ? '+' : difference < 0 ? 'eksi ' : ''}${durationLabel(Math.abs(difference))}`}`}
       accessibilityState={{ selected }} hitSlop={{ top: 2, bottom: 2, left: 3, right: 3 }} onPress={onPress} style={({ pressed }) => [styles.dayCell, {
@@ -99,6 +101,7 @@ function MiniCell({ date, plan, template, status, record, selected, onPress, the
 export default function TodayScreen() {
   const database = useAppDatabase();
   const router = useRouter();
+  const { openDate } = useLocalSearchParams<{ openDate?: string }>();
   const { theme, mode, toggleMode } = useAppTheme();
   const [now, setNow] = useState(() => new Date());
   const [monthOffset, setMonthOffset] = useState(0);
@@ -107,6 +110,7 @@ export default function TodayScreen() {
   const [plans, setPlans] = useState<PlannedShift[]>([]);
   const [records, setRecords] = useState<WorkRecordWithTimedBreaks[]>([]);
   const [statuses, setStatuses] = useState<Map<string, WorkDayStatusEntry>>(new Map());
+  const [dayNotes, setDayNotes] = useState<Map<string, string>>(new Map());
   const [active, setActive] = useState<Awaited<ReturnType<typeof getActiveWorkSession>>>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,10 +122,6 @@ export default function TodayScreen() {
   const [endTimeEdited, setEndTimeEdited] = useState(false);
   const [endOccurrence, setEndOccurrence] = useState<'earlier' | 'later' | undefined>();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [sheetStatus, setSheetStatus] = useState<WorkDayStatus | null>(null);
-  const [sheetNote, setSheetNote] = useState('');
-  const [sheetPlanKind, setSheetPlanKind] = useState<'SHIFT' | 'OFF' | 'LEAVE'>('SHIFT');
-  const [sheetTemplateId, setSheetTemplateId] = useState('');
   const [menu, setMenu] = useState<'profile' | 'notifications' | null>(null);
   const [editingTime, setEditingTime] = useState<'start' | 'end' | null>(null);
   const [draftTime, setDraftTime] = useState(() => dateForTime(localClock(new Date(), ZONE)));
@@ -150,9 +150,10 @@ export default function TodayScreen() {
         const focusedMonthRange = monthRange(currentMonth);
         const visibleStart = focusedWeekStart < focusedMonthRange.start ? focusedWeekStart : focusedMonthRange.start;
         const visibleEnd = focusedWeekEnd > focusedMonthRange.end ? focusedWeekEnd : focusedMonthRange.end;
-        const [savedStatuses, projectedPlans] = await Promise.all([
+        const [savedStatuses, projectedPlans, savedDayNotes] = await Promise.all([
           listWorkDayStatuses(database, visibleStart, visibleEnd),
           selectedCycle ? getPlannedShiftsForRange(database, selectedCycle.id, visibleStart, visibleEnd) : Promise.resolve([]),
+          listDayEditNotes(database, visibleStart, visibleEnd),
         ]);
         if (cancelled) return;
         setCycle(selectedCycle); setTemplates(savedTemplates); setRecords(savedRecords); setActive(currentSession);
@@ -162,6 +163,7 @@ export default function TodayScreen() {
           setEndTimeEdited(false);
         }
         setStatuses(new Map(savedStatuses.map((item) => [item.localDate, item])));
+        setDayNotes(new Map(savedDayNotes.map((item) => [item.localDate, item.note])));
         setPlans(projectedPlans);
       } catch {
         if (!cancelled) setError('Ana ekran verileri yüklenemedi. Yerel verilerin korunuyor; tekrar deneyebilirsin.');
@@ -198,7 +200,6 @@ export default function TodayScreen() {
   const scheduledDays = weeklyPlans.filter(({ plan }) => plan?.kind === 'SHIFT').length;
   const scheduledMinutes = weeklyPlans.reduce((sum, item) => sum + (item.template ? shiftMinutes(item.template) : 0), 0);
   const selectedPlan = selectedDate ? plansByDate.get(selectedDate) : undefined;
-  const selectedTemplate = selectedPlan?.kind === 'SHIFT' ? templatesById.get(selectedPlan.templateId ?? '') : undefined;
   const selectedRecords = selectedDate ? recordsByDate.get(selectedDate) ?? [] : [];
   const cellCount = mondayFirstOffset(month);
   const todayPlan = plansByDate.get(today);
@@ -227,7 +228,7 @@ export default function TodayScreen() {
       const startedAtUtc = localDateTimeToUtc(localDateTime, timezone);
       let planned: PlannedWorkSnapshot | null = null;
       if (todayPlan?.kind === 'SHIFT' && todayTemplate && cycle) {
-        const window = getNominalShiftWindow(today, todayTemplate.startLocalTime, todayTemplate.endLocalTime);
+        const window = getNominalShiftWindow(today, todayPlan.startLocalTime ?? todayTemplate.startLocalTime, todayPlan.endLocalTime ?? todayTemplate.endLocalTime);
         planned = {
           cycleId: cycle.id, localDate: today, templateId: todayTemplate.id, templateName: todayTemplate.name,
           startLocalDateTime: `${window.startDate}T${window.startLocalTime}`,
@@ -266,56 +267,38 @@ export default function TodayScreen() {
     } finally { setSaving(false); }
   };
 
-  const openDaySheet = (date: string) => {
-    const plan = plansByDate.get(date);
-    const defaultTemplateId = templates[0]?.id ?? '';
-    setSelectedDate(date); setSheetStatus(statuses.get(date)?.status ?? null); setSheetNote(statuses.get(date)?.note ?? '');
-    setSheetPlanKind(plan?.kind === 'OFF' || plan?.kind === 'LEAVE' ? plan.kind : 'SHIFT');
-    setSheetTemplateId(plan?.kind === 'SHIFT' ? plan.templateId ?? defaultTemplateId : defaultTemplateId);
-    setError(null); setNotice(null);
-  };
-  const saveDayStatus = async () => {
-    if (!selectedDate) return;
-    setSaving(true); setError(null); setNotice(null);
-    try {
-      if (sheetStatus) await saveWorkDayStatus(database, { localDate: selectedDate, status: sheetStatus, note: sheetNote.trim() || null, updatedAtUtc: new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString() });
-      else await deleteWorkDayStatus(database, selectedDate);
-      setNotice('Gün bilgisi kaydedildi. Bu not mesai veya ücret hesabı kuralı oluşturmaz.');
-      await refreshRef.current?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Gün bilgisi kaydedilemedi.'); }
-    finally { setSaving(false); }
-  };
+  const openDaySheet = useCallback((date: string) => { setSelectedDate(date); setError(null); setNotice(null); }, []);
 
-  const saveDayPlan = async () => {
-    if (!selectedDate || !cycle) return;
-    if (sheetPlanKind === 'SHIFT' && !templatesById.has(sheetTemplateId)) {
-      setError('Bir vardiya şablonu seçmelisin.');
-      return;
-    }
-    setSaving(true); setError(null); setNotice(null);
-    try {
-      const existing = await getPlanOverride(database, cycle.id, selectedDate);
-      const override = sheetPlanKind === 'SHIFT'
-        ? { localDate: selectedDate, kind: 'SHIFT' as const, templateId: sheetTemplateId }
-        : { localDate: selectedDate, kind: sheetPlanKind };
-      if (existing) await updatePlanOverride(database, cycle.id, selectedDate, override);
-      else await createPlanOverride(database, cycle.id, override);
-      setNotice('Gün vardiya planı kaydedildi.');
-      await refreshRef.current?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Gün vardiya planı kaydedilemedi.'); }
-    finally { setSaving(false); }
-  };
-
-  const resetDayPlan = async () => {
-    if (!selectedDate || !cycle) return;
-    setSaving(true); setError(null); setNotice(null);
-    try {
-      await deletePlanOverride(database, cycle.id, selectedDate);
-      setNotice('Gün, vardiya düzenindeki plana döndürüldü.');
-      await refreshRef.current?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Düzen varsayılan plana döndürülemedi.'); }
-    finally { setSaving(false); }
-  };
+  useEffect(() => {
+    if (loading || typeof openDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(openDate)) return;
+    try { dayOrdinal(openDate); } catch { return; }
+    const currentMonth = monthForLocalDate(getLocalToday(viewTimezone));
+    const targetMonth = openDate.slice(0, 7);
+    const [currentYear, currentMonthNumber] = currentMonth.split('-').map(Number);
+    const [targetYear, targetMonthNumber] = targetMonth.split('-').map(Number);
+    let active = true;
+    void (async () => {
+      try {
+        const [plan, statusRows, notes] = await Promise.all([
+          cycle ? getPlannedShiftForDate(database, cycle.id, openDate) : Promise.resolve(null),
+          listWorkDayStatuses(database, openDate, openDate),
+          listDayEditNotes(database, openDate, addLocalDays(openDate, 1)),
+        ]);
+        if (!active) return;
+        setMonthOffset((targetYear - currentYear) * 12 + targetMonthNumber - currentMonthNumber);
+        const status = statusRows[0] ?? null;
+        setDayNotes((current) => { const next = new Map(current); const note = notes[0]?.note; if (note) next.set(openDate, note); else next.delete(openDate); return next; });
+        setPlans((current) => [...current.filter((item) => item.localDate !== openDate), ...(plan ? [plan] : [])]);
+        setStatuses((current) => { const next = new Map(current); if (status) next.set(openDate, status); else next.delete(openDate); return next; });
+        setSelectedDate(openDate);
+        setError(null); setNotice(null);
+        router.setParams({ openDate: undefined });
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : 'Seçilen gün yüklenemedi.');
+      }
+    })();
+    return () => { active = false; };
+  }, [openDate, loading, cycle, database, router, viewTimezone]);
 
   const openAccount = () => { setMenu(null); router.push('/account'); };
   const openEarningsSettings = () => { setMenu(null); router.push('/earnings-settings'); };
@@ -464,63 +447,11 @@ export default function TodayScreen() {
         </Pressable>
       </ScrollView>
 
-      {selectedDate ? <View style={styles.sheetOverlay}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Gün ayrıntılarını kapat" onPress={() => setSelectedDate(null)} style={styles.sheetScrim} />
-        <View accessibilityViewIsModal={Boolean(selectedDate)} style={[styles.sheet, { backgroundColor: theme.background, borderColor: theme.border }]}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View style={styles.flex}>
-              <Text accessibilityRole="header" style={[styles.sheetTitle, { color: theme.foreground }]}>{formatLocalDate(selectedDate, { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-              <Text style={[styles.sectionCaption, { color: theme.muted }]}>{selectedPlan?.kind === 'SHIFT' && selectedTemplate ? `${selectedTemplate.name} · ${selectedTemplate.startLocalTime}–${selectedTemplate.endLocalTime}` : selectedPlan?.kind === 'OFF' ? 'OFF · planlı boş gün' : selectedPlan?.kind === 'LEAVE' ? 'Planlı izin' : 'Planlı vardiya yok'}</Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Gün panelini kapat" onPress={() => setSelectedDate(null)} style={[styles.closeButton, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={{ color: theme.foreground }}>×</Text></Pressable>
-          </View>
-          <ScrollView style={styles.sheetBody} contentContainerStyle={styles.sheetBodyContent} keyboardShouldPersistTaps="handled">
-          {selectedRecords.length ? <View style={[styles.recordList, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            {selectedRecords.map((item) => {
-              const start = utcToLocalDateTime(item.record.startedAtUtc, item.record.timezone).slice(11);
-              const end = utcToLocalDateTime(item.record.endedAtUtc, item.record.timezone);
-              const difference = getRecordRangeDifferenceMinutes(item.record);
-              return <View key={item.record.id} style={styles.recordRow}>
-                <View style={styles.flex}><Text style={[styles.recordTime, { color: theme.foreground }]}>{start}–{end.slice(11)}{end.slice(0, 10) !== selectedDate ? ' · ertesi gün' : ''}</Text><Text style={[styles.sectionCaption, { color: theme.muted }]}>{item.timedBreaks.length ? `${item.timedBreaks.length} zamanlı mola` : item.record.breakMinutes ? `${item.record.breakMinutes} dk · saati belirtilmemiş mola` : 'Mola yok'}</Text></View>
-                {difference !== null ? <Text style={{ color: difference >= 0 ? theme.success : theme.danger, fontWeight: '800' }}>{difference >= 0 ? '+' : '−'}{durationLabel(Math.abs(difference))}</Text> : null}
-                <Pressable accessibilityRole="button" accessibilityLabel="Çalışma kaydını düzenle" onPress={() => { setSelectedDate(null); router.push({ pathname: '/work-records', params: { recordId: item.record.id } }); }} style={styles.editLink}><Text style={{ color: theme.accent, fontWeight: '800' }}>Düzenle</Text></Pressable>
-              </View>;
-            })}
-          </View> : <Text style={[styles.sectionCaption, { color: theme.muted }]}>Bu gün için tamamlanmış çalışma kaydı yok.</Text>}
-          <Text style={[styles.sheetLabel, { color: theme.muted }]}>Vardiya tipi</Text>
-          <View style={styles.choicesRow}>
-            {(['SHIFT', 'OFF', 'LEAVE'] as const).map((kind) => {
-              const label = kind === 'SHIFT' ? 'Vardiya' : kind === 'OFF' ? 'OFF' : 'İzin';
-              return <Pressable key={kind} accessibilityRole="button" accessibilityState={{ selected: sheetPlanKind === kind }} onPress={() => setSheetPlanKind(kind)} style={[styles.choice, { backgroundColor: sheetPlanKind === kind ? theme.accentSurface : theme.surface, borderColor: sheetPlanKind === kind ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{label}</Text></Pressable>;
-            })}
-          </View>
-          {sheetPlanKind === 'SHIFT' ? <>
-            <Text style={[styles.sheetLabel, { color: theme.muted }]}>Vardiya şablonu · başlangıç ve bitiş saati</Text>
-            <View style={styles.choicesRow}>
-              {templates.length ? templates.map((template) => <Pressable key={template.id} accessibilityRole="button" accessibilityLabel={`${template.name}, ${template.startLocalTime}–${template.endLocalTime}`} accessibilityState={{ selected: sheetTemplateId === template.id }} onPress={() => setSheetTemplateId(template.id)} style={[styles.choice, { backgroundColor: sheetTemplateId === template.id ? theme.accentSurface : theme.surface, borderColor: sheetTemplateId === template.id ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{template.name} · {template.startLocalTime}–{template.endLocalTime}</Text></Pressable>) : <Text style={[styles.sectionCaption, { color: theme.muted }]}>Önce uygulama ayarlarından vardiya şablonu oluştur.</Text>}
-            </View>
-          </> : null}
-          <View style={styles.sheetActions}>
-            <Pressable accessibilityRole="button" disabled={saving || !cycle} onPress={() => void saveDayPlan()} style={[styles.sheetAction, { borderColor: theme.primaryAction, backgroundColor: theme.primaryAction }]}><Text style={[styles.sheetActionText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : 'Vardiya planını kaydet'}</Text></Pressable>
-            {cycle && plansByDate.has(selectedDate) ? <Pressable accessibilityRole="button" disabled={saving} onPress={() => void resetDayPlan()} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Düzeni kullan</Text></Pressable> : null}
-          </View>
-          <Text style={[styles.sheetLabel, { color: theme.muted }]}>Gün durumu · çalışma/ücret hesabı kuralı değildir</Text>
-          <View style={styles.choicesRow}>
-            {(['LEAVE', 'SICK_REPORT', 'NOT_WORKED'] as const).map((status) => <Pressable key={status} accessibilityRole="button" accessibilityState={{ selected: sheetStatus === status }} onPress={() => setSheetStatus(sheetStatus === status ? null : status)} style={[styles.choice, { backgroundColor: sheetStatus === status ? (status === 'NOT_WORKED' ? theme.dangerSurface : theme.warningSurface) : theme.surface, borderColor: sheetStatus === status ? (status === 'NOT_WORKED' ? theme.danger : theme.warning) : theme.border }]}>
-              <Text style={{ color: theme.foreground, fontWeight: '700' }}>{STATUS_LABELS[status]}</Text>
-            </Pressable>)}
-            {selectedRecords.length ? <View style={[styles.choice, { backgroundColor: theme.successSurface, borderColor: theme.success, flexDirection: 'row', alignItems: 'center', gap: 5 }]}><Ionicons name="checkmark-circle" size={16} color={theme.success} /><Text style={{ color: theme.success, fontWeight: '800' }}>Çalışıldı</Text></View> : null}
-          </View>
-          <TextInput accessibilityLabel="Gün notu" value={sheetNote} onChangeText={setSheetNote} maxLength={2000} placeholder="Kısa not (isteğe bağlı)" placeholderTextColor={theme.muted} style={[styles.noteInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
-          <View style={styles.sheetActions}>
-            <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setSelectedDate(null); router.push({ pathname: '/(tabs)/calendar', params: { initialDate: selectedDate } }); }} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Vardiya planını düzenle</Text></Pressable>
-            <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveDayStatus()} style={[styles.sheetAction, { borderColor: theme.primaryAction, backgroundColor: theme.primaryAction }]}><Text style={[styles.sheetActionText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : 'Gün bilgisini kaydet'}</Text></Pressable>
-          </View>
-          {error ? <Text accessibilityRole="alert" style={{ color: theme.danger }}>{error}</Text> : null}
-          </ScrollView>
-        </View>
-      </View> : null}
+      {selectedDate ? <DayEditSheet key={selectedDate} localDate={selectedDate} cycle={cycle} plan={selectedPlan}
+        templates={templates} statusEntry={statuses.get(selectedDate)} note={dayNotes.get(selectedDate)} records={selectedRecords}
+        onClose={() => setSelectedDate(null)} onSaved={async () => { setNotice('Değişiklikler kaydedildi; fiilî çalışma kayıtların korundu.'); await refreshRef.current?.(); }}
+        onEditRecord={(recordId) => router.push({ pathname: '/work-records', params: { recordId } })}
+        onCreateCycle={() => router.push('/(tabs)/settings')} /> : null}
 
       {menu ? <View style={styles.menuOverlay}>
         <Pressable accessibilityRole="button" accessibilityLabel="Menüyü kapat" onPress={() => setMenu(null)} style={styles.menuScrim} />
@@ -567,7 +498,8 @@ const styles = StyleSheet.create({
   choicesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, choice: { minHeight: 44, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, justifyContent: 'center' },
   calendarHeader: { gap: 10 }, monthControls: { flexDirection: 'row', alignItems: 'center', gap: 7 }, monthButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, monthTitle: { flex: 1, minWidth: 94, fontSize: 15, fontWeight: '800', textAlign: 'center', textTransform: 'capitalize' }, calendarCard: { borderWidth: 1, borderRadius: 20, padding: 10, gap: 9 }, calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.2857%', textAlign: 'center', fontSize: 11, fontWeight: '700', paddingVertical: 6 }, dayCell: { width: '14.2857%', minHeight: 53, alignItems: 'center', justifyContent: 'flex-start', paddingVertical: 4, gap: 1, borderWidth: 1, borderColor: 'transparent', borderRadius: 10 }, dayNumber: { fontSize: 13, fontWeight: '700' }, dayMarker: { fontSize: 13, fontWeight: '900', lineHeight: 16 }, markerSpacer: { height: 16 }, delta: { fontSize: 9, fontWeight: '800' }, legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 5 }, legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 }, legendDot: { width: 8, height: 8, borderRadius: 4 },
   loading: { minHeight: 140, alignItems: 'center', justifyContent: 'center', gap: 10 }, emptyCard: { borderWidth: 1, borderRadius: 18, padding: 17, gap: 10 }, cardTitle: { fontSize: 17, fontWeight: '800' }, linkButton: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 }, linkButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' }, secondaryLink: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
-  sheetOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 20 }, sheetScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F66' }, sheet: { minHeight: '54%', maxHeight: '84%', borderTopLeftRadius: 25, borderTopRightRadius: 25, borderWidth: 1, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16, gap: 12 }, sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: '#8A98AC', alignSelf: 'center', marginBottom: 3 }, sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sheetBody: { flexShrink: 1 }, sheetBodyContent: { gap: 12, paddingBottom: 5 }, sheetTitle: { fontSize: 19, fontWeight: '800', textTransform: 'capitalize' }, closeButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, recordList: { borderWidth: 1, borderRadius: 14, padding: 11, gap: 9, maxHeight: 130 }, recordRow: { flexDirection: 'row', alignItems: 'center', gap: 9, flexWrap: 'wrap' }, recordTime: { fontSize: 15, fontWeight: '800' }, editLink: { paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }, sheetLabel: { fontSize: 12, fontWeight: '700' }, noteInput: { minHeight: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 15 }, sheetActions: { flexDirection: 'row', gap: 8 }, sheetAction: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }, sheetActionText: { fontSize: 13, fontWeight: '800', textAlign: 'center' }, whiteText: { color: '#FFFFFF' },
+  whiteText: { color: '#FFFFFF' },
   menuOverlay: { ...StyleSheet.absoluteFill, zIndex: 30 }, menuScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F33' }, menuCard: { position: 'absolute', top: 68, right: 14, width: 232, borderWidth: 1, borderRadius: 18, padding: 12, gap: 4, shadowColor: '#0B1730', shadowOpacity: 0.14, shadowRadius: 18, elevation: 6 }, menuTitle: { fontSize: 16, fontWeight: '800', padding: 7 }, menuRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, borderTopWidth: StyleSheet.hairlineWidth },
   pickerBackdrop: { flex: 1, justifyContent: 'flex-end' }, pickerScrim: { ...StyleSheet.absoluteFill, backgroundColor: '#07101F66' }, pickerCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 18, gap: 10 }, pickerConfirm: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

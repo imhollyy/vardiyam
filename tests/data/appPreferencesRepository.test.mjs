@@ -6,6 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { initializeDatabase } from '../../src/data/database.ts';
 import { getOnboardingState, getReportsRewardState, getThemePreference, saveOnboardingState, saveReportsRewardState, saveThemePreference } from '../../src/data/appPreferencesRepository.ts';
+import { saveShiftSchedule } from '../../src/data/shiftCycleRepository.ts';
+import { buildShiftSchedule } from '../../src/features/shifts/schedule.ts';
 
 function adapter(sqlite) {
   return {
@@ -60,5 +62,20 @@ test('an existing work-only installation skips onboarding and preserves its reco
     sqlite.prepare("INSERT INTO work_records(id,record_source,started_at_utc,ended_at_utc,timezone,break_minutes) VALUES('work-only','MANUAL','2026-11-05T05:00:00.000Z','2026-11-05T06:00:00.000Z','Europe/Istanbul',0)").run();
     assert.deepEqual(await getOnboardingState(database), { step: 0, completed: true });
     assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM work_records WHERE id='work-only'").get().count, 1);
+  } finally { sqlite.close(); }
+});
+
+test('skipping onboarding pay preferences preserves the previously saved shift schedule', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    const database = adapter(sqlite);
+    await initializeDatabase(database);
+    const template = { id: 'onboard-test-day', code: 'D', name: 'Synthetic day', startLocalTime: '08:00', endLocalTime: '16:00' };
+    const schedule = buildShiftSchedule({ id: 'onboard-test-cycle', name: 'Vardiya düzenim', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-11-05', pattern: 'fixed', startTemplateIndex: 0, templates: [template], customEntries: [] });
+    await saveShiftSchedule(database, schedule.templates, schedule.cycle);
+    await saveOnboardingState(database, { step: 3, completed: false });
+    assert.deepEqual(await getOnboardingState(database), { step: 3, completed: false });
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM shift_cycles WHERE id='onboard-test-cycle';").get().count, 1);
+    assert.equal(sqlite.prepare("SELECT start_local_time FROM shift_templates WHERE id='onboard-test-day';").get().start_local_time, '08:00');
   } finally { sqlite.close(); }
 });

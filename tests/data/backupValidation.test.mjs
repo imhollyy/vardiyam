@@ -35,8 +35,8 @@ async function createReferenceDatabase() {
   return { database: expoAdapter(sqlite), close: async () => sqlite.close() };
 }
 
-test('synthetic v1-v7 database images validate, migrate in staging, and preserve prior metadata', async (t) => {
-  for (let sourceVersion = 1; sourceVersion <= 7; sourceVersion += 1) {
+test('synthetic v1-v8 database images validate, migrate in staging, and preserve prior metadata', async (t) => {
+  for (let sourceVersion = 1; sourceVersion <= 8; sourceVersion += 1) {
     await t.test(`v${sourceVersion} to v${CURRENT_SCHEMA_VERSION}`, async () => {
       const source = createHistoricalDatabase(sourceVersion);
       const image = source.serialize();
@@ -63,7 +63,7 @@ test('backup validation rejects future schemas, missing immutable guards, and fo
   await t.test('future user_version', async () => {
     const sqlite = createHistoricalDatabase(7);
     try {
-      sqlite.exec('PRAGMA user_version = 8;');
+      sqlite.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION + 1};`);
       await assert.rejects(validateBackupDatabase(expoAdapter(sqlite), { createReferenceDatabase }), /sürümü desteklenmiyor/);
     } finally { sqlite.close(); }
   });
@@ -94,7 +94,7 @@ test('backup validation rejects future schemas, missing immutable guards, and fo
   });
 });
 
-test('full synthetic v7 database image preserves plans, work, breaks, approved earnings, and payment ledger', async () => {
+test('full synthetic v9 database image preserves plans, work, breaks, approved earnings, payment ledger, and day notes', async () => {
   const source = new DatabaseSync(':memory:');
   const sourceAdapter = expoAdapter(source);
   const stamp = '2026-11-05T12:00:00.000Z';
@@ -124,20 +124,22 @@ test('full synthetic v7 database image preserves plans, work, breaks, approved e
         VALUES ('syn-allocation','syn-payment','syn-period',3000000,'${stamp}','${stamp}');
       INSERT INTO payment_ledger_events(id,entity_type,entity_id,event_type,event_at_utc,data_json)
         VALUES ('syn-ledger','PAYMENT','syn-payment','CREATE','${stamp}','{"synthetic":true}');
+      INSERT INTO day_edit_notes(local_date,note,updated_at_utc) VALUES ('2026-11-07','synthetic day note','${stamp}');
     `);
 
     const serialized = source.serialize();
     const restored = new DatabaseSync(':memory:');
     try {
       restored.deserialize(serialized);
-      const result = await validateBackupDatabase(expoAdapter(restored), { createReferenceDatabase, expectedSchemaVersion: 7 });
-      assert.equal(result.recordCount, 14);
+      const result = await validateBackupDatabase(expoAdapter(restored), { createReferenceDatabase, expectedSchemaVersion: 9 });
+      assert.equal(result.recordCount, 15);
       assert.equal(restored.prepare('SELECT note FROM work_records WHERE id=?').get('syn-work').note, 'synthetic');
       assert.equal(restored.prepare('SELECT started_at_utc FROM break_intervals WHERE id=?').get('syn-break').started_at_utc, '2026-11-05T10:00:00.000Z');
       assert.equal(restored.prepare('SELECT snapshot_json FROM earnings_snapshots WHERE calculation_id=?').get('syn-snapshot').snapshot_json, '{"synthetic":"immutable"}');
       assert.equal(restored.prepare('SELECT amount_minor FROM payslip_net_versions WHERE period_id=?').get('syn-period').amount_minor, 3500000);
       assert.equal(restored.prepare('SELECT COUNT(*) AS count FROM payment_allocations WHERE payment_id=?').get('syn-payment').count, 1);
       assert.equal(restored.prepare('SELECT COUNT(*) AS count FROM payment_ledger_events').get().count, 1);
+      assert.equal(restored.prepare("SELECT note FROM day_edit_notes WHERE local_date='2026-11-07'").get().note, 'synthetic day note');
     } finally { restored.close(); }
   } finally { source.close(); }
 });

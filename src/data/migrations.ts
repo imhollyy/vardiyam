@@ -464,6 +464,35 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 8,
+    sql: `
+      CREATE TABLE plan_time_overrides (
+        cycle_id TEXT NOT NULL,
+        local_date TEXT NOT NULL,
+        start_local_time TEXT NOT NULL CHECK (
+          length(start_local_time) = 5 AND start_local_time GLOB '[0-2][0-9]:[0-5][0-9]' AND CAST(substr(start_local_time, 1, 2) AS INTEGER) < 24
+        ),
+        end_local_time TEXT NOT NULL CHECK (
+          length(end_local_time) = 5 AND end_local_time GLOB '[0-2][0-9]:[0-5][0-9]' AND CAST(substr(end_local_time, 1, 2) AS INTEGER) < 24
+        ),
+        PRIMARY KEY(cycle_id, local_date),
+        FOREIGN KEY(cycle_id, local_date) REFERENCES plan_overrides(cycle_id, local_date) ON DELETE CASCADE ON UPDATE CASCADE
+      );
+    `,
+  },
+  {
+    version: 9,
+    sql: `
+      CREATE TABLE day_edit_notes (
+        local_date TEXT PRIMARY KEY NOT NULL CHECK (${canonicalLocalDateCheck('local_date')}),
+        note TEXT NOT NULL CHECK (length(trim(note)) BETWEEN 1 AND 2000),
+        updated_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('updated_at_utc')})
+      );
+      INSERT INTO day_edit_notes (local_date, note, updated_at_utc)
+        SELECT local_date, note, updated_at_utc FROM work_day_statuses WHERE note IS NOT NULL AND length(trim(note)) > 0;
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;

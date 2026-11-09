@@ -1,5 +1,19 @@
 # Vardiyam — Hesap ve Cihaz Test Matrisi v0.1
 
+## VDY-014 — Kazanç hata güvenliği ve kullanım akışı (2026-11-07)
+
+| Akış / kontrol | Otomatik kanıt | Platform kabulü | Sonuç |
+|---|---|---|---|
+| Hatalı bordro günü, saat dilimi ve dakika profili | `tests/domain/earningsPresentation.test.mjs` | iPhone log/repro yok | Otomatik PASS; gerçek runtime kök nedeni BLOCKED_NEEDS_RUNTIME_LOG |
+| Gün planı + durum/not birlikte kaydetme | `tests/data/workSessionRepository.test.mjs`; sentetik SQLite transaction rollback | Android/iOS UI NOT RUN | PASS; rollback kanıtlı, WorkRecord sıfır |
+| Onboarding vardiya/pattern/tarih/saat adımı | `buildShiftSchedule` domain regression + SQLite repository suite | Native picker/device NOT RUN | Static/export PASS; etkileşim cihazda doğrulanmadı |
+| Ücret ve bordro ayarı / ücret adımını atlama | profile guard + preferences/repository suite | Device NOT RUN | Otomatik PASS; ekran akışı cihaz kabulü bekliyor |
+| Kazanç özeti ve teknik detayların açıklanması | earnings UI render path + existing earnings/snapshot suite | Device NOT RUN | Bundle PASS; görünürlük/erişilebilirlik incelemesi sürüyor |
+| Android/iOS Hermes JS export | SDK 58 `expo export --platform android/ios` | Cihaz açılışı değil | PASS (Hermes bytecode); ilk deneme geçici klasör izin hatası, worktree temp ile tekrar PASS |
+| Expo Doctor | 20 kontrol | — | 18/20; `exp.host` DNS ve React Native Directory uzak yanıtı alınamadı |
+
+Final automated gate at checkpoint: typecheck PASS, lint PASS, `npm test` 280/280 PASS, `git diff --check` PASS. Independent data-safety and UI/accessibility reviews pending. No iPhone Metro log provided; no actual iOS runtime fix is claimed.
+
 ## VDY-010B — Tasarım sistemi, onboarding ve raporlar (2026-11-06)
 
 | Akış / kontrol | Otomatik kanıt | Gerçek UI/cihaz | Sonuç |
@@ -410,3 +424,71 @@ GitHub: draft PR #29 (eat/vdy-010a-home-ui → PR #25 head dalı), commit 39e3
 | Independent R2 UI/accessibility review | PASS | APPROVE; initial P1 and P2 findings fixed; re-review found no remaining static P0–P2 |
 
 No SQLite schema/migrations, recovery/backup flow, financial calculations, or payment reconciliation rules were changed.
+
+## VDY-014 — Kazanç runtime hatası ve kullanım akışları (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Additive schema v7→v8 preserves prior shift/user data; invalid planned wall-clock rejected | PASS | `tests/data/migrations.test.mjs`, real SQLite migration fixtures |
+| Day plan, planned times, status and note save atomically; injected error rolls all writes back | PASS | `tests/data/workSessionRepository.test.mjs`, in-memory SQLite |
+| Calendar opens shared day editor; day-specific planned times project and clock-in snapshot remains planned data | PASS (code/tests) | `app/(tabs)/calendar.tsx`, `app/(tabs)/index.tsx`, repository/domain tests |
+| Reopen onboarding updates existing cycle, preserves OFF anchor phase, stored pay mode/rate and custom workplace multipliers | PASS | `tests/data/workSessionRepository.test.mjs`, `tests/features/schedule.test.mjs`, `tests/domain/earningsPresentation.test.mjs` |
+| Skip wage step preserves previous values; period-only edit retains unchanged rate effective date | PASS | `tests/data/appPreferencesRepository.test.mjs`, `tests/domain/earningsPresentation.test.mjs` |
+| Earnings invalid-profile guard, empty period and expandable detail presentation | PASS (tests/code) | `tests/domain/earningsPresentation.test.mjs`, `app/(tabs)/earnings.tsx` |
+| TypeScript / ESLint / full suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` **287/287** |
+| Expo Doctor | PARTIAL (18/20) | Expo schema metadata DNS `ENOTFOUND exp.host`; React Native Directory endpoint returned unexpected server response. No dependency changes. |
+| Android Hermes export | PASS | `npx expo export --platform android`; `.hbc`, 1,309 modules, 3.5 MB. Worktree-scoped `TEMP/TMP` needed after sandbox Temp `index.hbc` permission denied. |
+| iOS Hermes export | PASS | `npx expo export --platform ios`; `.hbc`, 1,307 modules, 3.5 MB. Same scoped temp workaround. |
+| iPhone/Android runtime, native picker, screenshot, small/large text, VoiceOver/TalkBack | NOT RUN | No device interaction. iOS runtime log for prior `Ay seçimi geçersiz` report was not available; root cause remains `BLOCKED_NEEDS_RUNTIME_LOG`. |
+| Independent R2 review | PASS | Data-safety **APPROVE**, no P0/P1/P2; UI/accessibility **APPROVE**, no static P0/P1. Device checks remain open. |
+| GitHub Actions | PASS | Draft PR #39, Actions run #51 (`42616797249`), job “Verify Expo scaffold” succeeded for commit `cb4a6172ff939de765714202b2f459dc56cf2c3e`. |
+
+### VDY-014 PR #39 review follow-up (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Day panel default hierarchy and advanced schedule controls | PASS (code review) | Shared `DayEditSheet`; primary fields are selected date, planned pickers, optional leave/report/absence, note, one save; cycle/template choices are collapsed. |
+| Calendar day tap preserves Calendar route and opens editor overlay | PASS (code review/export) | `app/(tabs)/calendar.tsx` opens shared sheet in-place. |
+| Unsaved draft close/back confirmation and save guard | PASS (code review) | `DayEditSheet` confirms discard from scrim/close/Android back and blocks dismiss while saving. Real device interaction NOT RUN. |
+| Actual WorkRecord separation/edit route | PASS (code review) | Actual records are separately labeled; recordId routes to existing work-record editor. No planned record is rewritten. |
+| Existing v8 schema compatibility and old day-note preservation | PASS | v8 schema definition remains unchanged; v8→v9 integration fixture preserves prior status note in old table and copies it to `day_edit_notes`. |
+| v1–v8 backup migration and v9 note backup round-trip | PASS | `tests/data/backupValidation.test.mjs`; synthetic v9 serialize/validate includes a day note. |
+| Day note save/clear without status and atomic rollback on note insert failure | PASS | `tests/data/workSessionRepository.test.mjs`; injected note-table failure rolls back previously written override and status. |
+| TypeScript / ESLint / full suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` **291/291**. |
+| Android Hermes export | PASS | SDK 58 Expo export, 1,310 modules, 3.5 MB `.hbc`; process-scoped TEMP/TMP under worktree. |
+| iOS Hermes export | PASS | SDK 58 Expo export, 1,308 modules, 3.5 MB `.hbc`; process-scoped TEMP/TMP under worktree. |
+| Git diff whitespace | PASS | `git diff --check`; only Windows LF→CRLF notices. |
+| UI/a11y independent review | PASS | Re-review closed calendar background focus P2; no remaining static P0/P1/P2. |
+| Data-safety independent review | PASS | Re-review closed v8 compatibility P1 and verification P2; no remaining P0/P1/P2. |
+| Device UI, VoiceOver/TalkBack, actual unsaved prompt interaction | NOT RUN | No physical-device acceptance in this review pass. |
+| Earnings runtime console error | UNVERIFIED | No device log supplied. Historic Today date stack is separate; do not mark Earnings issue fixed. |
+| GitHub CI for follow-up code commit | PASS | Actions run #42621544548, “Verify Expo scaffold”, SHA `38ec5c412e36062e283c5b6f8d738099c9749734`. |
+
+### VDY-014 PR #39 empty calendar date follow-up (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Every actual day in February 2026 month slots remains interactive even with no data | PASS | `calendarMonthSlots`; all 28 dates are `kind: day, interactive: true`. |
+| Leading Monday-first alignment padding remains noninteractive | PASS | Same test; six February 2026 pad slots remain separate `interactive: false` views. |
+| Empty date accessible name and marker | PASS | “Plan yok” label + muted `remove-outline`; real slot maps to Cell Pressable and opens shared editor. |
+| SQLite v9/schema and repository behavior | PASS (unchanged) | No DB/repository/migration files changed in this follow-up. |
+| TypeScript / ESLint / full unit suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` **294/294**. |
+| Independent UI review | PASS | Reviewer confirmed no remaining P0–P2; empty dates map to Pressable `Cell`, padding stays noninteractive. |
+| GitHub CI | PASS | Actions run #42627688741, “Verify Expo scaffold”, commit `fb45ed48fad3fdc81dfa914372bf681974f51caf`. |
+| Device/TalkBack/VoiceOver | NOT RUN | No physical-device test in this turn. |
+
+### VDY-014 Earnings Settings iOS report follow-up (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| RULES.map root field has stable React identity | PASS (code review) | `field()` root View now receives `key={kind}`; RULES kinds are distinct. |
+| Stored earnings rule JSON rejected safely before render | PASS | New `isEarningsRules` guard rejects null, duplicate kinds, malformed shape and reversed validity intervals; invalid profile load preserves local data and disables save. |
+| Basic vs advanced settings hierarchy | PASS (code review) | Pay type/amount, payroll day, weekly hours visible; technical multiplier/holiday/validity details collapsed under “Gelişmiş Ayarlar”. |
+| NET_ONLY/SKIP, pay/rule approval and version history semantics | PASS (regression/code review) | Only UI placement and rule hydration guard changed; no finance engine, repository, schema, approval, or snapshot write semantics changed. Existing gross visibility suite retained. |
+| Advanced-field validation discoverability | PASS | Validation opens advanced disclosure before the existing alert; save behavior is unchanged. |
+| TypeScript / ESLint / full unit suite | PASS | `npm run typecheck`, `npm run lint`, `npm test` **295/295**. |
+| iOS Hermes export | PASS | `npx.cmd expo export --platform ios`; 1,308 modules, 3.5 MB Hermes bundle. Worktree-local process `TEMP/TMP` required after sandbox temp write denial. |
+| Android Hermes export | PASS | `npx.cmd expo export --platform android`; 1,310 modules, 3.5 MB Hermes bundle. Same process-scoped workaround. |
+| Independent UI/accessibility review | PASS | **APPROVE**, no P0/P1. Reviewer noted malformed loaded rules and advanced validation visibility; both addressed. |
+| Physical iPhone/Expo Go matrix: empty/current/custom/NET_ONLY/SKIP profile, save and reopen | NOT RUN | No connected device interaction; first Metro ERROR line remains unavailable. Do not treat export or CI as runtime proof. |
+| GitHub CI | PASS | Run #58 (`42636955848`), final code SHA `06a9adfb9a3cbb886e13b5c78aa154740e70f817`; PR #39 is open/draft/unmerged. |

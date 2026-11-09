@@ -6,9 +6,9 @@
 
 - **Tarih:** 2026-11-07
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-013 — Codex Skills kurulumu ve gerçek kullanım doğrulaması
-- **Durum:** DONE / beceri kurulumu, gerçek smoke ve CI PASS. Başlangıç HEAD `5bd957fd6325199ed6c2c1d38f86c11d8f55e9b2` doğrulandı; izole worktree `C:\Users\emrey\Documents\Codex\vdy-013-skills-routing`, dal `chore/vdy-013-skills-routing`. Vercel Skills CLI 1.7.6, Codex `find-skills` algısı, resmi UI UX Pro Max 2.15.0 kurulumu, Python 3.12.10 katalog araması ve ayrı Codex oturumunda UI becerilerinin gerçek kullanımı PASS. Commit `21335b96b9215209e50b808281c63c53c9bc873c`; PR #37 draft. GitHub Actions run #49 `42304155575` SUCCESS. Uygulama ekran kodu değiştirilmedi.
-- **Aktif branch:** chore/vdy-013-skills-routing
+- **Aktif aşama:** VDY-014 — Kazanç runtime hatası ve kullanım akışlarının sadeleştirilmesi
+- **Durum:** IN PROGRESS / R2 UI ve yerel veri akışları. PR #37 / `chore/vdy-013-skills-routing` HEAD `b3fb092556e5fb8850b32796e79571bc1689b9d4` doğrulandı. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-014-earnings-flow`, dal `feat/vdy-014-earnings-flow` aynı SHA'dan açıldı. Ana kullanıcı worktree'si ve VDY-013 worktree'deki altı untracked skill dizini değiştirilmedi. Gerçek iPhone Metro logu sağlanmadı; runtime kök neden iddiası beklemede, sentetik yeniden üretim incelemesi ve diğer akışlar devam ediyor.
+- **Aktif branch:** feat/vdy-014-earnings-flow
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,7 +22,17 @@
 
 ## NEXT ACTION
 
-1. PR #37 incelemesini bekle; VDY-014 bu görev kapsamında başlatılmadı.
+1. VDY-014 bağımsız reviewer bulgularını kapat, son doğrulamaları kaydet ve Issue #38'e bağlı taslak PR hazırla. Gerçek iPhone logu gelene kadar runtime kök nedeni bloke olarak kalsın.
+
+### 2026-11-07 — VDY-014 — IMPLEMENTATION / VERIFICATION CHECKPOINT
+
+- VDY-013 PR #37 head `b3fb092556e5fb8850b32796e79571bc1689b9d4` tabanından ayrı `feat/vdy-014-earnings-flow` worktree'si açıldı. Ana kullanıcı değişiklikleri ve VDY-013 skill dizinleri korundu.
+- Onboarding artık vardiya düzeni, seçilen başlangıç şablonu/tarihi ve yerel saatleri aynı akışta kaydediyor; ücret modu, bordro günü ve haftalık saat ayarı aynı adımda kalıcı yazılıyor. Atla akışı önceki vardiya kaydına dokunmuyor.
+- Bugün panelinde vardiya planı ve gün notu/durumu mevcut repository işlem kuyruğu içinde tek transaction ve tek kaydetme aksiyonuyla saklanıyor. Bu kayıt WorkRecord'e, ücret hesabına veya onaylı snapshot'a aktarılmıyor. Kazanç profili doğrulaması geçersiz dönem/saat dilimi değerlerini reddediyor; hesap kalemleri açılır ayrıntıya taşındı ve kayıtsız çalışma süresi `Kayıt yok` gösteriyor.
+- Gerçek iPhone logu yok. Sentetik incelemede hatalı ücret profilinin dönem/tutar üretmesini önleyecek hata yolu eklendi; ancak cihazdaki özgün açılış hatasının kök nedeni doğrulanmış değil (`BLOCKED_NEEDS_RUNTIME_LOG`).
+- Doğrulama checkpoint'i: typecheck PASS, lint PASS, npm test **280/280 PASS**; Expo Doctor 18/20 (2 uzak metadata kontrolü DNS/yanıt hatası); ilk Android/iOS Hermes çıkışı Windows izole geçici dizinine yazma izni hatası verdi; proje içi geçici dizine yöneltilen tekrar Android ve iOS `.hbc` export PASS. Gerçek iPhone UI, TalkBack/VoiceOver ve ekran görsel kabulü NOT RUN.
+- Bağımsız R2 data-safety ve UI/a11y reviewer incelemeleri devam ediyor. Taslak PR/CI henüz oluşturulmadı; merge/rebase/force-push/release yapılmadı.
+- **NEXT ACTION:** reviewer geri bildirimlerini değerlendir ve düzelt; ardından QA/PR kayıtlarını tamamla.
 
 ### 2026-11-07 — VDY-013 — DONE / SKILLS + SMOKE + CI PASS
 
@@ -647,3 +657,43 @@ NEXT ACTION:
 - Verification: typecheck PASS; lint PASS; tests PASS **276/276** (baseline 269 plus 7 focused cases); Android and iOS JS exports PASS with Hermes `.hbc`; Expo Doctor PASS **20/20**; `git diff --check` PASS.
 - Independent R2 UI/accessibility review **APPROVE**; findings fixed and re-reviewed with no remaining static P0/P1/P2. Real Android/iOS, screenshots, large text, and TalkBack/VoiceOver NOT RUN. No SQLite migrations or business rule engines changed.
 - Commit `2b26b25c4c756b487a5384a18c27d06f549c0fd5` pushed to `feat/vdy-010c-product-ux-polish`; draft PR #31 opened against PR #30. GitHub Actions run #42 (`42129795159`) PASS. PR remains draft/open and unmerged. NEXT ACTION: User iPhone acceptance of onboarding, theme, calendar draft guard, native pickers, work trend, and small/large text/screen-reader behavior before deciding whether to advance the UI branch.
+
+### 2026-11-09 — VDY-014 — IMPLEMENTATION AND REVIEW COMPLETE; PR DELIVERY PENDING
+
+- Base PR #37 branch HEAD `b3fb092556e5fb8850b32796e79571bc1689b9d4` confirmed. Isolated worktree branch `feat/vdy-014-earnings-flow`; original worktree/user changes untouched.
+- Added additive SQLite v8 day-specific planned-time overrides and shared Calendar/Today editor persistence. Onboarding now loads and edits the existing shift cycle and saved earnings profile, preserves custom rule versions and unchanged pay/rule effective boundaries, and keeps OFF anchor phases. Earnings shows explicit empty state and guards malformed period/profile values without changing calculation/snapshot/payment engines.
+- Verification: typecheck PASS; lint PASS; unit tests **287/287 PASS**; Expo Doctor 18/20 (2 remote metadata checks unavailable); Android Hermes export PASS (1,309 modules / 3.5 MB); iOS Hermes export PASS (1,307 modules / 3.5 MB); `git diff --check` PASS. Hermes export succeeded after process-only TEMP/TMP redirection to worktree due sandbox Temp write denial. Hardware/UI, picker, screenshot, large text, TalkBack/VoiceOver NOT RUN.
+- Independent R2 data-safety review **APPROVE**, no P0/P1/P2. Independent UI/accessibility review **APPROVE**, no static P0/P1; physical-device accessibility remains unverified. Prior iOS `Ay seçimi geçersiz` runtime root cause is **BLOCKED_NEEDS_RUNTIME_LOG** because no device log was available.
+- Commit `cb4a6172ff939de765714202b2f459dc56cf2c3e` pushed to `feat/vdy-014-earnings-flow`; draft PR #39 targets PR #37's branch (`chore/vdy-013-skills-routing`). GitHub Actions run #51 (`42616797249`) **PASS**. No merge, rebase, force-push, or release. R08, R13, Ethernet policy, and labor-law expert review remain separate open risks.
+- NEXT ACTION: Review draft PR #39; independently obtain device log before claiming the original iOS crash root cause is fixed.
+
+### 2026-11-09 — VDY-014 PR #39 REVIEW FIXES IN PROGRESS
+
+- Shared DayEditSheet now serves Today and Calendar. Calendar day taps open the panel in-place; default controls are time, optional status, note, and one atomic save. Template/cycle controls are collapsed under advanced settings. Actual work records keep their separate editor route. Dirty close/back prompts and saving blocks dismissal.
+- Independent data review caught a v8 schema compatibility issue before commit: v8 already exists in the PR history, so notes are now an additive v9 migration. Existing v8 schema remains unchanged; note values are copied forward, backup validation recognizes both v8 and v9, and note write rollback/backup round-trip tests were added.
+- Skills used: `vardiyam-ui-quality`, `ui-ux-pro-max` (local catalog searches), `vardiyam-data-safety`, `vardiyam-test-gate`. UI re-review confirmed no static P0–P2 after hiding Calendar background from screen-reader focus while sheet is open.
+- Verification: typecheck PASS; lint PASS; full suite **291/291 PASS**; Android/iOS Hermes export PASS (1,310/1,308 modules, 3.5 MB `.hbc` each); diff check PASS. Device/TalkBack/VoiceOver NOT RUN; Earnings console issue remains unverified pending runtime log.
+- Independent R2 review complete: UI/accessibility reviewer **APPROVE** with no static P0/P1/P2; data-safety reviewer **APPROVE** after v9 compatibility correction with no static P0/P1/P2.
+- GitHub Actions run #42621544548 “Verify Expo scaffold” **PASS** for follow-up code commit `38ec5c412e36062e283c5b6f8d738099c9749734`. Full local validation remains typecheck/lint PASS, tests 291/291, Android/iOS Hermes exports PASS, diff check PASS.
+- NEXT ACTION: Preview the draft PR on iPhone; investigate the separate Earnings runtime report only when its device log is available.
+
+### 2026-11-09 — VDY-014 PR #39 EMPTY CALENDAR DAYS
+
+- Latest PR review found that real dates without plan/record/status rendered as inert blanks. `calendarMonthSlots` now distinguishes alignment padding (`interactive: false`) from every real date (`interactive: true`); Calendar maps real dates to the existing `Cell` Pressable, which opens the shared `DayEditSheet`. Empty dates show the muted marker and screen-reader label “Plan yok”. Padding generation/layout and SQLite v9 are unchanged.
+- Skills: `vardiyam-ui-quality` and `vardiyam-data-safety` v1.0 read/applied; `vardiyam-test-gate` v1.0 used to choose full suite plus typecheck/lint/CI. UI UX Pro Max 2.15.0 local search command: `python .agents/skills/ui-ux-pro-max/scripts/search.py "calendar accessible tappable empty day cells" --domain ux`; results emphasized named interactive controls and nonblank empty state. Applied an accessible date + “Plan yok” label and existing native `Pressable`/theme marker.
+- Regression tests cover all February 2026 real days as interactive slots, six Monday-first alignment cells as noninteractive, and empty-day accessible label/marker.
+- Verification: typecheck PASS, lint PASS, full tests **294/294 PASS**, `git diff --check` PASS. GitHub Actions run #42627688741 “Verify Expo scaffold” PASS for code commit `fb45ed48fad3fdc81dfa914372bf681974f51caf`.
+- Independent UI re-review **APPROVE**, no P0/P1/P2. Device/TalkBack NOT RUN; SQLite v9/data flows unchanged.
+- NEXT ACTION: User device acceptance of an empty calendar day opening the shared editor; PR #39 remains draft, no merge/release.
+
+### 2026-11-09 — VDY-014 EARNINGS SETTINGS iOS REPORT FOLLOW-UP
+
+- PR #39 current code base `cb47f34` and correct branch/worktree verified (`feat/vdy-014-earnings-flow`, `C:\Users\emrey\Documents\Codex\vdy-014-earnings-flow`). Existing uncommitted user `.gitignore` and `expo-env.d.ts` remain untouched and excluded.
+- Confirmed the mapped field root View lacked a React `key`; it now receives unique `kind`. Since the first iPhone `ERROR` line is unavailable, this only confirms and fixes the key warning, not the entire crash root cause. Added strict shape/unique-kind validation for loaded rule versions so malformed local rule JSON cannot crash render, and preserves data with save disabled/error displayed. Advanced setting validation opens the collapsed section when needed.
+- Earnings Settings now presents pay type/amount, payroll day and weekly hours first; multipliers, divisor confirmation, validity, holiday coverage/date lists and workplace day classes remain in a collapsed “Gelişmiş Ayarlar” section. Save approvals, append-only versions, calculations, snapshots and database schema are unchanged.
+- Skills applied: `vardiyam-ui-quality`, `vardiyam-data-safety`, `vardiyam-test-gate`, `vardiyam-task-flow`, `ui-ux-pro-max`; Pro Max local UX search returned visible field-label and submit feedback guidance. Independent R2 UI reviewer APPROVE; no P0/P1. P2 usability observation (hidden advanced validation) was addressed with automatic disclosure.
+- Verification: typecheck PASS; lint PASS; npm test **295/295 PASS** (one new malformed-rule profile guard regression); iOS Expo Hermes export PASS, 1,308 modules/3.5 MB; Android Expo Hermes export PASS, 1,310 modules/3.5 MB; diff check PASS. First Expo temp location failed with sandbox `index.hbc permission denied`/`hermesc exit 6`; rerun using worktree-local process TEMP/TMP succeeded without project/system configuration changes.
+- Independent UI reviewer re-review **APPROVE**, no P0/P1/P2. The reviewer’s additional coverage note was resolved by rejecting missing rule kinds and testing a reversed validity interval inside the complete rule set.
+- Commits `7f19fd5`, `582a10a`, `06a9adf` pushed to PR #39. GitHub CI run #58 (`42636955848`) **success** for final code SHA `06a9adfb9a3cbb886e13b5c78aa154740e70f817`; PR remains open/draft/unmerged.
+- Runtime: no physical iPhone/Expo Go verification this turn. Empty/current/custom/NET_ONLY/SKIP save-reopen matrix remains NOT RUN. The Metro first error line remains needed to identify any remaining device crash. At prior read-only port probe there was no 8081/19000/19001 listener; CIM process enumeration was unavailable. The exact project root for preview is the worktree above.
+- NEXT ACTION: User runs Expo Go preview from the correct worktree and verifies `/earnings-settings` with empty/current/custom/NET_ONLY/SKIP profiles. If the runtime error remains, provide the first complete Metro ERROR/RedBox line.

@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -18,22 +15,16 @@ import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 import {
   dayOrdinal,
   getNominalShiftWindow,
-  type PlanOverride,
   type PlannedShift,
   type ShiftCycle,
   type ShiftTemplate,
 } from '@/src/domain/shift-cycle/index';
 import {
-  createPlanOverride,
-  deletePlanOverride,
-  getPlanOverride,
   getPlannedShiftsForRange,
   listShiftCycles,
   listShiftTemplates,
-  updatePlanOverride,
 } from '@/src/data/shiftCycleRepository';
 import {
-  daysInMonth,
   formatLocalDate,
   formatMonthTitle,
   getLocalToday,
@@ -41,7 +32,6 @@ import {
   localDateForMonthDay,
   monthForLocalDate,
   monthRange,
-  mondayFirstOffset,
   shiftYearMonth,
 } from '@/src/features/shifts/dates';
 import { colors } from '@/src/theme/tokens';
@@ -49,38 +39,14 @@ import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
 import { listWorkDayStatuses, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
 import { formatDuration, getRecordRangeDifferenceMinutes } from '@/src/domain/work-record';
-import { calendarMarker, hasUnsavedPlanDraft } from '@/src/features/shifts/presentation';
+import { calendarCellAccessibilityLabel, calendarMarker, calendarMonthSlots } from '@/src/features/shifts/presentation';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { ActionButton } from '@/src/components/ui/ActionButton';
+import { DayEditSheet } from '@/src/components/shifts/DayEditSheet';
+import { listDayEditNotes } from '@/src/data/dayEditRepository';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
-type OverrideKind = PlanOverride['kind'];
-
 const WEEKDAYS = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
-
-function Choice({ label, selected, onPress, theme }: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-  theme: Theme;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      hitSlop={{ left: 3, right: 3 }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.choice, {
-        backgroundColor: selected ? theme.accentSurface : theme.surface,
-        borderColor: selected ? theme.accent : theme.border,
-        opacity: pressed ? 0.72 : 1,
-      }]}
-    >
-      <Text style={{ color: selected ? theme.accent : theme.foreground, fontSize: 14, fontWeight: selected ? '800' : '600' }}>{label}</Text>
-    </Pressable>
-  );
-}
 
 function Cell({
   date,
@@ -105,14 +71,14 @@ function Cell({
 }) {
   const dayNumber = Number(date.slice(-2));
   const shiftLabel = item?.kind === 'SHIFT'
-    ? `${template?.name ?? 'Vardiya'} ${template?.startLocalTime ?? ''} ${template?.endLocalTime ?? ''}`.trim()
+    ? `${template?.name ?? 'Vardiya'} ${item.startLocalTime ?? template?.startLocalTime ?? ''} ${item.endLocalTime ?? template?.endLocalTime ?? ''}`.trim()
     : status?.status === 'LEAVE' ? 'İzin' : status?.status === 'SICK_REPORT' ? 'Rapor' : status?.status === 'NOT_WORKED' ? 'Gidilmedi' : item?.kind === 'OFF' ? 'OFF, planlı boş gün' : item?.kind === 'LEAVE' ? 'İzin' : 'Plan yok';
-  const marker = calendarMarker({ planKind: item?.kind, startLocalTime: template?.startLocalTime, status: status?.status, completed: Boolean(record) });
+  const marker = calendarMarker({ planKind: item?.kind, startLocalTime: item?.startLocalTime ?? template?.startLocalTime, status: status?.status, completed: Boolean(record) });
   const semanticColor = theme[marker.tone];
   const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
   return (
     <Pressable
-      accessibilityLabel={`${formatLocalDate(date)}, ${record ? 'Çalışma tamamlandı, ' : ''}${shiftLabel}${difference === null || difference === 0 ? '' : `, mola dahil vardiya aralığı farkı ${difference > 0 ? 'artı ' : 'eksi '}${Math.abs(difference)} dakika`}`}
+      accessibilityLabel={calendarCellAccessibilityLabel(formatLocalDate(date), shiftLabel, Boolean(record), difference)}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       hitSlop={{ left: 3, right: 3 }}
@@ -144,27 +110,11 @@ export default function CalendarScreen() {
   const [days, setDays] = useState<PlannedShift[]>([]);
   const [records, setRecords] = useState<WorkRecordWithTimedBreaks[]>([]);
   const [statuses, setStatuses] = useState<WorkDayStatusEntry[]>([]);
+  const [dayNotes, setDayNotes] = useState<Map<string, string>>(new Map());
+  const [editorDate, setEditorDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [editorVisible, setEditorVisible] = useState(false);
-  const [editingOverride, setEditingOverride] = useState<PlanOverride | null>(null);
-  const [overrideKind, setOverrideKind] = useState<OverrideKind>('SHIFT');
-  const [overrideTemplateId, setOverrideTemplateId] = useState('');
-  const [overrideReason, setOverrideReason] = useState('');
-  const [overrideBaseline, setOverrideBaseline] = useState('');
-  const overrideDraftSignature = JSON.stringify({ overrideKind, overrideTemplateId, overrideReason });
-  const closeOverrideEditor = () => {
-    if (hasUnsavedPlanDraft(overrideBaseline, overrideDraftSignature)) {
-      Alert.alert('Değişiklikler kaydedilmedi', 'Gün planındaki taslak değişiklikler silinecek.', [
-        { text: 'Düzenlemeye dön', style: 'cancel' },
-        { text: 'Taslağı sil', style: 'destructive', onPress: () => setEditorVisible(false) },
-      ]);
-      return;
-    }
-    setEditorVisible(false);
-  };
 
   useEffect(() => {
     if (!initialDateParam) return;
@@ -196,7 +146,9 @@ export default function CalendarScreen() {
       const range = monthRange(month);
       const endExclusive = addLocalDays(range.end, 1);
       const savedStatuses = await listWorkDayStatuses(database, range.start, endExclusive);
+      const savedNotes = await listDayEditNotes(database, range.start, endExclusive);
       setStatuses(savedStatuses);
+      setDayNotes(new Map(savedNotes.map((entry) => [entry.localDate, entry.note])));
       if (!active) {
         setDays([]);
         return;
@@ -216,8 +168,7 @@ export default function CalendarScreen() {
   const selectedTemplate = selectedPlan?.kind === 'SHIFT'
     ? templates.find((template) => template.id === selectedPlan.templateId)
     : undefined;
-  const blankCells = useMemo(() => Array.from({ length: mondayFirstOffset(month) }, (_, index) => `blank-${index}`), [month]);
-  const monthDays = useMemo(() => Array.from({ length: daysInMonth(month) }, (_, index) => index + 1), [month]);
+  const monthSlots = useMemo(() => calendarMonthSlots(month), [month]);
   const recordsByDate = useMemo(() => {
     const grouped = new Map<string, WorkRecordWithTimedBreaks[]>();
     for (const item of records) {
@@ -232,90 +183,10 @@ export default function CalendarScreen() {
   const selectedRecords = recordsByDate.get(selectedDate) ?? [];
   const selectedStatus = statusesByDate.get(selectedDate);
 
-  const openOverrideEditor = async () => {
-    if (!cycle) return;
+  const openOverrideEditor = () => {
     setMessage(null);
     setError(null);
-    try {
-      const existing = await getPlanOverride(database, cycle.id, selectedDate);
-      const plan = daysByDate.get(selectedDate);
-      setEditingOverride(existing);
-      setOverrideKind(existing?.kind ?? plan?.kind ?? 'SHIFT');
-      setOverrideTemplateId(
-        existing?.kind === 'SHIFT'
-          ? existing.templateId
-          : plan?.kind === 'SHIFT'
-            ? plan.templateId ?? templates[0]?.id ?? ''
-            : templates[0]?.id ?? '',
-      );
-      setOverrideReason(existing?.reason ?? '');
-      setOverrideBaseline(JSON.stringify({
-        overrideKind: existing?.kind ?? plan?.kind ?? 'SHIFT',
-        overrideTemplateId: existing?.kind === 'SHIFT' ? existing.templateId : plan?.kind === 'SHIFT' ? plan.templateId ?? templates[0]?.id ?? '' : templates[0]?.id ?? '',
-        overrideReason: existing?.reason ?? '',
-      }));
-      setEditorVisible(true);
-    } catch {
-      setError('Seçilen günün planı yüklenemedi.');
-    }
-  };
-
-  const saveOverride = async () => {
-    if (!cycle) return;
-    let override: PlanOverride;
-    if (overrideKind === 'SHIFT') {
-      if (!overrideTemplateId) {
-        setError('Vardiya istisnası için bir şablon seçin.');
-        return;
-      }
-      override = { localDate: selectedDate, kind: 'SHIFT', templateId: overrideTemplateId, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) };
-    } else {
-      override = { localDate: selectedDate, kind: overrideKind, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) };
-    }
-
-    setSaving(true);
-    setError(null);
-    try {
-      if (editingOverride) {
-        await updatePlanOverride(database, cycle.id, selectedDate, override);
-      } else {
-        await createPlanOverride(database, cycle.id, override);
-      }
-      setOverrideBaseline(JSON.stringify({ overrideKind, overrideTemplateId, overrideReason }));
-      setEditorVisible(false);
-      setMessage(`${formatLocalDate(selectedDate)} planı kaydedildi.`);
-      await load();
-    } catch {
-      setError('Bu günün istisnası kaydedilemedi. Seçilen şablonu ve günü kontrol edin.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const removeOverride = () => {
-    if (!cycle || !editingOverride) return;
-    Alert.alert(
-      'Gün istisnasını kaldır?',
-      `${formatLocalDate(selectedDate)} yeniden çevrim düzenine göre gösterilecek.`,
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'İstisnayı kaldır',
-          style: 'destructive',
-          onPress: () => {
-            setSaving(true);
-            void deletePlanOverride(database, cycle.id, selectedDate)
-              .then(async () => {
-                setEditorVisible(false);
-                setMessage('Gün istisnası kaldırıldı. Çevrim planı yeniden gösteriliyor.');
-                await load();
-              })
-              .catch(() => setError('Gün istisnası kaldırılamadı.'))
-              .finally(() => setSaving(false));
-          },
-        },
-      ],
-    );
+    setEditorDate(selectedDate);
   };
 
   const switchMonth = (offset: number) => {
@@ -327,7 +198,7 @@ export default function CalendarScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView accessibilityElementsHidden={editorDate !== null} importantForAccessibility={editorDate ? 'no-hide-descendants' : 'auto'} contentContainerStyle={styles.scrollContent}>
         <PageHeading eyebrow="PLANLANAN VARDİYALAR" title="Takvim" subtitle="Plan, fiilî çalışma ve gün durumları" />
 
         <View style={styles.monthBar}>
@@ -374,13 +245,12 @@ export default function CalendarScreen() {
                 {WEEKDAYS.map((label) => <Text key={label} accessibilityLabel={label} style={[styles.weekday, { color: theme.muted }]}>{label}</Text>)}
               </View>
               <View style={styles.grid}>
-                {blankCells.map((key) => <View key={key} style={styles.blankCell} />)}
-                {monthDays.map((dayNumber) => {
-                  const date = localDateForMonthDay(month, dayNumber);
+                {monthSlots.map((slot) => {
+                  if (!slot.interactive) return <View key={slot.key} style={styles.blankCell} />;
+                  const date = slot.date;
                   const item = daysByDate.get(date);
                   const record = recordsByDate.get(date)?.[0];
                   const status = statusesByDate.get(date);
-                  if (!item && !record && !status) return <View key={date} style={styles.blankCell} />;
                   const template = item?.kind === 'SHIFT' ? templates.find((candidate) => candidate.id === item.templateId) : undefined;
                   return (
                     <Cell
@@ -393,7 +263,7 @@ export default function CalendarScreen() {
                       selected={selectedDate === date}
                       isToday={today === date}
                       theme={theme}
-                      onPress={() => { setSelectedDate(date); setMessage(null); setError(null); }}
+                      onPress={() => { setSelectedDate(date); setEditorDate(date); setMessage(null); setError(null); }}
                     />
                   );
                 })}
@@ -423,7 +293,7 @@ export default function CalendarScreen() {
                 <>
                   <ShiftKindBadge kind={selectedPlan.kind} template={selectedTemplate} />
                   {selectedPlan.kind === 'SHIFT' && selectedTemplate ? (() => {
-                    const window = getNominalShiftWindow(selectedDate, selectedTemplate.startLocalTime, selectedTemplate.endLocalTime);
+                    const window = getNominalShiftWindow(selectedDate, selectedPlan.startLocalTime ?? selectedTemplate.startLocalTime, selectedPlan.endLocalTime ?? selectedTemplate.endLocalTime);
                     return <Text style={[styles.shiftTime, { color: theme.foreground }]}>{window.startLocalTime}–{window.endLocalTime}{window.crossesMidnight ? ' · ertesi gün biter' : ''}</Text>;
                   })() : null}
                   {selectedPlan.source === 'OVERRIDE' ? <Text style={[styles.overrideHint, { color: theme.accent }]}>Tek günlük istisna · diğer döngü günleri değişmez</Text> : null}
@@ -451,54 +321,11 @@ export default function CalendarScreen() {
         )}
         {message ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{message}</Text> : null}
       </ScrollView>
-
-      <Modal animationType="slide" onRequestClose={closeOverrideEditor} transparent visible={editorVisible}>
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
-            <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-              <View style={styles.modalHeader}>
-                <View style={styles.flex}>
-                  <Text accessibilityRole="header" style={[styles.modalTitle, { color: theme.foreground }]}>Gün planını değiştir</Text>
-                  <Text style={[styles.body, { color: theme.muted }]}>{formatLocalDate(selectedDate)}</Text>
-                </View>
-                <Pressable accessibilityLabel="Pencereyi kapat" accessibilityRole="button" onPress={closeOverrideEditor} style={[styles.closeButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                  <Text style={{ color: theme.foreground, fontSize: 18 }}>×</Text>
-                </Pressable>
-              </View>
-              <Text style={[styles.fieldLabel, { color: theme.muted }]}>Plan türü</Text>
-              <View style={styles.choices}>
-                <Choice label="Vardiya" selected={overrideKind === 'SHIFT'} onPress={() => setOverrideKind('SHIFT')} theme={theme} />
-                <Choice label="OFF" selected={overrideKind === 'OFF'} onPress={() => setOverrideKind('OFF')} theme={theme} />
-                <Choice label="İzin" selected={overrideKind === 'LEAVE'} onPress={() => setOverrideKind('LEAVE')} theme={theme} />
-              </View>
-              {overrideKind === 'SHIFT' ? (
-                <>
-                  <Text style={[styles.fieldLabel, { color: theme.muted }]}>Vardiya şablonu</Text>
-                  <View style={styles.choices}>
-                    {templates.map((template) => <Choice key={template.id} label={`${template.code} · ${template.name}`} selected={overrideTemplateId === template.id} onPress={() => setOverrideTemplateId(template.id)} theme={theme} />)}
-                  </View>
-                </>
-              ) : null}
-              <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: theme.muted }]}>İsteğe bağlı not</Text>
-                <TextInput
-                  accessibilityLabel="İsteğe bağlı not"
-                  maxLength={120}
-                  onChangeText={setOverrideReason}
-                  placeholder="Bu gün için kısa bir not"
-                  placeholderTextColor={theme.muted}
-                  style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.foreground }]}
-                  value={overrideReason}
-                />
-              </View>
-              <Text style={[styles.overrideHint, { color: theme.muted }]}>Bu değişiklik yalnız seçili günü etkiler. OFF, yasal hafta tatili anlamına gelmez.</Text>
-              {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
-              <ActionButton label={saving ? 'Kaydediliyor…' : editingOverride ? 'Değişikliği kaydet' : 'Gün istisnasını kaydet'} onPress={() => void saveOverride()} disabled={saving} />
-              {editingOverride ? <ActionButton label="İstisnayı kaldır" onPress={removeOverride} variant="secondary" disabled={saving} /> : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      {editorDate ? <DayEditSheet key={editorDate} localDate={editorDate} cycle={cycle} plan={daysByDate.get(editorDate)}
+        templates={templates} statusEntry={statusesByDate.get(editorDate)} note={dayNotes.get(editorDate)} records={recordsByDate.get(editorDate) ?? []}
+        onClose={() => setEditorDate(null)} onSaved={async () => { await load(); setMessage('Değişiklikler kaydedildi; fiilî çalışma kayıtların korundu.'); }}
+        onEditRecord={(recordId) => router.push({ pathname: '/work-records', params: { recordId } })}
+        onCreateCycle={() => router.push('/(tabs)/settings')} /> : null}
     </View>
   );
 }

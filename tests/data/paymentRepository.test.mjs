@@ -44,7 +44,7 @@ test('v6 payment ledger supports immutable statement revisions, multi-period pay
     assert.equal(ledger.rows[0].amountMinor, 1_500_000);
     assert.equal((await listNetPayments(database))[0].unallocatedMinor, 0);
     assert.equal(await getPaymentHistoryCount(database, 'pay-1'), 1);
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 9);
   } finally { sqlite.close(); }
 });
 
@@ -160,7 +160,7 @@ test('payment, allocations and payslip history survive SQLite close and reopen',
     assert.equal(ledger.statement?.amountMinor, 3_500_000);
     assert.equal(ledger.reconciliation.allocatedPaymentMinor, 3_000_000);
     assert.equal(ledger.reconciliation.differenceMinor, 500_000);
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 9);
     sqlite.close();
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

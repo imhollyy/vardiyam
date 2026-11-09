@@ -96,6 +96,11 @@ export function buildShiftSchedule(draft: ScheduleDraft): BuiltSchedule {
       cycle = createCustomShiftCycle(base, entries);
       const savedStart = draft.preservedStartEntryIndex;
       const savedEntry = savedStart === undefined ? undefined : cycle.entries[savedStart];
+      if (savedStart !== undefined && savedEntry?.kind === 'OFF') {
+        // Reopening an existing schedule must retain an OFF anchor as well as a shift anchor.
+        cycle.startIndex = savedStart;
+        break;
+      }
       const selectedStart =
         savedStart !== undefined && savedEntry?.kind === 'SHIFT' && savedEntry.templateId === selectedTemplate.id
           ? savedStart
