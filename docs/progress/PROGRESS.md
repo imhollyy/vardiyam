@@ -4,11 +4,11 @@
 
 ## CURRENT STATE
 
-- **Tarih:** 2026-11-07
+- **Tarih:** 2026-11-09
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-014 — Kazanç runtime hatası ve kullanım akışlarının sadeleştirilmesi
-- **Durum:** IN PROGRESS / R2 UI ve yerel veri akışları. PR #37 / `chore/vdy-013-skills-routing` HEAD `b3fb092556e5fb8850b32796e79571bc1689b9d4` doğrulandı. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-014-earnings-flow`, dal `feat/vdy-014-earnings-flow` aynı SHA'dan açıldı. Ana kullanıcı worktree'si ve VDY-013 worktree'deki altı untracked skill dizini değiştirilmedi. Gerçek iPhone Metro logu sağlanmadı; runtime kök neden iddiası beklemede, sentetik yeniden üretim incelemesi ve diğer akışlar devam ediyor.
-- **Aktif branch:** feat/vdy-014-earnings-flow
+- **Aktif aşama:** VDY-015B — kolay vardiya kurulumu ve 30 günlük önizleme
+- **Durum:** VDY-015B P1 kullanıcı durum regresyonu düzeltildi; kod commit'i ve GitHub CI PASS. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`, dal `feat/vdy-015b-easy-shift-onboarding`. Ana/önceki worktree'nin `.gitignore`, `expo-env.d.ts`, VDY-015A raporu ve kullanıcı değişiklikleri korunuyor. PR #41 taslak kalacak. Fiziksel cihaz kabul testi yapılmadı.
+- **Aktif branch:** feat/vdy-015b-easy-shift-onboarding
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. VDY-014 bağımsız reviewer bulgularını kapat, son doğrulamaları kaydet ve Issue #38'e bağlı taslak PR hazırla. Gerçek iPhone logu gelene kadar runtime kök nedeni bloke olarak kalsın.
+1. PR #41 için iPhone/Expo Go kullanıcı kabulini yap. VDY-015C'ye otomatik geçme.
 
 ### 2026-11-07 — VDY-014 — IMPLEMENTATION / VERIFICATION CHECKPOINT
 
@@ -697,3 +697,32 @@ NEXT ACTION:
 - Commits `7f19fd5`, `582a10a`, `06a9adf` pushed to PR #39. GitHub CI run #58 (`42636955848`) **success** for final code SHA `06a9adfb9a3cbb886e13b5c78aa154740e70f817`; PR remains open/draft/unmerged.
 - Runtime: no physical iPhone/Expo Go verification this turn. Empty/current/custom/NET_ONLY/SKIP save-reopen matrix remains NOT RUN. The Metro first error line remains needed to identify any remaining device crash. At prior read-only port probe there was no 8081/19000/19001 listener; CIM process enumeration was unavailable. The exact project root for preview is the worktree above.
 - NEXT ACTION: User runs Expo Go preview from the correct worktree and verifies `/earnings-settings` with empty/current/custom/NET_ONLY/SKIP profiles. If the runtime error remains, provide the first complete Metro ERROR/RedBox line.
+
+### 2026-11-09 — VDY-015B — START / INSPECT
+
+- PR #39 and `origin/feat/vdy-014-earnings-flow` HEAD both verified at `d58ab0d1c49b1cde4013fe70e01c01988d3e6445`; PR remains draft/open/unmerged. Isolated branch/worktree `feat/vdy-015b-easy-shift-onboarding` created at `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`. The source worktree's `.gitignore`, `expo-env.d.ts`, VDY-015A analysis and progress changes are untouched; the analysis was copied into the new worktree for continuity.
+- Risk: R2. Cycle/template identity, cycle phase and historical projection can affect existing planned days; code must retain WorkRecord/snapshot/payment/backup boundaries. Independent UI and data-safety reviewers required before delivery.
+- Skills read/applied: `vardiyam-task-flow`, `vardiyam-ui-quality`, `ui-ux-pro-max`, `vardiyam-data-safety`, `vardiyam-test-gate`. Pro Max searched mobile shift onboarding, accessible native time picking and calendar symbols. Used: preserve current theme tokens, native pickers, explicit midnight messaging, tap labels, and do not copy generic web palette. The symbol query returned no match; fall back to existing Ionicons/theme system.
+- Inspection confirms `fixed` is a one-entry all-days cycle, not weekdays; weekly-three means three seven-day blocks; preview supports 1–31 days but defaults 21. `saveShiftSchedule` upserts an existing cycle transactionally. Existing onboarding currently saves before preview, recreates template IDs on reload, and only persists step index.
+- NEXT ACTION: Replace onboarding steps with persisted draft → pattern/times/start → 30-day preview → explicit schedule save → optional pay, preserving existing profile and stored IDs.
+
+### 2026-11-09 — VDY-015B — IMPLEMENTATION / VERIFICATION CHECKPOINT
+
+- Replaced onboarding with seven persisted steps: welcome, shift pattern, relevant native time pickers, start date/phase, 30-day preview, optional pay, completion. Existing custom cycles reopen with actual sequence and stable cycle/template IDs; unknown preset names are not guessed. A custom cycle can explicitly start on OFF. Fixed is clearly presented as an every-calendar-day cycle.
+- 30-day display uses existing VDY-003A `previewShiftSchedule` projection; a SQLite integration regression proves preview leaves `shift_cycles` and `shift_templates` unchanged. Only explicit “Onayla ve takvimi kaydet” invokes transactional repository writes. Possible past-plan changes require an acknowledgment. WorkRecord/snapshot/payment/backup data and migration history are untouched. Skipping pay writes nothing and saved profiles are reloaded.
+- Validation after final fixes: typecheck PASS; lint PASS; `npm test` **305/305 PASS**; Android Hermes export PASS (1311 modules, 3.5 MB); iOS Hermes export PASS (1309 modules, 3.5 MB); diff check PASS. Expo Doctor 18/20; only remote Expo schema and RN Directory metadata checks failed due DNS/server network availability. `npm ci` was unavailable because npm registry DNS failed; dependency lock unchanged and current node_modules content copied from the same-lockfile source tree for local verification.
+- Independent R2 UI reviewer: APPROVE, no open P0/P1/P2 after increasing custom cycle tap targets to 44 px. P3 only: long custom template names can truncate visually while full screen-reader label remains.
+- Independent R2 data-safety reviewer: APPROVE, no open P0/P1/P2. Malformed saved historical baseline now fails validation and rehydrates from the live stored cycle; regression tests cover invalid/null baseline shapes.
+- PR #41 is open/draft/unmerged against PR #39's head branch. Implementation commit `f2c81afebca9850dca8edbc1a565652df60a4b53`; GitHub Actions CI run #60 (`42668995724`) PASS (locked install, typecheck, lint, unit tests, dependency health). PR body includes verification and NOT RUN disclosures. No merge/rebase/force-push/release.
+- Real Android/iOS user acceptance, screenshots, large text and TalkBack/VoiceOver NOT RUN. Source worktree local changes remain untouched. The copied VDY-015A report is preserved locally and excluded from selected commit.
+- NEXT ACTION: User performs iPhone/Expo Go acceptance from `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`; do not start VDY-015C until the 30-day preview and save flow are accepted.
+
+### 2026-11-09 — VDY-015B — PR #41 COMPLETION STATE REGRESSION FIX
+
+- Read the latest PR review finding (P1): Settings/onboarding progress writes could persist `completed:false` for an already configured user, causing `app/index.tsx` to route into required onboarding on next launch.
+- Skills for this correction: `vardiyam-task-flow`, `vardiyam-data-safety`, `vardiyam-test-gate` read and applied. Change is metadata state protection, so UI/Pro Max is not applicable to the narrow fix.
+- `app_preferences` metadata now stores completion separately from the wizard step, transactionally. Completion stays true across settings entry, step navigation and abandoning the wizard. A first-run user's false marker and progress step persist; existing legacy installs with a downgraded flag are recovered from stored shift/pay/work data. No database migration or existing product data mutation was added.
+- Regressions cover a legacy downgraded existing user who exits at step 0 then step 2 and cold-starts into tabs, unchanged cycle/template/pay-profile/work-record data, and a first-time user who saves a schedule then resumes at step 5 as incomplete. Existing preview/schedule save tests remain in the full suite.
+- Focused onboarding tests PASS 36/36; full suite **307/307 PASS**; typecheck PASS; lint PASS; Android Hermes export PASS (1311 modules, 3.5 MB); iOS Hermes export PASS (1309 modules, 3.5 MB); `git diff --check` PASS. Independent data-safety reviewer APPROVE, no P0/P1/P2. Real device NOT RUN.
+- Fix commit `d4336500392f288315590dc3adc7bcd9e59f8e25` pushed to PR #41. GitHub Actions run #62 (`42687174860`) PASS. No merge/rebase/force-push/release.
+- NEXT ACTION: User performs real iPhone/Expo Go acceptance. This code is ready for that test, but VDY-015B is not device-accepted yet.

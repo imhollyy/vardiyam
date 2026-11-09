@@ -33,6 +33,8 @@ export type ScheduleDraft = {
   anchorLocalDate: LocalDate;
   pattern: ShiftPattern;
   startTemplateIndex: number;
+  /** Explicit phase selection for custom cycles, including an OFF first entry. */
+  startEntryIndex?: number;
   preservedStartEntryIndex?: number;
   templates: readonly ShiftTemplate[];
   customEntries: readonly CustomEntryDraft[];
@@ -94,32 +96,25 @@ export function buildShiftSchedule(draft: ScheduleDraft): BuiltSchedule {
           : { kind: 'SHIFT', templateId: templateAt(draft, entry.templateIndex).id },
       );
       cycle = createCustomShiftCycle(base, entries);
-      const savedStart = draft.preservedStartEntryIndex;
-      const savedEntry = savedStart === undefined ? undefined : cycle.entries[savedStart];
-      if (savedStart !== undefined && savedEntry?.kind === 'OFF') {
-        // Reopening an existing schedule must retain an OFF anchor as well as a shift anchor.
-        cycle.startIndex = savedStart;
-        break;
-      }
-      const selectedStart =
-        savedStart !== undefined && savedEntry?.kind === 'SHIFT' && savedEntry.templateId === selectedTemplate.id
-          ? savedStart
-          : cycle.entries.findIndex(
-              (entry) => entry.kind === 'SHIFT' && entry.templateId === selectedTemplate.id,
-            );
+      const selectedStart = draft.startEntryIndex ?? draft.preservedStartEntryIndex ?? cycle.entries.findIndex(
+        (entry) => entry.kind === 'SHIFT' && entry.templateId === selectedTemplate.id,
+      );
       if (selectedStart < 0) {
         throw new Error('Başlangıç vardiyası özel düzende kullanılmalıdır.');
       }
+      if (selectedStart >= cycle.entries.length) throw new Error('Döngü başlangıç günü bulunamadı.');
       cycle.startIndex = selectedStart;
       break;
     }
   }
 
   // Keep a saved cycle's exact phase when the edit preserves its start shift.
-  const preservedStart = draft.preservedStartEntryIndex;
-  const preservedEntry = preservedStart === undefined ? undefined : cycle.entries[preservedStart];
-  if (preservedStart !== undefined && preservedEntry?.kind === 'SHIFT' && preservedEntry.templateId === selectedTemplate.id) {
-    cycle.startIndex = preservedStart;
+  if (draft.pattern !== 'custom') {
+    const preservedStart = draft.preservedStartEntryIndex;
+    const preservedEntry = preservedStart === undefined ? undefined : cycle.entries[preservedStart];
+    if (preservedStart !== undefined && preservedEntry?.kind === 'SHIFT' && preservedEntry.templateId === selectedTemplate.id) {
+      cycle.startIndex = preservedStart;
+    }
   }
 
   validateShiftCycle(cycle, [...draft.templates]);
