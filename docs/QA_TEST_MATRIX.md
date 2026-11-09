@@ -462,4 +462,4 @@ No SQLite schema/migrations, recovery/backup flow, financial calculations, or pa
 | Data-safety independent review | PASS | Re-review closed v8 compatibility P1 and verification P2; no remaining P0/P1/P2. |
 | Device UI, VoiceOver/TalkBack, actual unsaved prompt interaction | NOT RUN | No physical-device acceptance in this review pass. |
 | Earnings runtime console error | UNVERIFIED | No device log supplied. Historic Today date stack is separate; do not mark Earnings issue fixed. |
-| GitHub CI for follow-up commit | PENDING | To be recorded after the small commit is pushed to PR #39. |
+| GitHub CI for follow-up code commit | PASS | Actions run #42621544548, “Verify Expo scaffold”, SHA `38ec5c412e36062e283c5b6f8d738099c9749734`. |
