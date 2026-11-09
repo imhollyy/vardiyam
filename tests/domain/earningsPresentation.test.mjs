@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { canApproveEarnings, shouldShowGrossEstimate } from '../../src/features/earnings/presentation.ts';
-import { createDefaultRules, createDefaultSettings, earningsOnboardingDraft, earningsPayEffectiveFromOnboardingSave, earningsRulesForOnboardingSave, isEarningsSettings, makeCalculationInput } from '../../src/features/earnings/profile.ts';
+import { createDefaultRules, createDefaultSettings, earningsOnboardingDraft, earningsPayEffectiveFromOnboardingSave, earningsRulesForOnboardingSave, isEarningsRules, isEarningsSettings, makeCalculationInput } from '../../src/features/earnings/profile.ts';
 
 test('net-only and skip modes omit the gross estimate presentation entirely', () => {
   assert.equal(shouldShowGrossEstimate('NET_ONLY'), false);
@@ -77,6 +77,14 @@ test('earnings profile guard rejects malformed period and timezone values while 
   assert.equal(isEarningsSettings({ ...defaults, weeklyMinutes: Number.NaN }), false);
   assert.equal(isEarningsSettings({ ...defaults, mode: 'MONTHLY_GROSS', monthlyGrossMinor: 4_000_000 }), false);
   assert.equal(isEarningsSettings({ ...defaults, payEffectiveFromUtc: '2026-02-31T00:00:00.000Z' }), false);
+});
+
+test('earnings settings accepts only unique, well-formed rule versions before rendering them', () => {
+  const rules = createDefaultRules();
+  assert.equal(isEarningsRules(rules), true);
+  assert.equal(isEarningsRules([rules[0], null]), false);
+  assert.equal(isEarningsRules([rules[0], rules[0]]), false);
+  assert.equal(isEarningsRules([{ ...rules[0], effectiveToUtc: '1999-01-01T00:00:00.000Z' }]), false);
 });
 
 test('work records before the saved pay profile effective date remain uncertain', () => {

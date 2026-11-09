@@ -170,6 +170,27 @@ export function isEarningsSettings(value: unknown): value is EarningsSettings {
   return true;
 }
 
+export function isEarningsRules(value: unknown): value is EarningsRule[] {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const kinds = new Set<string>();
+  return value.every((candidate: unknown) => {
+    if (!candidate || typeof candidate !== 'object') return false;
+    const rule = candidate as Partial<EarningsRule>;
+    if (typeof rule.id !== 'string' || !rule.id.trim() || typeof rule.name !== 'string' || !rule.name.trim() ||
+        !['NORMAL', 'EXTRA_HOURS', 'OVERTIME', 'CALENDAR_WEEKEND', 'WORKPLACE_REST_DAY', 'PUBLIC_HOLIDAY', 'WORKPLACE_HOLIDAY'].includes(rule.kind ?? '') ||
+        !Number.isSafeInteger(rule.multiplierBasisPoints) || (rule.multiplierBasisPoints ?? -1) < 0 ||
+        !['FULL_MULTIPLIER', 'PREMIUM_ONLY', 'INCLUDED_IN_BASE'].includes(rule.amountBasis ?? '') ||
+        typeof rule.effectiveFromUtc !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(rule.effectiveFromUtc) ||
+        !Number.isFinite(Date.parse(rule.effectiveFromUtc)) || new Date(Date.parse(rule.effectiveFromUtc)).toISOString() !== rule.effectiveFromUtc ||
+        (rule.effectiveToUtc !== null && (typeof rule.effectiveToUtc !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(rule.effectiveToUtc) ||
+          !Number.isFinite(Date.parse(rule.effectiveToUtc)) || new Date(Date.parse(rule.effectiveToUtc)).toISOString() !== rule.effectiveToUtc || Date.parse(rule.effectiveToUtc) <= Date.parse(rule.effectiveFromUtc)))) return false;
+    const kind = rule.kind as string;
+    if (kinds.has(kind)) return false;
+    kinds.add(kind);
+    return true;
+  });
+}
+
 export function makeCalculationInput(args: {
   settings: EarningsSettings;
   rules: readonly EarningsRule[];

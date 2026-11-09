@@ -476,3 +476,19 @@ No SQLite schema/migrations, recovery/backup flow, financial calculations, or pa
 | Independent UI review | PASS | Reviewer confirmed no remaining P0–P2; empty dates map to Pressable `Cell`, padding stays noninteractive. |
 | GitHub CI | PASS | Actions run #42627688741, “Verify Expo scaffold”, commit `fb45ed48fad3fdc81dfa914372bf681974f51caf`. |
 | Device/TalkBack/VoiceOver | NOT RUN | No physical-device test in this turn. |
+
+### VDY-014 Earnings Settings iOS report follow-up (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| RULES.map root field has stable React identity | PASS (code review) | `field()` root View now receives `key={kind}`; RULES kinds are distinct. |
+| Stored earnings rule JSON rejected safely before render | PASS | New `isEarningsRules` guard rejects null, duplicate kinds, malformed shape and reversed validity intervals; invalid profile load preserves local data and disables save. |
+| Basic vs advanced settings hierarchy | PASS (code review) | Pay type/amount, payroll day, weekly hours visible; technical multiplier/holiday/validity details collapsed under “Gelişmiş Ayarlar”. |
+| NET_ONLY/SKIP, pay/rule approval and version history semantics | PASS (regression/code review) | Only UI placement and rule hydration guard changed; no finance engine, repository, schema, approval, or snapshot write semantics changed. Existing gross visibility suite retained. |
+| Advanced-field validation discoverability | PASS | Validation opens advanced disclosure before the existing alert; save behavior is unchanged. |
+| TypeScript / ESLint / full unit suite | PASS | `npm run typecheck`, `npm run lint`, `npm test` **295/295**. |
+| iOS Hermes export | PASS | `npx.cmd expo export --platform ios`; 1,308 modules, 3.5 MB Hermes bundle. Worktree-local process `TEMP/TMP` required after sandbox temp write denial. |
+| Android Hermes export | PASS | `npx.cmd expo export --platform android`; 1,310 modules, 3.5 MB Hermes bundle. Same process-scoped workaround. |
+| Independent UI/accessibility review | PASS | **APPROVE**, no P0/P1. Reviewer noted malformed loaded rules and advanced validation visibility; both addressed. |
+| Physical iPhone/Expo Go matrix: empty/current/custom/NET_ONLY/SKIP profile, save and reopen | NOT RUN | No connected device interaction; first Metro ERROR line remains unavailable. Do not treat export or CI as runtime proof. |
+| GitHub CI | PENDING | Code/docs commit and PR push pending. |
