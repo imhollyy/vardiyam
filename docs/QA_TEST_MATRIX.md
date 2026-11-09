@@ -441,4 +441,4 @@ No SQLite schema/migrations, recovery/backup flow, financial calculations, or pa
 | iOS Hermes export | PASS | `npx expo export --platform ios`; `.hbc`, 1,307 modules, 3.5 MB. Same scoped temp workaround. |
 | iPhone/Android runtime, native picker, screenshot, small/large text, VoiceOver/TalkBack | NOT RUN | No device interaction. iOS runtime log for prior `Ay seçimi geçersiz` report was not available; root cause remains `BLOCKED_NEEDS_RUNTIME_LOG`. |
 | Independent R2 review | PASS | Data-safety **APPROVE**, no P0/P1/P2; UI/accessibility **APPROVE**, no static P0/P1. Device checks remain open. |
-| GitHub Actions | PENDING | Will report after draft PR creation and CI run. |
+| GitHub Actions | PASS | Draft PR #39, Actions run #51 (`42616797249`), job “Verify Expo scaffold” succeeded for commit `cb4a6172ff939de765714202b2f459dc56cf2c3e`. |
