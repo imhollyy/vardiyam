@@ -7,7 +7,7 @@
 - **Tarih:** 2026-11-09
 - **Proje:** Vardiyam
 - **Aktif aşama:** VDY-015B — kolay vardiya kurulumu ve 30 günlük önizleme
-- **Durum:** IN PROGRESS / R2. PR #39 head `d58ab0d1c49b1cde4013fe70e01c01988d3e6445` doğrulandı. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`, dal `feat/vdy-015b-easy-shift-onboarding`. Kaynak worktree'deki `.gitignore`, `expo-env.d.ts`, VDY-015A raporu ve kullanıcı değişiklikleri korunuyor. PR taslağı/CI teslimatı bekliyor; gerçek cihaz kabulü yapılmadı.
+- **Durum:** IMPLEMENTATION DONE / gerçek kullanıcı cihaz kabulini bekliyor. PR #39 head `d58ab0d1c49b1cde4013fe70e01c01988d3e6445` doğrulandı. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`, dal `feat/vdy-015b-easy-shift-onboarding`. Kaynak worktree'deki `.gitignore`, `expo-env.d.ts`, VDY-015A raporu ve kullanıcı değişiklikleri korunuyor. Taslak PR #41 ve GitHub CI run #60 PASS. Fiziksel cihaz kabul testi yapılmadı.
 - **Aktif branch:** feat/vdy-015b-easy-shift-onboarding
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
@@ -22,7 +22,7 @@
 
 ## NEXT ACTION
 
-1. VDY-015B kanıtlarını ve bağımsız incelemeleri kaydet; seçili dosyaları commit edip PR #39 dalına karşı taslak PR aç. Kullanıcı cihaz kabuline kadar VDY-015C'ye geçme.
+1. Taslak PR #41 için iPhone/Expo Go kullanıcı kabulini yap. Takvim önizlemesi, native picker, ücret adımını atlama ve kayıtlı döngüyü düzenleme kabul edilmeden VDY-015C'ye geçme.
 
 ### 2026-11-07 — VDY-014 — IMPLEMENTATION / VERIFICATION CHECKPOINT
 
@@ -713,5 +713,6 @@ NEXT ACTION:
 - Validation after final fixes: typecheck PASS; lint PASS; `npm test` **305/305 PASS**; Android Hermes export PASS (1311 modules, 3.5 MB); iOS Hermes export PASS (1309 modules, 3.5 MB); diff check PASS. Expo Doctor 18/20; only remote Expo schema and RN Directory metadata checks failed due DNS/server network availability. `npm ci` was unavailable because npm registry DNS failed; dependency lock unchanged and current node_modules content copied from the same-lockfile source tree for local verification.
 - Independent R2 UI reviewer: APPROVE, no open P0/P1/P2 after increasing custom cycle tap targets to 44 px. P3 only: long custom template names can truncate visually while full screen-reader label remains.
 - Independent R2 data-safety reviewer: APPROVE, no open P0/P1/P2. Malformed saved historical baseline now fails validation and rehydrates from the live stored cycle; regression tests cover invalid/null baseline shapes.
-- Real Android/iOS user acceptance, screenshots, large text and TalkBack/VoiceOver NOT RUN. No CI result yet; it will be read after the draft PR is opened. Source worktree local changes remain untouched. The copied VDY-015A report is preserved locally and excluded from selected commit.
-- NEXT ACTION: Commit only VDY-015B code/tests/task/progress files, push the branch and create a draft PR against PR #39; then inspect its CI. Do not merge/rebase/release.
+- PR #41 is open/draft/unmerged against PR #39's head branch. Implementation commit `f2c81afebca9850dca8edbc1a565652df60a4b53`; GitHub Actions CI run #60 (`42668995724`) PASS (locked install, typecheck, lint, unit tests, dependency health). PR body includes verification and NOT RUN disclosures. No merge/rebase/force-push/release.
+- Real Android/iOS user acceptance, screenshots, large text and TalkBack/VoiceOver NOT RUN. Source worktree local changes remain untouched. The copied VDY-015A report is preserved locally and excluded from selected commit.
+- NEXT ACTION: User performs iPhone/Expo Go acceptance from `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`; do not start VDY-015C until the 30-day preview and save flow are accepted.
