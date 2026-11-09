@@ -171,7 +171,8 @@ export function isEarningsSettings(value: unknown): value is EarningsSettings {
 }
 
 export function isEarningsRules(value: unknown): value is EarningsRule[] {
-  if (!Array.isArray(value) || value.length === 0) return false;
+  const requiredKinds = ['NORMAL', 'EXTRA_HOURS', 'OVERTIME', 'CALENDAR_WEEKEND', 'WORKPLACE_REST_DAY', 'PUBLIC_HOLIDAY', 'WORKPLACE_HOLIDAY'];
+  if (!Array.isArray(value) || value.length !== requiredKinds.length) return false;
   const kinds = new Set<string>();
   return value.every((candidate: unknown) => {
     if (!candidate || typeof candidate !== 'object') return false;
@@ -185,10 +186,10 @@ export function isEarningsRules(value: unknown): value is EarningsRule[] {
         (rule.effectiveToUtc !== null && (typeof rule.effectiveToUtc !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(rule.effectiveToUtc) ||
           !Number.isFinite(Date.parse(rule.effectiveToUtc)) || new Date(Date.parse(rule.effectiveToUtc)).toISOString() !== rule.effectiveToUtc || Date.parse(rule.effectiveToUtc) <= Date.parse(rule.effectiveFromUtc)))) return false;
     const kind = rule.kind as string;
-    if (kinds.has(kind)) return false;
+    if (!requiredKinds.includes(kind) || kinds.has(kind)) return false;
     kinds.add(kind);
     return true;
-  });
+  }) && requiredKinds.every((kind) => kinds.has(kind));
 }
 
 export function makeCalculationInput(args: {

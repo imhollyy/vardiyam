@@ -84,6 +84,7 @@ test('earnings settings accepts only unique, well-formed rule versions before re
   assert.equal(isEarningsRules(rules), true);
   assert.equal(isEarningsRules([rules[0], null]), false);
   assert.equal(isEarningsRules([rules[0], rules[0]]), false);
+  assert.equal(isEarningsRules(rules.slice(1)), false);
   assert.equal(isEarningsRules([{ ...rules[0], effectiveToUtc: '1999-01-01T00:00:00.000Z' }]), false);
 });
 
