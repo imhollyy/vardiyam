@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { initializeDatabase } from '../../src/data/database.ts';
-import { getOnboardingState, getReportsRewardState, getThemePreference, saveOnboardingState, saveReportsRewardState, saveThemePreference } from '../../src/data/appPreferencesRepository.ts';
+import { clearOnboardingScheduleDraft, getOnboardingScheduleDraft, getOnboardingState, getReportsRewardState, getThemePreference, saveOnboardingScheduleDraft, saveOnboardingState, saveReportsRewardState, saveThemePreference } from '../../src/data/appPreferencesRepository.ts';
 import { saveShiftSchedule } from '../../src/data/shiftCycleRepository.ts';
 import { buildShiftSchedule } from '../../src/features/shifts/schedule.ts';
+import { previewNext30Days } from '../../src/features/onboarding/scheduleDraft.ts';
 
 function adapter(sqlite) {
   return {
@@ -42,6 +43,54 @@ test('onboarding steps, theme, and reports preview state persist locally across 
     try { sqlite.close(); } catch { /* Database already closed to verify on-disk persistence. */ }
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('onboarding draft and preview step survive a cold SQLite reopen and can be cleared after finish', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'vardiyam-onboarding-draft-'));
+  const path = join(directory, 'preferences.db');
+  const sqlite = new DatabaseSync(path);
+  const draft = {
+    version: 1, pattern: 'custom', anchorLocalDate: '2026-12-20', startTemplateIndex: 0,
+    startEntryIndex: 1, cycleId: 'stable-cycle-id', templates: [], customEntries: [{ kind: 'OFF' }],
+  };
+  try {
+    const database = adapter(sqlite);
+    await initializeDatabase(database);
+    await saveOnboardingScheduleDraft(database, draft);
+    await saveOnboardingState(database, { step: 4, completed: false });
+    sqlite.close();
+    const reopened = new DatabaseSync(path);
+    const reopenedDatabase = adapter(reopened);
+    assert.deepEqual(await getOnboardingState(reopenedDatabase), { step: 4, completed: false });
+    assert.deepEqual(await getOnboardingScheduleDraft(reopenedDatabase), draft);
+    await saveOnboardingState(reopenedDatabase, { step: 6, completed: true });
+    await clearOnboardingScheduleDraft(reopenedDatabase);
+    assert.equal(await getOnboardingScheduleDraft(reopenedDatabase), null);
+    reopened.close();
+  } finally {
+    try { sqlite.close(); } catch { /* Database already closed after cold reopen verification. */ }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('showing the 30-day onboarding preview does not write shift cycles or templates', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    const database = adapter(sqlite);
+    await initializeDatabase(database);
+    const draft = {
+      version: 1, pattern: 'fixed', anchorLocalDate: '2026-11-09', startTemplateIndex: 0,
+      startEntryIndex: 0, cycleId: 'preview-only-cycle',
+      templates: [{ id: 'preview-only-template', code: 'PREVIEW', name: 'Sabit vardiya', startLocalTime: '08:00', endLocalTime: '16:00' }],
+      customEntries: [], baseline: null, baselinePatternUnknown: false,
+    };
+    const count = (table) => sqlite.prepare(`SELECT COUNT(*) AS count FROM ${table};`).get().count;
+    assert.equal(count('shift_cycles'), 0);
+    assert.equal(count('shift_templates'), 0);
+    assert.equal(previewNext30Days(draft, '2026-11-09').length, 30);
+    assert.equal(count('shift_cycles'), 0);
+    assert.equal(count('shift_templates'), 0);
+  } finally { sqlite.close(); }
 });
 
 test('existing configured installs skip onboarding when no onboarding preference exists', async () => {

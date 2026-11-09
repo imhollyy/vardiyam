@@ -116,6 +116,29 @@ test('saving an edited schedule is atomic and keeps existing date overrides', as
   } finally { sqlite.close(); }
 });
 
+test('reconfirming a reopened schedule reuses cycle/template IDs and does not touch work records', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    const templates = [day()];
+    const saved = {
+      id: 'stable-cycle', name: 'Vardiya düzenim', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-01-01', startIndex: 0,
+      entries: [{ kind: 'SHIFT', templateId: 'day' }],
+    };
+    await saveShiftSchedule(database, templates, saved);
+    sqlite.prepare("INSERT INTO work_records(id,record_source,started_at_utc,ended_at_utc,timezone,break_minutes,note) VALUES('existing-work','MANUAL','2026-01-04T05:00:00.000Z','2026-01-04T13:00:00.000Z','Europe/Istanbul',0,NULL);").run();
+
+    const updatedTemplate = { ...templates[0], startLocalTime: '09:00' };
+    const updated = { ...saved, entries: [{ kind: 'SHIFT', templateId: 'day' }] };
+    await saveShiftSchedule(database, [updatedTemplate], updated);
+    await saveShiftSchedule(database, [updatedTemplate], updated);
+
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM shift_cycles WHERE id='stable-cycle';").get().count, 1);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM shift_templates WHERE id='day';").get().count, 1);
+    assert.equal(sqlite.prepare("SELECT start_local_time FROM shift_templates WHERE id='day';").get().start_local_time, '09:00');
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM work_records WHERE id='existing-work';").get().count, 1);
+  } finally { sqlite.close(); }
+});
+
 test('repository edit round-trip keeps the saved cycle phase exactly', async () => {
   const { sqlite, database } = await setup();
   try {

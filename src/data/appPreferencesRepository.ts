@@ -6,6 +6,7 @@ export type ThemePreference = 'light' | 'dark';
 
 export type OnboardingState = { step: number; completed: boolean };
 export type ReportsRewardState = { expiresAtUtc: string | null; lastUsedLocalDate: string | null };
+const MAX_ONBOARDING_STEP = 6;
 
 async function getMetadata(database: SQLiteDatabase, key: string): Promise<string | null> {
   return withDatabaseOperation(database, async () => {
@@ -26,7 +27,7 @@ export async function getOnboardingState(database: SQLiteDatabase): Promise<Onbo
   if (value) {
     try {
       const parsed = JSON.parse(value) as Partial<OnboardingState>;
-      if (Number.isInteger(parsed.step) && (parsed.step ?? -1) >= 0 && (parsed.step ?? 9) <= 3 && typeof parsed.completed === 'boolean') {
+      if (Number.isInteger(parsed.step) && (parsed.step ?? -1) >= 0 && (parsed.step ?? MAX_ONBOARDING_STEP + 1) <= MAX_ONBOARDING_STEP && typeof parsed.completed === 'boolean') {
         return { step: parsed.step as number, completed: parsed.completed };
       }
     } catch { /* Invalid local preference is safely ignored. */ }
@@ -42,8 +43,27 @@ export async function getOnboardingState(database: SQLiteDatabase): Promise<Onbo
 }
 
 export async function saveOnboardingState(database: SQLiteDatabase, state: OnboardingState): Promise<void> {
-  if (!Number.isInteger(state.step) || state.step < 0 || state.step > 3) throw new Error('Onboarding step is invalid.');
+  if (!Number.isInteger(state.step) || state.step < 0 || state.step > MAX_ONBOARDING_STEP) throw new Error('Onboarding step is invalid.');
   await saveMetadata(database, 'onboarding_state', JSON.stringify(state));
+}
+
+export async function getOnboardingScheduleDraft<T = unknown>(database: SQLiteDatabase): Promise<T | null> {
+  const value = await getMetadata(database, 'onboarding_schedule_draft');
+  if (!value) return null;
+  try { return JSON.parse(value) as T; } catch { return null; }
+}
+
+export async function saveOnboardingScheduleDraft(database: SQLiteDatabase, draft: unknown): Promise<void> {
+  let serialized: string;
+  try { serialized = JSON.stringify(draft); } catch { throw new Error('Kurulum taslağı kaydedilemedi.'); }
+  if (!serialized || serialized.length > 100_000) throw new Error('Kurulum taslağı geçersiz veya çok büyük.');
+  await saveMetadata(database, 'onboarding_schedule_draft', serialized);
+}
+
+export async function clearOnboardingScheduleDraft(database: SQLiteDatabase): Promise<void> {
+  await withDatabaseTransaction(database, async () => {
+    await database.runAsync("DELETE FROM app_metadata WHERE key = 'onboarding_schedule_draft';");
+  });
 }
 
 export async function getReportsRewardState(database: SQLiteDatabase): Promise<ReportsRewardState> {

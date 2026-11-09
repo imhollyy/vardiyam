@@ -67,6 +67,16 @@ test('reopening a custom schedule preserves an OFF anchor phase', () => {
   assert.deepEqual(edited.cycle.entries[edited.cycle.startIndex], { kind: 'OFF' });
 });
 
+test('a new custom cycle can explicitly start on an OFF phase', () => {
+  const built = buildShiftSchedule(draft('custom', {
+    startTemplateIndex: 0,
+    startEntryIndex: 1,
+    customEntries: [{ kind: 'SHIFT', templateIndex: 0 }, { kind: 'OFF' }, { kind: 'SHIFT', templateIndex: 1 }],
+  }));
+  assert.equal(built.cycle.startIndex, 1);
+  assert.deepEqual(built.cycle.entries[built.cycle.startIndex], { kind: 'OFF' });
+});
+
 test('4+2 and 6+1 presets include OFF days without relabeling them as legal rest', () => {
   const fourTwo = buildShiftSchedule(draft('four-two', { startTemplateIndex: 1 }));
   assert.deepEqual(fourTwo.cycle.entries.map((entry) => entry.kind), [
