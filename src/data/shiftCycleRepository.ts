@@ -69,6 +69,7 @@ type OverrideRow = {
   template_id: string | null;
   reason: string | null;
 };
+type PlanTimeRow = { local_date: LocalDate; start_local_time: string; end_local_time: string };
 
 const TEMPLATE_SELECT =
   'SELECT id, code, name, start_local_time, end_local_time, color_token, icon_key FROM shift_templates';
@@ -170,6 +171,23 @@ async function listPlanOverridesInternal(
         );
 
   return rows.map(fromOverrideRow);
+}
+
+async function attachPlanTimes(database: ShiftCycleDatabase, cycleId: string, shifts: PlannedShift[], templates: readonly ShiftTemplate[]): Promise<PlannedShift[]> {
+  if (!shifts.length) return shifts;
+  const rows = await database.getAllAsync<PlanTimeRow>(
+    'SELECT local_date, start_local_time, end_local_time FROM plan_time_overrides WHERE cycle_id = ? AND local_date >= ? AND local_date <= ?;',
+    cycleId, shifts[0]!.localDate, shifts.at(-1)!.localDate,
+  );
+  const times = new Map(rows.map((row) => [row.local_date, row]));
+  const templatesById = new Map(templates.map((template) => [template.id, template]));
+  return shifts.map((shift) => {
+    if (shift.kind !== 'SHIFT' || !shift.templateId) return shift;
+    const template = templatesById.get(shift.templateId);
+    if (!template) return shift;
+    const override = times.get(shift.localDate);
+    return override ? { ...shift, startLocalTime: override.start_local_time, endLocalTime: override.end_local_time } : shift;
+  });
 }
 
 async function getShiftCycleInternal(
@@ -615,7 +633,8 @@ export async function getPlannedShiftForDate(
     const templates = await listShiftTemplatesInternal(database);
     const overrides = await listPlanOverridesInternal(database, cycleId, localDate, localDate);
     validatePlanOverrides(overrides, templates);
-    return getProjectedDay(cycle, templates, localDate, overrides);
+    const projected = getProjectedDay(cycle, templates, localDate, overrides);
+    return (await attachPlanTimes(database, cycleId, [projected], templates))[0]!;
   });
 }
 
@@ -640,7 +659,8 @@ export async function getPlannedShiftsForRange(
       endLocalDate,
     );
     validatePlanOverrides(overrides, templates);
-    return getProjectedRange(cycle, templates, startLocalDate, endLocalDate, overrides);
+    const projected = getProjectedRange(cycle, templates, startLocalDate, endLocalDate, overrides);
+    return attachPlanTimes(database, cycleId, projected, templates);
   });
 }
 

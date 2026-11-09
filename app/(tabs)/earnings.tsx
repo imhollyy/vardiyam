@@ -56,6 +56,7 @@ export default function EarningsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentLedger, setPaymentLedger] = useState<Awaited<ReturnType<typeof getPeriodPaymentLedger>> | null>(null);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   const period = useMemo(() => {
     const day = version?.profile.payrollPeriodStartDay ?? 1;
@@ -69,11 +70,12 @@ export default function EarningsScreen() {
     setLoading(true); setError(null); setPreview(null);
     try {
       const current = await getLatestEarningsProfile<EarningsSettings, EarningsRule[]>(database);
+      if (current && !isEarningsSettings(current.profile)) throw new Error('Kaydedilmiş ücret ayarları geçersiz. Tutar gösterilmedi; ayarları gözden geçir.');
       const paymentPeriod = payrollPeriodForMonth(periodMonth, current?.profile && isEarningsSettings(current.profile) ? current.profile.payrollPeriodStartDay : 1,
         current?.profile && isEarningsSettings(current.profile) ? current.profile.timezone : 'Europe/Istanbul');
       const persistedPeriod = await getOrCreatePayrollPeriod(database, paymentPeriod);
       setPaymentLedger(await getPeriodPaymentLedger(database, persistedPeriod.id));
-      if (!current || !isEarningsSettings(current.profile)) {
+      if (!current) {
         setVersion(null); setRecords([]); setWeekChoices([]); setHistory(await listApprovedEarningsSnapshots(database));
         return;
       }
@@ -205,7 +207,7 @@ export default function EarningsScreen() {
     {!version ? <View style={[styles.notice, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.cardTitle, { color: theme.foreground }]}>Ücret ayarları henüz yok</Text><Text style={[styles.body, { color: theme.muted }]}>Ücret seçimini kendin yap. Ücret girmeden de devam edebilirsin.</Text></View> : null}
     <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <SectionTitle icon="time-outline" title="Çalışma özeti" theme={theme} />
-      <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Fiilî net çalışma süresi</Text><Text style={[styles.metric, { color: theme.foreground }]}>{actualNetMinutes === null ? 'Belirsiz' : `${(actualNetMinutes / 60).toFixed(1)} sa`}</Text></View>
+      <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Fiilî net çalışma süresi</Text><Text style={[styles.metric, { color: theme.foreground }]}>{actualNetMinutes === null ? 'Belirsiz' : periodRecords.length === 0 ? 'Kayıt yok' : `${(actualNetMinutes / 60).toFixed(1)} sa`}</Text></View>
       {actualNetMinutes === null ? <Text style={[styles.caption, { color: theme.muted }]}>Dönem sınırından geçen bir kaydın mola saati bilinmiyor; net süreyi bu dönem için ayıramadık.</Text> : null}
       <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Planı kayıtlı vardiyalar</Text><Text style={[styles.metric, { color: theme.foreground }]}>{(linkedPlannedMinutes / 60).toFixed(1)} sa</Text></View>
       <Text style={[styles.caption, { color: theme.muted }]}>Planlanan süre yalnız fiilî kayda bağlı vardiyalardan toplanmıştır; tam takvim planı değildir.</Text>
@@ -233,12 +235,14 @@ export default function EarningsScreen() {
     {preview ? <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Text style={[styles.cardTitle, { color: theme.foreground }]}>Önizleme · {preview.result.status === 'COMPLETE' ? 'TAM' : preview.result.status === 'NO_GROSS_MODE' ? 'BRÜT HESABI YOK' : preview.result.status === 'PARTIAL' ? 'KISMİ' : 'TUTAR BEKLETİLDİ'}</Text>
       {preview.result.uncertainties.map((item, index) => <Text key={`${item.code}-${index}`} style={[styles.body, { color: theme.muted }]}>• {item.message}</Text>)}
-      {periodLines.map((line) => <View key={line.id} style={[styles.detail, { borderColor: theme.border }]}>
+      <View style={styles.metricRow}><Text style={[styles.body, { color: theme.muted }]}>Önizlemedeki fazla çalışma süresi</Text><Text style={[styles.metric, { color: theme.foreground }]}>{periodLines.length ? `${(periodLines.reduce((sum, line) => sum + line.minutes, 0) / 60).toFixed(1)} sa` : 'Kayıt yok'}</Text></View>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded((value) => !value)} style={styles.settingsLink}><Text style={[styles.body, { color: theme.accent, fontWeight: '800' }]}>{detailsExpanded ? 'Hesap kalemlerini gizle' : `Hesap kalemlerini göster (${periodLines.length})`}</Text><Ionicons name={detailsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.accent} /></Pressable>
+      {detailsExpanded ? periodLines.map((line) => <View key={line.id} style={[styles.detail, { borderColor: theme.border }]}>
         <Text style={[styles.body, { color: theme.foreground }]}>{shortTime(line.startedAtUtc)}–{shortTime(line.endedAtUtc)} · {line.minutes} dk</Text>
         <Text style={[styles.caption, { color: theme.muted }]}>{line.selectedRuleName ?? 'Eşleştirilen kural yok'} · {line.hourlyBaseDescription} · katsayı {line.multiplierBasisPoints === null ? 'belirsiz' : `${(line.multiplierBasisPoints / 10_000).toFixed(2)}×`}</Text>
         <Text style={[styles.caption, { color: theme.muted }]}>{line.selectionReason}</Text>
         {preview.result.status === 'COMPLETE' && line.amountMinor !== null ? <Text style={{ color: theme.accent, fontWeight: '700' }}>{money(line.amountMinor)}</Text> : null}
-      </View>)}
+      </View>) : null}
       {canApproveEarnings(preview.result) ? <Pressable accessibilityRole="button" disabled={saving} onPress={saveSnapshot} style={[styles.primary, { backgroundColor: theme.primaryAction }]}>{saving ? <ActivityIndicator color={theme.onPrimaryAction} /> : <Text style={[styles.primaryText, { color: theme.onPrimaryAction }]}>Önizlemeyi onayla ve geçmişe kaydet</Text>}</Pressable> : <Text style={[styles.caption, { color: theme.muted }]}>Kısmi veya bekletilen önizlemeler onaylı hesap olarak kaydedilemez.</Text>}
     </View> : null}
     <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.cardTitle, { color: theme.foreground }]}>Onaylı hesap geçmişi</Text>

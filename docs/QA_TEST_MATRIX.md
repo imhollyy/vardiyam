@@ -1,5 +1,19 @@
 # Vardiyam — Hesap ve Cihaz Test Matrisi v0.1
 
+## VDY-014 — Kazanç hata güvenliği ve kullanım akışı (2026-11-07)
+
+| Akış / kontrol | Otomatik kanıt | Platform kabulü | Sonuç |
+|---|---|---|---|
+| Hatalı bordro günü, saat dilimi ve dakika profili | `tests/domain/earningsPresentation.test.mjs` | iPhone log/repro yok | Otomatik PASS; gerçek runtime kök nedeni BLOCKED_NEEDS_RUNTIME_LOG |
+| Gün planı + durum/not birlikte kaydetme | `tests/data/workSessionRepository.test.mjs`; sentetik SQLite transaction rollback | Android/iOS UI NOT RUN | PASS; rollback kanıtlı, WorkRecord sıfır |
+| Onboarding vardiya/pattern/tarih/saat adımı | `buildShiftSchedule` domain regression + SQLite repository suite | Native picker/device NOT RUN | Static/export PASS; etkileşim cihazda doğrulanmadı |
+| Ücret ve bordro ayarı / ücret adımını atlama | profile guard + preferences/repository suite | Device NOT RUN | Otomatik PASS; ekran akışı cihaz kabulü bekliyor |
+| Kazanç özeti ve teknik detayların açıklanması | earnings UI render path + existing earnings/snapshot suite | Device NOT RUN | Bundle PASS; görünürlük/erişilebilirlik incelemesi sürüyor |
+| Android/iOS Hermes JS export | SDK 58 `expo export --platform android/ios` | Cihaz açılışı değil | PASS (Hermes bytecode); ilk deneme geçici klasör izin hatası, worktree temp ile tekrar PASS |
+| Expo Doctor | 20 kontrol | — | 18/20; `exp.host` DNS ve React Native Directory uzak yanıtı alınamadı |
+
+Final automated gate at checkpoint: typecheck PASS, lint PASS, `npm test` 280/280 PASS, `git diff --check` PASS. Independent data-safety and UI/accessibility reviews pending. No iPhone Metro log provided; no actual iOS runtime fix is claimed.
+
 ## VDY-010B — Tasarım sistemi, onboarding ve raporlar (2026-11-06)
 
 | Akış / kontrol | Otomatik kanıt | Gerçek UI/cihaz | Sonuç |
@@ -410,3 +424,21 @@ GitHub: draft PR #29 (eat/vdy-010a-home-ui → PR #25 head dalı), commit 39e3
 | Independent R2 UI/accessibility review | PASS | APPROVE; initial P1 and P2 findings fixed; re-review found no remaining static P0–P2 |
 
 No SQLite schema/migrations, recovery/backup flow, financial calculations, or payment reconciliation rules were changed.
+
+## VDY-014 — Kazanç runtime hatası ve kullanım akışları (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Additive schema v7→v8 preserves prior shift/user data; invalid planned wall-clock rejected | PASS | `tests/data/migrations.test.mjs`, real SQLite migration fixtures |
+| Day plan, planned times, status and note save atomically; injected error rolls all writes back | PASS | `tests/data/workSessionRepository.test.mjs`, in-memory SQLite |
+| Calendar opens shared day editor; day-specific planned times project and clock-in snapshot remains planned data | PASS (code/tests) | `app/(tabs)/calendar.tsx`, `app/(tabs)/index.tsx`, repository/domain tests |
+| Reopen onboarding updates existing cycle, preserves OFF anchor phase, stored pay mode/rate and custom workplace multipliers | PASS | `tests/data/workSessionRepository.test.mjs`, `tests/features/schedule.test.mjs`, `tests/domain/earningsPresentation.test.mjs` |
+| Skip wage step preserves previous values; period-only edit retains unchanged rate effective date | PASS | `tests/data/appPreferencesRepository.test.mjs`, `tests/domain/earningsPresentation.test.mjs` |
+| Earnings invalid-profile guard, empty period and expandable detail presentation | PASS (tests/code) | `tests/domain/earningsPresentation.test.mjs`, `app/(tabs)/earnings.tsx` |
+| TypeScript / ESLint / full suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` **287/287** |
+| Expo Doctor | PARTIAL (18/20) | Expo schema metadata DNS `ENOTFOUND exp.host`; React Native Directory endpoint returned unexpected server response. No dependency changes. |
+| Android Hermes export | PASS | `npx expo export --platform android`; `.hbc`, 1,309 modules, 3.5 MB. Worktree-scoped `TEMP/TMP` needed after sandbox Temp `index.hbc` permission denied. |
+| iOS Hermes export | PASS | `npx expo export --platform ios`; `.hbc`, 1,307 modules, 3.5 MB. Same scoped temp workaround. |
+| iPhone/Android runtime, native picker, screenshot, small/large text, VoiceOver/TalkBack | NOT RUN | No device interaction. iOS runtime log for prior `Ay seçimi geçersiz` report was not available; root cause remains `BLOCKED_NEEDS_RUNTIME_LOG`. |
+| Independent R2 review | PASS | Data-safety **APPROVE**, no P0/P1/P2; UI/accessibility **APPROVE**, no static P0/P1. Device checks remain open. |
+| GitHub Actions | PENDING | Will report after draft PR creation and CI run. |

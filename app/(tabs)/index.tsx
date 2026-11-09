@@ -4,18 +4,20 @@ import {
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
-import { deleteWorkDayStatus, getActiveWorkSession, listWorkDayStatuses, saveWorkDayStatus, startActiveWorkSession, type WorkDayStatus, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
-import { createPlanOverride, deletePlanOverride, getPlanOverride, getPlannedShiftsForRange, listShiftCycles, listShiftTemplates, updatePlanOverride } from '@/src/data/shiftCycleRepository';
+import { getActiveWorkSession, listWorkDayStatuses, startActiveWorkSession, type WorkDayStatus, type WorkDayStatusEntry } from '@/src/data/workSessionRepository';
+import { getPlannedShiftForDate, getPlannedShiftsForRange, listShiftCycles, listShiftTemplates } from '@/src/data/shiftCycleRepository';
+import { saveDayEdit } from '@/src/data/dayEditRepository';
 import { completeActiveWorkSessionWithRecord, listWorkRecordsWithTimedBreaks, type WorkRecordWithTimedBreaks } from '@/src/data/workRecordRepository';
 import { getLocalDateTimeCandidates, getRecordRangeDifferenceMinutes, localDateTimeToUtc, utcToLocalDateTime, type PlannedWorkSnapshot, type WorkRecord } from '@/src/domain/work-record';
-import { getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTemplate } from '@/src/domain/shift-cycle';
+import { dayOrdinal, getNominalShiftWindow, type PlannedShift, type ShiftCycle, type ShiftTemplate } from '@/src/domain/shift-cycle';
 import { addLocalDays, daysInMonth, formatLocalDate, formatMonthTitle, getLocalToday, localDateForMonthDay, monthForLocalDate, monthRange, mondayFirstOffset, mondayFirstWeekdayOffset, shiftYearMonth } from '@/src/features/shifts/dates';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { colors } from '@/src/theme/tokens';
 import { calendarMarker, canStartClockIn } from '@/src/features/shifts/presentation';
 import { ActionButton as SharedActionButton } from '@/src/components/ui/ActionButton';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 const ZONE = 'Europe/Istanbul';
@@ -80,9 +82,9 @@ function MiniCell({ date, plan, template, status, record, selected, onPress, the
   selected: boolean; onPress: () => void; theme: Theme;
 }) {
   const difference = record ? getRecordRangeDifferenceMinutes(record.record) : null;
-  const markerPresentation = calendarMarker({ planKind: plan?.kind, startLocalTime: template?.startLocalTime, status, completed: Boolean(record) });
+  const markerPresentation = calendarMarker({ planKind: plan?.kind, startLocalTime: plan?.startLocalTime ?? template?.startLocalTime, status, completed: Boolean(record) });
   const markerColor = theme[markerPresentation.tone];
-  const spokenStatus = record ? 'Çalışma tamamlandı' : status ? STATUS_LABELS[status] : plan?.kind === 'OFF' ? 'OFF' : plan?.kind === 'LEAVE' ? 'İzin planı' : plan?.kind === 'SHIFT' ? `${template?.name ?? 'Vardiya'} ${template?.startLocalTime ?? ''} ${template?.endLocalTime ?? ''}` : 'Plan yok';
+  const spokenStatus = record ? 'Çalışma tamamlandı' : status ? STATUS_LABELS[status] : plan?.kind === 'OFF' ? 'OFF' : plan?.kind === 'LEAVE' ? 'İzin planı' : plan?.kind === 'SHIFT' ? `${template?.name ?? 'Vardiya'} ${plan.startLocalTime ?? template?.startLocalTime ?? ''} ${plan.endLocalTime ?? template?.endLocalTime ?? ''}` : 'Plan yok';
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${formatLocalDate(date)}, ${spokenStatus}${difference === null ? '' : `, süre farkı ${difference > 0 ? '+' : difference < 0 ? 'eksi ' : ''}${durationLabel(Math.abs(difference))}`}`}
       accessibilityState={{ selected }} hitSlop={{ top: 2, bottom: 2, left: 3, right: 3 }} onPress={onPress} style={({ pressed }) => [styles.dayCell, {
@@ -99,6 +101,7 @@ function MiniCell({ date, plan, template, status, record, selected, onPress, the
 export default function TodayScreen() {
   const database = useAppDatabase();
   const router = useRouter();
+  const { openDate } = useLocalSearchParams<{ openDate?: string }>();
   const { theme, mode, toggleMode } = useAppTheme();
   const [now, setNow] = useState(() => new Date());
   const [monthOffset, setMonthOffset] = useState(0);
@@ -121,7 +124,10 @@ export default function TodayScreen() {
   const [sheetStatus, setSheetStatus] = useState<WorkDayStatus | null>(null);
   const [sheetNote, setSheetNote] = useState('');
   const [sheetPlanKind, setSheetPlanKind] = useState<'SHIFT' | 'OFF' | 'LEAVE'>('SHIFT');
+  const [sheetUseCycle, setSheetUseCycle] = useState(true);
   const [sheetTemplateId, setSheetTemplateId] = useState('');
+  const [sheetStartTime, setSheetStartTime] = useState('08:00');
+  const [sheetEndTime, setSheetEndTime] = useState('16:00');
   const [menu, setMenu] = useState<'profile' | 'notifications' | null>(null);
   const [editingTime, setEditingTime] = useState<'start' | 'end' | null>(null);
   const [draftTime, setDraftTime] = useState(() => dateForTime(localClock(new Date(), ZONE)));
@@ -227,7 +233,7 @@ export default function TodayScreen() {
       const startedAtUtc = localDateTimeToUtc(localDateTime, timezone);
       let planned: PlannedWorkSnapshot | null = null;
       if (todayPlan?.kind === 'SHIFT' && todayTemplate && cycle) {
-        const window = getNominalShiftWindow(today, todayTemplate.startLocalTime, todayTemplate.endLocalTime);
+        const window = getNominalShiftWindow(today, todayPlan.startLocalTime ?? todayTemplate.startLocalTime, todayPlan.endLocalTime ?? todayTemplate.endLocalTime);
         planned = {
           cycleId: cycle.id, localDate: today, templateId: todayTemplate.id, templateName: todayTemplate.name,
           startLocalDateTime: `${window.startDate}T${window.startLocalTime}`,
@@ -266,56 +272,74 @@ export default function TodayScreen() {
     } finally { setSaving(false); }
   };
 
-  const openDaySheet = (date: string) => {
+  const openDaySheet = useCallback((date: string) => {
     const plan = plansByDate.get(date);
     const defaultTemplateId = templates[0]?.id ?? '';
     setSelectedDate(date); setSheetStatus(statuses.get(date)?.status ?? null); setSheetNote(statuses.get(date)?.note ?? '');
     setSheetPlanKind(plan?.kind === 'OFF' || plan?.kind === 'LEAVE' ? plan.kind : 'SHIFT');
+    setSheetUseCycle(plan?.source !== 'OVERRIDE');
     setSheetTemplateId(plan?.kind === 'SHIFT' ? plan.templateId ?? defaultTemplateId : defaultTemplateId);
+    const template = templatesById.get(plan?.kind === 'SHIFT' ? plan.templateId ?? defaultTemplateId : defaultTemplateId);
+    setSheetStartTime(plan?.kind === 'SHIFT' ? plan.startLocalTime ?? template?.startLocalTime ?? '08:00' : template?.startLocalTime ?? '08:00');
+    setSheetEndTime(plan?.kind === 'SHIFT' ? plan.endLocalTime ?? template?.endLocalTime ?? '16:00' : template?.endLocalTime ?? '16:00');
     setError(null); setNotice(null);
-  };
-  const saveDayStatus = async () => {
+  }, [plansByDate, templatesById, statuses, templates]);
+  const saveDayChanges = async () => {
     if (!selectedDate) return;
-    setSaving(true); setError(null); setNotice(null);
-    try {
-      if (sheetStatus) await saveWorkDayStatus(database, { localDate: selectedDate, status: sheetStatus, note: sheetNote.trim() || null, updatedAtUtc: new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString() });
-      else await deleteWorkDayStatus(database, selectedDate);
-      setNotice('Gün bilgisi kaydedildi. Bu not mesai veya ücret hesabı kuralı oluşturmaz.');
-      await refreshRef.current?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Gün bilgisi kaydedilemedi.'); }
-    finally { setSaving(false); }
-  };
-
-  const saveDayPlan = async () => {
-    if (!selectedDate || !cycle) return;
     if (sheetPlanKind === 'SHIFT' && !templatesById.has(sheetTemplateId)) {
       setError('Bir vardiya şablonu seçmelisin.');
       return;
     }
     setSaving(true); setError(null); setNotice(null);
     try {
-      const existing = await getPlanOverride(database, cycle.id, selectedDate);
-      const override = sheetPlanKind === 'SHIFT'
+      const override = cycle && !sheetUseCycle ? (sheetPlanKind === 'SHIFT'
         ? { localDate: selectedDate, kind: 'SHIFT' as const, templateId: sheetTemplateId }
-        : { localDate: selectedDate, kind: sheetPlanKind };
-      if (existing) await updatePlanOverride(database, cycle.id, selectedDate, override);
-      else await createPlanOverride(database, cycle.id, override);
-      setNotice('Gün vardiya planı kaydedildi.');
+        : { localDate: selectedDate, kind: sheetPlanKind }) : null;
+      await saveDayEdit(database, { cycleId: cycle?.id ?? null, localDate: selectedDate, override, status: sheetStatus,
+        plannedTimes: override?.kind === 'SHIFT' ? { startLocalTime: sheetStartTime, endLocalTime: sheetEndTime } : null,
+        note: sheetNote.trim() || null, updatedAtUtc: new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString() });
+      setNotice('Gün planı ve durumu birlikte kaydedildi. Fiilî çalışma kayıtların değişmedi.');
       await refreshRef.current?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Gün vardiya planı kaydedilemedi.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Gün değişiklikleri kaydedilemedi. Değerlerin korunuyor.'); }
     finally { setSaving(false); }
   };
 
-  const resetDayPlan = async () => {
-    if (!selectedDate || !cycle) return;
-    setSaving(true); setError(null); setNotice(null);
-    try {
-      await deletePlanOverride(database, cycle.id, selectedDate);
-      setNotice('Gün, vardiya düzenindeki plana döndürüldü.');
-      await refreshRef.current?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Düzen varsayılan plana döndürülemedi.'); }
-    finally { setSaving(false); }
-  };
+  useEffect(() => {
+    if (loading || typeof openDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(openDate)) return;
+    try { dayOrdinal(openDate); } catch { return; }
+    const currentMonth = monthForLocalDate(getLocalToday(viewTimezone));
+    const targetMonth = openDate.slice(0, 7);
+    const [currentYear, currentMonthNumber] = currentMonth.split('-').map(Number);
+    const [targetYear, targetMonthNumber] = targetMonth.split('-').map(Number);
+    let active = true;
+    void (async () => {
+      try {
+        const [plan, statusRows] = await Promise.all([
+          cycle ? getPlannedShiftForDate(database, cycle.id, openDate) : Promise.resolve(null),
+          listWorkDayStatuses(database, openDate, openDate),
+        ]);
+        if (!active) return;
+        setMonthOffset((targetYear - currentYear) * 12 + targetMonthNumber - currentMonthNumber);
+        const status = statusRows[0] ?? null;
+        setPlans((current) => [...current.filter((item) => item.localDate !== openDate), ...(plan ? [plan] : [])]);
+        setStatuses((current) => { const next = new Map(current); if (status) next.set(openDate, status); else next.delete(openDate); return next; });
+        setSelectedDate(openDate); setSheetStatus(status?.status ?? null); setSheetNote(status?.note ?? '');
+        setSheetPlanKind(plan?.kind === 'OFF' || plan?.kind === 'LEAVE' ? plan.kind : 'SHIFT');
+        setSheetUseCycle(plan?.source !== 'OVERRIDE');
+        const defaultId = templates[0]?.id ?? '';
+        const templateId = plan?.kind === 'SHIFT' ? plan.templateId ?? defaultId : defaultId;
+        setSheetTemplateId(templateId);
+        const template = templatesById.get(templateId);
+        setSheetStartTime(plan?.kind === 'SHIFT' ? plan.startLocalTime ?? template?.startLocalTime ?? '08:00' : template?.startLocalTime ?? '08:00');
+        setSheetEndTime(plan?.kind === 'SHIFT' ? plan.endLocalTime ?? template?.endLocalTime ?? '16:00' : template?.endLocalTime ?? '16:00');
+        setError(null); setNotice(null);
+        router.setParams({ openDate: undefined });
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : 'Seçilen gün yüklenemedi.');
+      }
+    })();
+    return () => { active = false; };
+  }, [openDate, loading, cycle, database, router, templates, templatesById, viewTimezone]);
 
   const openAccount = () => { setMenu(null); router.push('/account'); };
   const openEarningsSettings = () => { setMenu(null); router.push('/earnings-settings'); };
@@ -471,7 +495,7 @@ export default function TodayScreen() {
           <View style={styles.sheetHeader}>
             <View style={styles.flex}>
               <Text accessibilityRole="header" style={[styles.sheetTitle, { color: theme.foreground }]}>{formatLocalDate(selectedDate, { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-              <Text style={[styles.sectionCaption, { color: theme.muted }]}>{selectedPlan?.kind === 'SHIFT' && selectedTemplate ? `${selectedTemplate.name} · ${selectedTemplate.startLocalTime}–${selectedTemplate.endLocalTime}` : selectedPlan?.kind === 'OFF' ? 'OFF · planlı boş gün' : selectedPlan?.kind === 'LEAVE' ? 'Planlı izin' : 'Planlı vardiya yok'}</Text>
+              <Text style={[styles.sectionCaption, { color: theme.muted }]}>{selectedPlan?.kind === 'SHIFT' && selectedTemplate ? `${selectedTemplate.name} · ${selectedPlan.startLocalTime ?? selectedTemplate.startLocalTime}–${selectedPlan.endLocalTime ?? selectedTemplate.endLocalTime}` : selectedPlan?.kind === 'OFF' ? 'OFF · planlı boş gün' : selectedPlan?.kind === 'LEAVE' ? 'Planlı izin' : 'Planlı vardiya yok'}</Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Gün panelini kapat" onPress={() => setSelectedDate(null)} style={[styles.closeButton, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={{ color: theme.foreground }}>×</Text></Pressable>
           </View>
@@ -490,20 +514,25 @@ export default function TodayScreen() {
           </View> : <Text style={[styles.sectionCaption, { color: theme.muted }]}>Bu gün için tamamlanmış çalışma kaydı yok.</Text>}
           <Text style={[styles.sheetLabel, { color: theme.muted }]}>Vardiya tipi</Text>
           <View style={styles.choicesRow}>
+            {cycle ? <Pressable accessibilityRole="button" accessibilityState={{ selected: sheetUseCycle }} onPress={() => setSheetUseCycle(true)} style={[styles.choice, { backgroundColor: sheetUseCycle ? theme.accentSurface : theme.surface, borderColor: sheetUseCycle ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>Döngü planı</Text></Pressable> : null}
             {(['SHIFT', 'OFF', 'LEAVE'] as const).map((kind) => {
               const label = kind === 'SHIFT' ? 'Vardiya' : kind === 'OFF' ? 'OFF' : 'İzin';
-              return <Pressable key={kind} accessibilityRole="button" accessibilityState={{ selected: sheetPlanKind === kind }} onPress={() => setSheetPlanKind(kind)} style={[styles.choice, { backgroundColor: sheetPlanKind === kind ? theme.accentSurface : theme.surface, borderColor: sheetPlanKind === kind ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{label}</Text></Pressable>;
+              const selected = !sheetUseCycle && sheetPlanKind === kind;
+              return <Pressable key={kind} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => { setSheetUseCycle(false); setSheetPlanKind(kind); }} style={[styles.choice, { backgroundColor: selected ? theme.accentSurface : theme.surface, borderColor: selected ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{label}</Text></Pressable>;
             })}
           </View>
           {sheetPlanKind === 'SHIFT' ? <>
-            <Text style={[styles.sheetLabel, { color: theme.muted }]}>Vardiya şablonu · başlangıç ve bitiş saati</Text>
+            <Text style={[styles.sheetLabel, { color: theme.muted }]}>Planlanan vardiya şablonu</Text>
             <View style={styles.choicesRow}>
-              {templates.length ? templates.map((template) => <Pressable key={template.id} accessibilityRole="button" accessibilityLabel={`${template.name}, ${template.startLocalTime}–${template.endLocalTime}`} accessibilityState={{ selected: sheetTemplateId === template.id }} onPress={() => setSheetTemplateId(template.id)} style={[styles.choice, { backgroundColor: sheetTemplateId === template.id ? theme.accentSurface : theme.surface, borderColor: sheetTemplateId === template.id ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{template.name} · {template.startLocalTime}–{template.endLocalTime}</Text></Pressable>) : <Text style={[styles.sectionCaption, { color: theme.muted }]}>Önce uygulama ayarlarından vardiya şablonu oluştur.</Text>}
+              {templates.length ? templates.map((template) => <Pressable key={template.id} accessibilityRole="button" accessibilityLabel={`${template.name}, ${template.startLocalTime}–${template.endLocalTime}`} accessibilityState={{ selected: sheetTemplateId === template.id }} onPress={() => { setSheetUseCycle(false); setSheetTemplateId(template.id); setSheetStartTime(template.startLocalTime); setSheetEndTime(template.endLocalTime); }} style={[styles.choice, { backgroundColor: sheetTemplateId === template.id ? theme.accentSurface : theme.surface, borderColor: sheetTemplateId === template.id ? theme.accent : theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>{template.name} · {template.startLocalTime}–{template.endLocalTime}</Text></Pressable>) : <Text style={[styles.sectionCaption, { color: theme.muted }]}>Önce uygulama ayarlarından vardiya şablonu oluştur.</Text>}
+            </View>
+            <View style={styles.choicesRow}>
+              <DateTimePickerField mode="time" label="Planlanan başlangıç" value={sheetStartTime} timezone={cycle?.timezone ?? ZONE} localDate={selectedDate ?? undefined} onChange={(value) => { setSheetUseCycle(false); setSheetStartTime(value); }} onError={setError} />
+              <DateTimePickerField mode="time" label="Planlanan bitiş" value={sheetEndTime} timezone={cycle?.timezone ?? ZONE} localDate={selectedDate ?? undefined} onChange={(value) => { setSheetUseCycle(false); setSheetEndTime(value); }} onError={setError} />
             </View>
           </> : null}
           <View style={styles.sheetActions}>
-            <Pressable accessibilityRole="button" disabled={saving || !cycle} onPress={() => void saveDayPlan()} style={[styles.sheetAction, { borderColor: theme.primaryAction, backgroundColor: theme.primaryAction }]}><Text style={[styles.sheetActionText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : 'Vardiya planını kaydet'}</Text></Pressable>
-            {cycle && plansByDate.has(selectedDate) ? <Pressable accessibilityRole="button" disabled={saving} onPress={() => void resetDayPlan()} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Düzeni kullan</Text></Pressable> : null}
+            {cycle ? <Text style={[styles.sectionCaption, { color: theme.muted }]}>Planlanan vardiya seçimi, fiilî çalışma kaydından ayrıdır.</Text> : null}
           </View>
           <Text style={[styles.sheetLabel, { color: theme.muted }]}>Gün durumu · çalışma/ücret hesabı kuralı değildir</Text>
           <View style={styles.choicesRow}>
@@ -514,8 +543,7 @@ export default function TodayScreen() {
           </View>
           <TextInput accessibilityLabel="Gün notu" value={sheetNote} onChangeText={setSheetNote} maxLength={2000} placeholder="Kısa not (isteğe bağlı)" placeholderTextColor={theme.muted} style={[styles.noteInput, { backgroundColor: theme.surface, color: theme.foreground, borderColor: theme.border }]} />
           <View style={styles.sheetActions}>
-            <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setSelectedDate(null); router.push({ pathname: '/(tabs)/calendar', params: { initialDate: selectedDate } }); }} style={[styles.sheetAction, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.sheetActionText, { color: theme.foreground }]}>Vardiya planını düzenle</Text></Pressable>
-            <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveDayStatus()} style={[styles.sheetAction, { borderColor: theme.primaryAction, backgroundColor: theme.primaryAction }]}><Text style={[styles.sheetActionText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : 'Gün bilgisini kaydet'}</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={saving} onPress={() => void saveDayChanges()} style={[styles.sheetAction, { borderColor: theme.primaryAction, backgroundColor: theme.primaryAction }]}><Text style={[styles.sheetActionText, { color: theme.onPrimaryAction }]}>{saving ? 'Kaydediliyor…' : 'Değişiklikleri Kaydet'}</Text></Pressable>
           </View>
           {error ? <Text accessibilityRole="alert" style={{ color: theme.danger }}>{error}</Text> : null}
           </ScrollView>

@@ -6,9 +6,9 @@
 
 - **Tarih:** 2026-11-07
 - **Proje:** Vardiyam
-- **Aktif aşama:** VDY-013 — Codex Skills kurulumu ve gerçek kullanım doğrulaması
-- **Durum:** DONE / beceri kurulumu, gerçek smoke ve CI PASS. Başlangıç HEAD `5bd957fd6325199ed6c2c1d38f86c11d8f55e9b2` doğrulandı; izole worktree `C:\Users\emrey\Documents\Codex\vdy-013-skills-routing`, dal `chore/vdy-013-skills-routing`. Vercel Skills CLI 1.7.6, Codex `find-skills` algısı, resmi UI UX Pro Max 2.15.0 kurulumu, Python 3.12.10 katalog araması ve ayrı Codex oturumunda UI becerilerinin gerçek kullanımı PASS. Commit `21335b96b9215209e50b808281c63c53c9bc873c`; PR #37 draft. GitHub Actions run #49 `42304155575` SUCCESS. Uygulama ekran kodu değiştirilmedi.
-- **Aktif branch:** chore/vdy-013-skills-routing
+- **Aktif aşama:** VDY-014 — Kazanç runtime hatası ve kullanım akışlarının sadeleştirilmesi
+- **Durum:** IN PROGRESS / R2 UI ve yerel veri akışları. PR #37 / `chore/vdy-013-skills-routing` HEAD `b3fb092556e5fb8850b32796e79571bc1689b9d4` doğrulandı. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-014-earnings-flow`, dal `feat/vdy-014-earnings-flow` aynı SHA'dan açıldı. Ana kullanıcı worktree'si ve VDY-013 worktree'deki altı untracked skill dizini değiştirilmedi. Gerçek iPhone Metro logu sağlanmadı; runtime kök neden iddiası beklemede, sentetik yeniden üretim incelemesi ve diğer akışlar devam ediyor.
+- **Aktif branch:** feat/vdy-014-earnings-flow
 - **Ana depo:** `imhollyy/vardiyam`
 - **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
 - **Expo/SQLite scaffold:** READY_FOR_PR
@@ -22,7 +22,17 @@
 
 ## NEXT ACTION
 
-1. PR #37 incelemesini bekle; VDY-014 bu görev kapsamında başlatılmadı.
+1. VDY-014 bağımsız reviewer bulgularını kapat, son doğrulamaları kaydet ve Issue #38'e bağlı taslak PR hazırla. Gerçek iPhone logu gelene kadar runtime kök nedeni bloke olarak kalsın.
+
+### 2026-11-07 — VDY-014 — IMPLEMENTATION / VERIFICATION CHECKPOINT
+
+- VDY-013 PR #37 head `b3fb092556e5fb8850b32796e79571bc1689b9d4` tabanından ayrı `feat/vdy-014-earnings-flow` worktree'si açıldı. Ana kullanıcı değişiklikleri ve VDY-013 skill dizinleri korundu.
+- Onboarding artık vardiya düzeni, seçilen başlangıç şablonu/tarihi ve yerel saatleri aynı akışta kaydediyor; ücret modu, bordro günü ve haftalık saat ayarı aynı adımda kalıcı yazılıyor. Atla akışı önceki vardiya kaydına dokunmuyor.
+- Bugün panelinde vardiya planı ve gün notu/durumu mevcut repository işlem kuyruğu içinde tek transaction ve tek kaydetme aksiyonuyla saklanıyor. Bu kayıt WorkRecord'e, ücret hesabına veya onaylı snapshot'a aktarılmıyor. Kazanç profili doğrulaması geçersiz dönem/saat dilimi değerlerini reddediyor; hesap kalemleri açılır ayrıntıya taşındı ve kayıtsız çalışma süresi `Kayıt yok` gösteriyor.
+- Gerçek iPhone logu yok. Sentetik incelemede hatalı ücret profilinin dönem/tutar üretmesini önleyecek hata yolu eklendi; ancak cihazdaki özgün açılış hatasının kök nedeni doğrulanmış değil (`BLOCKED_NEEDS_RUNTIME_LOG`).
+- Doğrulama checkpoint'i: typecheck PASS, lint PASS, npm test **280/280 PASS**; Expo Doctor 18/20 (2 uzak metadata kontrolü DNS/yanıt hatası); ilk Android/iOS Hermes çıkışı Windows izole geçici dizinine yazma izni hatası verdi; proje içi geçici dizine yöneltilen tekrar Android ve iOS `.hbc` export PASS. Gerçek iPhone UI, TalkBack/VoiceOver ve ekran görsel kabulü NOT RUN.
+- Bağımsız R2 data-safety ve UI/a11y reviewer incelemeleri devam ediyor. Taslak PR/CI henüz oluşturulmadı; merge/rebase/force-push/release yapılmadı.
+- **NEXT ACTION:** reviewer geri bildirimlerini değerlendir ve düzelt; ardından QA/PR kayıtlarını tamamla.
 
 ### 2026-11-07 — VDY-013 — DONE / SKILLS + SMOKE + CI PASS
 
@@ -647,3 +657,12 @@ NEXT ACTION:
 - Verification: typecheck PASS; lint PASS; tests PASS **276/276** (baseline 269 plus 7 focused cases); Android and iOS JS exports PASS with Hermes `.hbc`; Expo Doctor PASS **20/20**; `git diff --check` PASS.
 - Independent R2 UI/accessibility review **APPROVE**; findings fixed and re-reviewed with no remaining static P0/P1/P2. Real Android/iOS, screenshots, large text, and TalkBack/VoiceOver NOT RUN. No SQLite migrations or business rule engines changed.
 - Commit `2b26b25c4c756b487a5384a18c27d06f549c0fd5` pushed to `feat/vdy-010c-product-ux-polish`; draft PR #31 opened against PR #30. GitHub Actions run #42 (`42129795159`) PASS. PR remains draft/open and unmerged. NEXT ACTION: User iPhone acceptance of onboarding, theme, calendar draft guard, native pickers, work trend, and small/large text/screen-reader behavior before deciding whether to advance the UI branch.
+
+### 2026-11-09 — VDY-014 — IMPLEMENTATION AND REVIEW COMPLETE; PR DELIVERY PENDING
+
+- Base PR #37 branch HEAD `b3fb092556e5fb8850b32796e79571bc1689b9d4` confirmed. Isolated worktree branch `feat/vdy-014-earnings-flow`; original worktree/user changes untouched.
+- Added additive SQLite v8 day-specific planned-time overrides and shared Calendar/Today editor persistence. Onboarding now loads and edits the existing shift cycle and saved earnings profile, preserves custom rule versions and unchanged pay/rule effective boundaries, and keeps OFF anchor phases. Earnings shows explicit empty state and guards malformed period/profile values without changing calculation/snapshot/payment engines.
+- Verification: typecheck PASS; lint PASS; unit tests **287/287 PASS**; Expo Doctor 18/20 (2 remote metadata checks unavailable); Android Hermes export PASS (1,309 modules / 3.5 MB); iOS Hermes export PASS (1,307 modules / 3.5 MB); `git diff --check` PASS. Hermes export succeeded after process-only TEMP/TMP redirection to worktree due sandbox Temp write denial. Hardware/UI, picker, screenshot, large text, TalkBack/VoiceOver NOT RUN.
+- Independent R2 data-safety review **APPROVE**, no P0/P1/P2. Independent UI/accessibility review **APPROVE**, no static P0/P1; physical-device accessibility remains unverified. Prior iOS `Ay seçimi geçersiz` runtime root cause is **BLOCKED_NEEDS_RUNTIME_LOG** because no device log was available.
+- Draft PR / CI pending selected commit and push. No merge, rebase, force-push, or release. R08, R13, Ethernet policy, and labor-law expert review remain separate open risks.
+- NEXT ACTION: Commit/push the selected VDY-014 changes and open a draft PR against PR #37; then capture CI status. Obtain device log separately before claiming the original iOS crash root cause is fixed.

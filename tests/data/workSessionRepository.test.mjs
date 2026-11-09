@@ -3,9 +3,10 @@ import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 import { initializeDatabase } from '../../src/data/database.ts';
-import { createShiftCycle, createShiftTemplate, deleteShiftCycle, deleteShiftTemplate } from '../../src/data/shiftCycleRepository.ts';
+import { createPlanOverride, createShiftCycle, createShiftTemplate, deleteShiftCycle, deleteShiftTemplate, getPlannedShiftForDate, listShiftCycles, saveShiftSchedule } from '../../src/data/shiftCycleRepository.ts';
 import { deleteWorkDayStatus, getActiveWorkSession, listWorkDayStatuses, saveWorkDayStatus, startActiveWorkSession } from '../../src/data/workSessionRepository.ts';
 import { completeActiveWorkSessionWithRecord } from '../../src/data/workRecordRepository.ts';
+import { saveDayEdit } from '../../src/data/dayEditRepository.ts';
 
 function adapter(sqlite) {
   return {
@@ -71,6 +72,44 @@ test('day annotations persist locally and can be cleared without becoming work r
     await deleteWorkDayStatus(database, entry.localDate);
     assert.deepEqual(await listWorkDayStatuses(database, '2026-11-01', '2026-12-01'), []);
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM work_records;').get().count, 0);
+  } finally { sqlite.close(); }
+});
+
+test('day plan and status save together and rollback together without changing actual records', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, { id: 'edit-template', code: 'ED', name: 'Synthetic', startLocalTime: '08:00', endLocalTime: '16:00' });
+    await createShiftCycle(database, { id: 'edit-cycle', name: 'Cycle', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-11-05', startIndex: 0, entries: [{ kind: 'SHIFT', templateId: 'edit-template' }] });
+    await createPlanOverride(database, 'edit-cycle', { localDate: '2026-11-05', kind: 'SHIFT', templateId: 'edit-template', reason: 'synthetic rationale' });
+    await saveDayEdit(database, { cycleId: 'edit-cycle', localDate: '2026-11-05', override: { localDate: '2026-11-05', kind: 'SHIFT', templateId: 'edit-template' }, plannedTimes: { startLocalTime: '20:00', endLocalTime: '04:00' }, status: 'LEAVE', note: 'synthetic', updatedAtUtc: '2026-11-05T05:00:00.000Z' });
+    assert.equal(sqlite.prepare('SELECT kind FROM plan_overrides WHERE cycle_id = ? AND local_date = ?;').get('edit-cycle', '2026-11-05').kind, 'SHIFT');
+    assert.equal(sqlite.prepare('SELECT reason FROM plan_overrides WHERE cycle_id = ? AND local_date = ?;').get('edit-cycle', '2026-11-05').reason, 'synthetic rationale');
+    assert.equal(sqlite.prepare('SELECT status FROM work_day_statuses WHERE local_date = ?;').get('2026-11-05').status, 'LEAVE');
+    assert.deepEqual({ ...(await getPlannedShiftForDate(database, 'edit-cycle', '2026-11-05')) }, {
+      localDate: '2026-11-05', source: 'OVERRIDE', kind: 'SHIFT', templateId: 'edit-template', cycleId: 'edit-cycle', cycleIndex: 0,
+      timezone: 'Europe/Istanbul', startLocalTime: '20:00', endLocalTime: '04:00',
+    });
+    sqlite.exec("CREATE TRIGGER fail_day_status BEFORE INSERT ON work_day_statuses BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;");
+    await assert.rejects(saveDayEdit(database, { cycleId: 'edit-cycle', localDate: '2026-11-06', override: { localDate: '2026-11-06', kind: 'LEAVE' }, status: 'SICK_REPORT', note: null, updatedAtUtc: '2026-11-05T05:00:00.000Z' }), /synthetic failure/);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM plan_overrides WHERE local_date = ?;').get('2026-11-06').count, 0);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM work_records;').get().count, 0);
+  } finally { sqlite.close(); }
+});
+
+test('reopening onboarding updates the selected cycle instead of creating a competing cycle', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    const template = { id: 'reopen-template', code: 'RO', name: 'Synthetic', startLocalTime: '08:00', endLocalTime: '16:00' };
+    const cycle = { id: 'a-current-cycle', name: 'Existing', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-11-05', startIndex: 0,
+      entries: [{ kind: 'SHIFT', templateId: template.id }] };
+    await createShiftTemplate(database, template);
+    await createShiftCycle(database, cycle);
+    await saveShiftSchedule(database, [template], { ...cycle, name: 'Vardiya düzenim', anchorLocalDate: '2026-11-06' });
+    const cycles = await listShiftCycles(database);
+    assert.equal(cycles.length, 1);
+    assert.equal(cycles[0].id, cycle.id);
+    assert.equal(cycles[0].anchorLocalDate, '2026-11-06');
+    assert.equal(cycles[0].entries.length, 1);
   } finally { sqlite.close(); }
 });
 

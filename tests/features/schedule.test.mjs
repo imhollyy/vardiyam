@@ -53,6 +53,20 @@ test('editing a saved preset retains the exact startIndex inside a repeated shif
   assert.equal(edited.cycle.startIndex, 10);
 });
 
+test('reopening a custom schedule preserves an OFF anchor phase', () => {
+  const edited = buildShiftSchedule(draft('custom', {
+    startTemplateIndex: 0,
+    preservedStartEntryIndex: 1,
+    customEntries: [
+      { kind: 'SHIFT', templateIndex: 0 },
+      { kind: 'OFF' },
+      { kind: 'SHIFT', templateIndex: 1 },
+    ],
+  }));
+  assert.equal(edited.cycle.startIndex, 1);
+  assert.deepEqual(edited.cycle.entries[edited.cycle.startIndex], { kind: 'OFF' });
+});
+
 test('4+2 and 6+1 presets include OFF days without relabeling them as legal rest', () => {
   const fourTwo = buildShiftSchedule(draft('four-two', { startTemplateIndex: 1 }));
   assert.deepEqual(fourTwo.cycle.entries.map((entry) => entry.kind), [

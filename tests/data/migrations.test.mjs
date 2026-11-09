@@ -47,7 +47,7 @@ test('initial migration creates only additive app metadata and sets schema versi
     );
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
     assert.equal(sqlite.prepare('PRAGMA foreign_keys;').get().foreign_keys, 1);
-    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses']) {
+    for (const table of ['shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses', 'plan_time_overrides']) {
       assert.equal(
         sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name=?;").get(table).count,
         1,
@@ -58,7 +58,7 @@ test('initial migration creates only additive app metadata and sets schema versi
   }
 });
 
-test('v7 migration preserves v6 app and shift data while adding the dashboard tables', async () => {
+test('v6-to-v8 migrations preserve app and shift data and add dashboard and plan-time tables', async () => {
   const sqlite = new DatabaseSync(':memory:');
   try {
     for (const migration of migrations.slice(0, 6)) {
@@ -70,13 +70,32 @@ test('v7 migration preserves v6 app and shift data while adding the dashboard ta
       .run('preserved-template', 'P', 'Synthetic', '08:00', '16:00');
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
 
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 8);
     assert.deepEqual({ ...sqlite.prepare("SELECT key,value FROM app_metadata WHERE key='theme_mode';").get() }, { key: 'theme_mode', value: 'dark' });
     assert.deepEqual({ ...sqlite.prepare("SELECT id,code,name FROM shift_templates WHERE id='preserved-template';").get() }, {
       id: 'preserved-template', code: 'P', name: 'Synthetic',
     });
     assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='active_work_sessions';").get().count, 1);
     assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='work_day_statuses';").get().count, 1);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='plan_time_overrides';").get().count, 1);
+  } finally { sqlite.close(); }
+});
+
+test('v7-to-v8 adds day-specific plan times without changing existing overrides', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    for (const migration of migrations.filter(({ version }) => version <= 7)) sqlite.exec(migration.sql);
+    sqlite.exec(`INSERT INTO shift_templates(id,code,name,start_local_time,end_local_time) VALUES ('legacy-shift','L','Legacy','08:00','16:00');
+      INSERT INTO shift_cycles(id,name,timezone,anchor_local_date,start_index,entry_count) VALUES ('legacy-cycle','Cycle','Europe/Istanbul','2026-11-05',0,1);
+      INSERT INTO cycle_entries(cycle_id,position,kind,template_id) VALUES ('legacy-cycle',0,'SHIFT','legacy-shift');
+      INSERT INTO plan_overrides(cycle_id,local_date,kind,template_id) VALUES ('legacy-cycle','2026-11-06','SHIFT','legacy-shift');
+      PRAGMA user_version = 7;`);
+    await initializeDatabase(createExpoSqliteAdapter(sqlite));
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 8);
+    assert.equal(sqlite.prepare("SELECT kind FROM plan_overrides WHERE local_date='2026-11-06';").get().kind, 'SHIFT');
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM plan_time_overrides;').get().count, 0);
+    assert.throws(() => sqlite.prepare("INSERT INTO plan_time_overrides VALUES ('legacy-cycle','2026-11-06','24:00','16:00');").run(), /CHECK constraint failed/);
   } finally { sqlite.close(); }
 });
 
@@ -177,12 +196,12 @@ test('v5 to v7 preserves existing work and approved gross snapshots', async () =
       INSERT INTO earnings_snapshots VALUES ('gross-v1','2026-01-02T00:00:00.000Z','default',1,'rules-v1','COMPLETE',123,'{}','{}');
       INSERT INTO app_metadata VALUES ('legacy','kept');`);
     await initializeDatabase(database);
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 8);
     assert.equal(sqlite.prepare("SELECT total_amount_minor FROM earnings_snapshots WHERE calculation_id='gross-v1';").get().total_amount_minor, 123);
     assert.equal(sqlite.prepare("SELECT value FROM app_metadata WHERE key='legacy';").get().value, 'kept');
     assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='payment_allocations';").get().count, 1);
     await initializeDatabase(database);
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 8);
   } finally { sqlite.close(); }
 });
 
@@ -206,7 +225,7 @@ test('v2 to v4 adds work records and timed-break storage while preserving shift 
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
 
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 8);
     assert.deepEqual({ ...sqlite.prepare('SELECT id, name FROM shift_cycles;').get() }, { id: 'cycle', name: 'Synthetic' });
     assert.deepEqual({ ...sqlite.prepare('SELECT * FROM cycle_entries;').get() }, {
       cycle_id: 'cycle', position: 0, kind: 'SHIFT', template_id: 'day',
@@ -236,7 +255,7 @@ test('v3 to v4 leaves historical aggregate-only work records unchanged', async (
     await initializeDatabase(adapter);
     await initializeDatabase(adapter);
 
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 8);
     assert.deepEqual({ ...sqlite.prepare('SELECT id, started_at_utc, ended_at_utc, break_minutes, note FROM work_records WHERE id = ?;').get('legacy-work') }, {
       id: 'legacy-work', started_at_utc: '2026-10-28T07:00:00.000Z', ended_at_utc: '2026-10-28T15:00:00.000Z',
       break_minutes: 30, note: 'synthetic legacy record',
@@ -259,7 +278,7 @@ test('v4 to v5 preserves actual work and timed breaks and adds append-only earni
       PRAGMA user_version = 4;
     `);
     await initializeDatabase(createExpoSqliteAdapter(sqlite));
-    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 7);
+    assert.equal(sqlite.prepare('PRAGMA user_version;').get().user_version, 8);
     assert.equal(sqlite.prepare('SELECT note FROM work_records WHERE id=?').get('synthetic-v4-work').note, 'synthetic');
     assert.deepEqual({ ...sqlite.prepare('SELECT id, work_record_id, started_at_utc, ended_at_utc FROM break_intervals').get() }, {
       id: 'synthetic-break', work_record_id: 'synthetic-v4-work', started_at_utc: '2026-01-05T09:00:00.000Z', ended_at_utc: '2026-01-05T09:30:00.000Z',

@@ -33,6 +33,61 @@ export type EarningsSettings = {
   workplaceWindowCoverageConfirmed: boolean;
 };
 
+export type EarningsOnboardingDraft = { mode: GrossPayMode; pay: string; periodDay: string; weeklyHours: string };
+
+function minorToInput(value: number | null): string {
+  if (value === null) return '';
+  const formatted = (value / 100).toFixed(2);
+  return formatted.includes('.') ? formatted.replace(/0+$/, '').replace(/\.$/, '') : formatted;
+}
+
+function decimalInput(value: number): string {
+  return String(value);
+}
+
+export function earningsOnboardingDraft(settings: EarningsSettings): EarningsOnboardingDraft {
+  return {
+    mode: settings.mode,
+    pay: settings.mode === 'MONTHLY_GROSS' ? minorToInput(settings.monthlyGrossMinor)
+      : settings.mode === 'HOURLY_GROSS' ? minorToInput(settings.hourlyGrossMinor) : '',
+    periodDay: String(settings.payrollPeriodStartDay),
+    weeklyHours: decimalInput(settings.weeklyMinutes / 60),
+  };
+}
+
+export function earningsRulesForOnboardingSave(
+  previousSettings: EarningsSettings | null,
+  previousRules: readonly EarningsRule[] | null,
+  nextMode: GrossPayMode,
+  effectiveFromUtc: string,
+): { rules: EarningsRule[]; rulesEffectiveFromUtc: string } {
+  if (!previousSettings || !previousRules) {
+    return { rules: createDefaultEarningsRules(effectiveFromUtc, nextMode), rulesEffectiveFromUtc: effectiveFromUtc };
+  }
+  if (previousSettings.mode === nextMode) {
+    return { rules: previousRules.map((rule) => ({ ...rule })), rulesEffectiveFromUtc: previousSettings.rulesEffectiveFromUtc };
+  }
+  const amountBasisByKind = new Map(createDefaultEarningsRules(effectiveFromUtc, nextMode).map((rule) => [rule.kind, rule.amountBasis]));
+  return {
+    rules: previousRules.map((rule) => ({ ...rule, amountBasis: amountBasisByKind.get(rule.kind) ?? rule.amountBasis,
+      effectiveFromUtc, effectiveToUtc: null })),
+    rulesEffectiveFromUtc: effectiveFromUtc,
+  };
+}
+
+export function earningsPayEffectiveFromOnboardingSave(
+  previousSettings: EarningsSettings | null,
+  nextMode: GrossPayMode,
+  nextAmountMinor: number | null,
+  effectiveFromUtc: string,
+): string {
+  if (!previousSettings) return effectiveFromUtc;
+  const previousAmount = previousSettings.mode === 'MONTHLY_GROSS' ? previousSettings.monthlyGrossMinor
+    : previousSettings.mode === 'HOURLY_GROSS' ? previousSettings.hourlyGrossMinor : null;
+  return previousSettings.mode === nextMode && previousAmount === nextAmountMinor && previousSettings.payEffectiveFromUtc
+    ? previousSettings.payEffectiveFromUtc : effectiveFromUtc;
+}
+
 export const DEFAULT_PROFILE_ID = 'default';
 
 export function createDefaultSettings(): EarningsSettings {
@@ -88,10 +143,31 @@ export function createDefaultRules(mode: GrossPayMode = 'SKIP'): EarningsRule[] 
 export function isEarningsSettings(value: unknown): value is EarningsSettings {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<EarningsSettings>;
-  return ['MONTHLY_GROSS', 'HOURLY_GROSS', 'NET_ONLY', 'SKIP'].includes(item.mode ?? '') &&
-    typeof item.payEffectiveFromUtc === 'string' && typeof item.rulesEffectiveFromUtc === 'string' &&
-    typeof item.weeklyMinutes === 'number' && typeof item.timezone === 'string' &&
-    typeof item.payrollPeriodStartDay === 'number' && Array.isArray(item.completeWeekStarts);
+  const integer = (candidate: unknown, minimum: number, maximum: number) => Number.isSafeInteger(candidate) && (candidate as number) >= minimum && (candidate as number) <= maximum;
+  const nullableMoney = (candidate: unknown) => candidate === null || (Number.isSafeInteger(candidate) && (candidate as number) >= 0);
+  const validWindows = (candidate: unknown): boolean => Array.isArray(candidate) && candidate.every((entry) => entry && typeof entry === 'object' &&
+    typeof entry.id === 'string' && typeof entry.startsAtUtc === 'string' && typeof entry.endedAtUtc === 'string' &&
+    Number.isFinite(Date.parse(entry.startsAtUtc)) && Date.parse(entry.endedAtUtc) > Date.parse(entry.startsAtUtc));
+  const validEffective = (candidate: unknown) => typeof candidate === 'string' && (candidate === '' ||
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(candidate) && Number.isFinite(Date.parse(candidate)) && new Date(Date.parse(candidate)).toISOString() === candidate);
+  if (!['MONTHLY_GROSS', 'HOURLY_GROSS', 'NET_ONLY', 'SKIP'].includes(item.mode ?? '') ||
+      !validEffective(item.payEffectiveFromUtc) || !validEffective(item.rulesEffectiveFromUtc) ||
+      !integer(item.weeklyMinutes, 1, 10_080) || !integer(item.monthlyDividerMinutes, 1, 100_800) ||
+      !integer(item.payrollPeriodStartDay, 1, 31) || !integer(item.weekStartsOn, 0, 6) ||
+      typeof item.timezone !== 'string' || !item.timezone.trim() ||
+      !nullableMoney(item.monthlyGrossMinor) || !nullableMoney(item.hourlyGrossMinor) ||
+      typeof item.monthlyDividerConfirmed !== 'boolean' || typeof item.basePolicyConfirmed !== 'boolean' ||
+      typeof item.averagingOrEqualizationUnclear !== 'boolean' || typeof item.holidayNoWindowsConfirmed !== 'boolean' ||
+      typeof item.workplaceWindowCoverageConfirmed !== 'boolean' || typeof item.holidaySource !== 'string' ||
+      typeof item.holidayVersion !== 'string' || typeof item.holidayCoveredFromUtc !== 'string' ||
+      typeof item.holidayCoveredToUtc !== 'string' || !Array.isArray(item.completeWeekStarts) ||
+      item.completeWeekStarts.some((date) => typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) ||
+      !validWindows(item.holidayWindows) || !validWindows(item.workplaceRestWindows) || !validWindows(item.workplaceHolidayWindows)) return false;
+  try { new Intl.DateTimeFormat('en', { timeZone: item.timezone }); } catch { return false; }
+  if ((item.mode === 'MONTHLY_GROSS' || item.mode === 'HOURLY_GROSS') && (!item.payEffectiveFromUtc || !item.rulesEffectiveFromUtc)) return false;
+  if (item.mode === 'MONTHLY_GROSS' && item.monthlyGrossMinor === null) return false;
+  if (item.mode === 'HOURLY_GROSS' && item.hourlyGrossMinor === null) return false;
+  return true;
 }
 
 export function makeCalculationInput(args: {

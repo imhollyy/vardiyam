@@ -63,7 +63,7 @@ test('backup validation rejects future schemas, missing immutable guards, and fo
   await t.test('future user_version', async () => {
     const sqlite = createHistoricalDatabase(7);
     try {
-      sqlite.exec('PRAGMA user_version = 8;');
+      sqlite.exec('PRAGMA user_version = 9;');
       await assert.rejects(validateBackupDatabase(expoAdapter(sqlite), { createReferenceDatabase }), /sürümü desteklenmiyor/);
     } finally { sqlite.close(); }
   });
@@ -94,7 +94,7 @@ test('backup validation rejects future schemas, missing immutable guards, and fo
   });
 });
 
-test('full synthetic v7 database image preserves plans, work, breaks, approved earnings, and payment ledger', async () => {
+test('full synthetic v8 database image preserves plans, work, breaks, approved earnings, and payment ledger', async () => {
   const source = new DatabaseSync(':memory:');
   const sourceAdapter = expoAdapter(source);
   const stamp = '2026-11-05T12:00:00.000Z';
@@ -130,7 +130,7 @@ test('full synthetic v7 database image preserves plans, work, breaks, approved e
     const restored = new DatabaseSync(':memory:');
     try {
       restored.deserialize(serialized);
-      const result = await validateBackupDatabase(expoAdapter(restored), { createReferenceDatabase, expectedSchemaVersion: 7 });
+      const result = await validateBackupDatabase(expoAdapter(restored), { createReferenceDatabase, expectedSchemaVersion: 8 });
       assert.equal(result.recordCount, 14);
       assert.equal(restored.prepare('SELECT note FROM work_records WHERE id=?').get('syn-work').note, 'synthetic');
       assert.equal(restored.prepare('SELECT started_at_utc FROM break_intervals WHERE id=?').get('syn-break').started_at_utc, '2026-11-05T10:00:00.000Z');
