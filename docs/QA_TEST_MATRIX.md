@@ -442,3 +442,24 @@ No SQLite schema/migrations, recovery/backup flow, financial calculations, or pa
 | iPhone/Android runtime, native picker, screenshot, small/large text, VoiceOver/TalkBack | NOT RUN | No device interaction. iOS runtime log for prior `Ay seçimi geçersiz` report was not available; root cause remains `BLOCKED_NEEDS_RUNTIME_LOG`. |
 | Independent R2 review | PASS | Data-safety **APPROVE**, no P0/P1/P2; UI/accessibility **APPROVE**, no static P0/P1. Device checks remain open. |
 | GitHub Actions | PASS | Draft PR #39, Actions run #51 (`42616797249`), job “Verify Expo scaffold” succeeded for commit `cb4a6172ff939de765714202b2f459dc56cf2c3e`. |
+
+### VDY-014 PR #39 review follow-up (2026-11-09)
+
+| Case | Result | Evidence |
+|---|---|---|
+| Day panel default hierarchy and advanced schedule controls | PASS (code review) | Shared `DayEditSheet`; primary fields are selected date, planned pickers, optional leave/report/absence, note, one save; cycle/template choices are collapsed. |
+| Calendar day tap preserves Calendar route and opens editor overlay | PASS (code review/export) | `app/(tabs)/calendar.tsx` opens shared sheet in-place. |
+| Unsaved draft close/back confirmation and save guard | PASS (code review) | `DayEditSheet` confirms discard from scrim/close/Android back and blocks dismiss while saving. Real device interaction NOT RUN. |
+| Actual WorkRecord separation/edit route | PASS (code review) | Actual records are separately labeled; recordId routes to existing work-record editor. No planned record is rewritten. |
+| Existing v8 schema compatibility and old day-note preservation | PASS | v8 schema definition remains unchanged; v8→v9 integration fixture preserves prior status note in old table and copies it to `day_edit_notes`. |
+| v1–v8 backup migration and v9 note backup round-trip | PASS | `tests/data/backupValidation.test.mjs`; synthetic v9 serialize/validate includes a day note. |
+| Day note save/clear without status and atomic rollback on note insert failure | PASS | `tests/data/workSessionRepository.test.mjs`; injected note-table failure rolls back previously written override and status. |
+| TypeScript / ESLint / full suite | PASS | `npm run typecheck`; `npm run lint`; `npm test` **291/291**. |
+| Android Hermes export | PASS | SDK 58 Expo export, 1,310 modules, 3.5 MB `.hbc`; process-scoped TEMP/TMP under worktree. |
+| iOS Hermes export | PASS | SDK 58 Expo export, 1,308 modules, 3.5 MB `.hbc`; process-scoped TEMP/TMP under worktree. |
+| Git diff whitespace | PASS | `git diff --check`; only Windows LF→CRLF notices. |
+| UI/a11y independent review | PASS | Re-review closed calendar background focus P2; no remaining static P0/P1/P2. |
+| Data-safety independent review | PASS | Re-review closed v8 compatibility P1 and verification P2; no remaining P0/P1/P2. |
+| Device UI, VoiceOver/TalkBack, actual unsaved prompt interaction | NOT RUN | No physical-device acceptance in this review pass. |
+| Earnings runtime console error | UNVERIFIED | No device log supplied. Historic Today date stack is separate; do not mark Earnings issue fixed. |
+| GitHub CI for follow-up commit | PENDING | To be recorded after the small commit is pushed to PR #39. |

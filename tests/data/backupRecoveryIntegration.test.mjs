@@ -41,7 +41,7 @@ async function createV8(path, value = null) {
   await db.execAsync('PRAGMA foreign_keys = ON;');
   await initializeDatabase(db);
   if (value !== null) await db.runAsync('INSERT INTO app_metadata (key,value) VALUES (?,?);', 'synthetic_recovery_fixture', value);
-  const validation = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 8 });
+  const validation = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 9 });
   const image = sqlite.serialize();
   const digest = hex(sha256(image));
   image.fill(0);
@@ -111,7 +111,7 @@ async function verify(path, digest, expectedCount) {
   try {
     sqlite = new DatabaseSync(path);
     const db = adapter(sqlite);
-    const result = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 8 });
+    const result = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 9 });
     const image = sqlite.serialize();
     const actualDigest = hex(sha256(image));
     image.fill(0);
@@ -139,7 +139,7 @@ test('committed recovery verifies the candidate before deleting the old rollback
   live.close();
 });
 
-test('committed all-data wipe validates empty v8 candidate while retaining rollback until validation', async (t) => {
+test('committed all-data wipe validates empty v9 candidate while retaining rollback until validation', async (t) => {
   const h = await createHarness(t);
   const old = await createV8(h.path(ROLLBACK), 'old-data');
   const empty = await createV8(h.path(STAGE));
@@ -151,7 +151,7 @@ test('committed all-data wipe validates empty v8 candidate while retaining rollb
 
   assert.equal(await run.recover(), 'finish-commit');
   const live = new DatabaseSync(h.path(LIVE));
-  assert.equal(live.prepare('PRAGMA user_version;').get().user_version, 8);
+  assert.equal(live.prepare('PRAGMA user_version;').get().user_version, 9);
   assert.equal(live.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
   live.close();
   assert.equal(await exists(h.path(ROLLBACK)), false);

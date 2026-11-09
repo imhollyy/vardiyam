@@ -666,3 +666,12 @@ NEXT ACTION:
 - Independent R2 data-safety review **APPROVE**, no P0/P1/P2. Independent UI/accessibility review **APPROVE**, no static P0/P1; physical-device accessibility remains unverified. Prior iOS `Ay seçimi geçersiz` runtime root cause is **BLOCKED_NEEDS_RUNTIME_LOG** because no device log was available.
 - Commit `cb4a6172ff939de765714202b2f459dc56cf2c3e` pushed to `feat/vdy-014-earnings-flow`; draft PR #39 targets PR #37's branch (`chore/vdy-013-skills-routing`). GitHub Actions run #51 (`42616797249`) **PASS**. No merge, rebase, force-push, or release. R08, R13, Ethernet policy, and labor-law expert review remain separate open risks.
 - NEXT ACTION: Review draft PR #39; independently obtain device log before claiming the original iOS crash root cause is fixed.
+
+### 2026-11-09 — VDY-014 PR #39 REVIEW FIXES IN PROGRESS
+
+- Shared DayEditSheet now serves Today and Calendar. Calendar day taps open the panel in-place; default controls are time, optional status, note, and one atomic save. Template/cycle controls are collapsed under advanced settings. Actual work records keep their separate editor route. Dirty close/back prompts and saving blocks dismissal.
+- Independent data review caught a v8 schema compatibility issue before commit: v8 already exists in the PR history, so notes are now an additive v9 migration. Existing v8 schema remains unchanged; note values are copied forward, backup validation recognizes both v8 and v9, and note write rollback/backup round-trip tests were added.
+- Skills used: `vardiyam-ui-quality`, `ui-ux-pro-max` (local catalog searches), `vardiyam-data-safety`, `vardiyam-test-gate`. UI re-review confirmed no static P0–P2 after hiding Calendar background from screen-reader focus while sheet is open.
+- Verification: typecheck PASS; lint PASS; full suite **291/291 PASS**; Android/iOS Hermes export PASS (1,310/1,308 modules, 3.5 MB `.hbc` each); diff check PASS. Device/TalkBack/VoiceOver NOT RUN; Earnings console issue remains unverified pending runtime log.
+- Independent R2 review complete: UI/accessibility reviewer **APPROVE** with no static P0/P1/P2; data-safety reviewer **APPROVE** after v9 compatibility correction with no static P0/P1/P2. GitHub CI remains pending until the follow-up commit is pushed.
+- NEXT ACTION: Finish v9 migration/backup verification, final independent data review, and push the small PR #39 follow-up commit.

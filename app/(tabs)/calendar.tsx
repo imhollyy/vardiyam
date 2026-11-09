@@ -44,6 +44,8 @@ import { formatDuration, getRecordRangeDifferenceMinutes } from '@/src/domain/wo
 import { calendarMarker } from '@/src/features/shifts/presentation';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { ActionButton } from '@/src/components/ui/ActionButton';
+import { DayEditSheet } from '@/src/components/shifts/DayEditSheet';
+import { listDayEditNotes } from '@/src/data/dayEditRepository';
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 const WEEKDAYS = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
@@ -110,6 +112,8 @@ export default function CalendarScreen() {
   const [days, setDays] = useState<PlannedShift[]>([]);
   const [records, setRecords] = useState<WorkRecordWithTimedBreaks[]>([]);
   const [statuses, setStatuses] = useState<WorkDayStatusEntry[]>([]);
+  const [dayNotes, setDayNotes] = useState<Map<string, string>>(new Map());
+  const [editorDate, setEditorDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -144,7 +148,9 @@ export default function CalendarScreen() {
       const range = monthRange(month);
       const endExclusive = addLocalDays(range.end, 1);
       const savedStatuses = await listWorkDayStatuses(database, range.start, endExclusive);
+      const savedNotes = await listDayEditNotes(database, range.start, endExclusive);
       setStatuses(savedStatuses);
+      setDayNotes(new Map(savedNotes.map((entry) => [entry.localDate, entry.note])));
       if (!active) {
         setDays([]);
         return;
@@ -180,10 +186,10 @@ export default function CalendarScreen() {
   const selectedRecords = recordsByDate.get(selectedDate) ?? [];
   const selectedStatus = statusesByDate.get(selectedDate);
 
-  const openOverrideEditor = async () => {
+  const openOverrideEditor = () => {
     setMessage(null);
     setError(null);
-    router.push({ pathname: '/(tabs)/index', params: { openDate: selectedDate } });
+    setEditorDate(selectedDate);
   };
 
   const switchMonth = (offset: number) => {
@@ -195,7 +201,7 @@ export default function CalendarScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView accessibilityElementsHidden={editorDate !== null} importantForAccessibility={editorDate ? 'no-hide-descendants' : 'auto'} contentContainerStyle={styles.scrollContent}>
         <PageHeading eyebrow="PLANLANAN VARDİYALAR" title="Takvim" subtitle="Plan, fiilî çalışma ve gün durumları" />
 
         <View style={styles.monthBar}>
@@ -261,7 +267,7 @@ export default function CalendarScreen() {
                       selected={selectedDate === date}
                       isToday={today === date}
                       theme={theme}
-                      onPress={() => { setSelectedDate(date); setMessage(null); setError(null); }}
+                      onPress={() => { setSelectedDate(date); setEditorDate(date); setMessage(null); setError(null); }}
                     />
                   );
                 })}
@@ -319,7 +325,11 @@ export default function CalendarScreen() {
         )}
         {message ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{message}</Text> : null}
       </ScrollView>
-
+      {editorDate ? <DayEditSheet key={editorDate} localDate={editorDate} cycle={cycle} plan={daysByDate.get(editorDate)}
+        templates={templates} statusEntry={statusesByDate.get(editorDate)} note={dayNotes.get(editorDate)} records={recordsByDate.get(editorDate) ?? []}
+        onClose={() => setEditorDate(null)} onSaved={async () => { await load(); setMessage('Değişiklikler kaydedildi; fiilî çalışma kayıtların korundu.'); }}
+        onEditRecord={(recordId) => router.push({ pathname: '/work-records', params: { recordId } })}
+        onCreateCycle={() => router.push('/(tabs)/settings')} /> : null}
     </View>
   );
 }

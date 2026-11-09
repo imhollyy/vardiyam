@@ -6,7 +6,7 @@ import { initializeDatabase } from '../../src/data/database.ts';
 import { createPlanOverride, createShiftCycle, createShiftTemplate, deleteShiftCycle, deleteShiftTemplate, getPlannedShiftForDate, listShiftCycles, saveShiftSchedule } from '../../src/data/shiftCycleRepository.ts';
 import { deleteWorkDayStatus, getActiveWorkSession, listWorkDayStatuses, saveWorkDayStatus, startActiveWorkSession } from '../../src/data/workSessionRepository.ts';
 import { completeActiveWorkSessionWithRecord } from '../../src/data/workRecordRepository.ts';
-import { saveDayEdit } from '../../src/data/dayEditRepository.ts';
+import { listDayEditNotes, saveDayEdit } from '../../src/data/dayEditRepository.ts';
 
 function adapter(sqlite) {
   return {
@@ -85,6 +85,7 @@ test('day plan and status save together and rollback together without changing a
     assert.equal(sqlite.prepare('SELECT kind FROM plan_overrides WHERE cycle_id = ? AND local_date = ?;').get('edit-cycle', '2026-11-05').kind, 'SHIFT');
     assert.equal(sqlite.prepare('SELECT reason FROM plan_overrides WHERE cycle_id = ? AND local_date = ?;').get('edit-cycle', '2026-11-05').reason, 'synthetic rationale');
     assert.equal(sqlite.prepare('SELECT status FROM work_day_statuses WHERE local_date = ?;').get('2026-11-05').status, 'LEAVE');
+    assert.equal(sqlite.prepare('SELECT note FROM day_edit_notes WHERE local_date = ?;').get('2026-11-05').note, 'synthetic');
     assert.deepEqual({ ...(await getPlannedShiftForDate(database, 'edit-cycle', '2026-11-05')) }, {
       localDate: '2026-11-05', source: 'OVERRIDE', kind: 'SHIFT', templateId: 'edit-template', cycleId: 'edit-cycle', cycleIndex: 0,
       timezone: 'Europe/Istanbul', startLocalTime: '20:00', endLocalTime: '04:00',
@@ -148,5 +149,29 @@ test('planned session finishes after its cycle and template are deleted while ke
       record_source: 'PLANNED', planned_cycle_id: null, planned_template_id: null,
       planned_template_name: 'Synthetic shift', planned_start_local_datetime: '2026-11-05T08:00',
     });
+  } finally { sqlite.close(); }
+});
+
+test('day notes persist without a status and can be cleared independently', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await saveDayEdit(database, { cycleId: null, localDate: '2026-11-07', override: null, status: null, note: 'synthetic note', updatedAtUtc: '2026-11-05T05:00:00.000Z' });
+    assert.deepEqual(await listDayEditNotes(database, '2026-11-01', '2026-12-01'), [{ localDate: '2026-11-07', note: 'synthetic note' }]);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM work_day_statuses WHERE local_date = ?;').get('2026-11-07').count, 0);
+    await saveDayEdit(database, { cycleId: null, localDate: '2026-11-07', override: null, status: null, note: null, updatedAtUtc: '2026-11-05T05:01:00.000Z' });
+    assert.deepEqual(await listDayEditNotes(database, '2026-11-01', '2026-12-01'), []);
+  } finally { sqlite.close(); }
+});
+
+test('day note insert failure rolls back the planned override and status written earlier in the transaction', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, { id: 'note-fail-template', code: 'NF', name: 'Synthetic', startLocalTime: '08:00', endLocalTime: '16:00' });
+    await createShiftCycle(database, { id: 'note-fail-cycle', name: 'Cycle', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-11-05', startIndex: 0, entries: [{ kind: 'SHIFT', templateId: 'note-fail-template' }] });
+    sqlite.exec("CREATE TRIGGER fail_day_note BEFORE INSERT ON day_edit_notes BEGIN SELECT RAISE(ABORT, 'synthetic note failure'); END;");
+    await assert.rejects(saveDayEdit(database, { cycleId: 'note-fail-cycle', localDate: '2026-11-06', override: { localDate: '2026-11-06', kind: 'LEAVE' }, status: 'LEAVE', note: 'synthetic', updatedAtUtc: '2026-11-05T05:00:00.000Z' }), /synthetic note failure/);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM plan_overrides WHERE local_date='2026-11-06';").get().count, 0);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM work_day_statuses WHERE local_date='2026-11-06';").get().count, 0);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM day_edit_notes WHERE local_date='2026-11-06';").get().count, 0);
   } finally { sqlite.close(); }
 });

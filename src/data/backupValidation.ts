@@ -19,6 +19,7 @@ const TABLES_BY_VERSION: Record<number, readonly string[]> = {
   6: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events'],
   7: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses'],
   8: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses', 'plan_time_overrides'],
+  9: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses', 'plan_time_overrides', 'day_edit_notes'],
 };
 
 const CRITICAL_V6_TRIGGERS = [

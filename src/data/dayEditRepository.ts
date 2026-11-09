@@ -1,10 +1,18 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { dayOrdinal, validatePlanOverrides, validateShiftTemplate, type LocalDate, type PlanOverride, type ShiftTemplate } from '../domain/shift-cycle/index.ts';
 import type { WorkDayStatus } from './workSessionRepository.ts';
-import { withDatabaseTransaction } from './transactions.ts';
+import { withDatabaseOperation, withDatabaseTransaction } from './transactions.ts';
 
 type DayEditDatabase = Pick<SQLiteDatabase, 'getAllAsync' | 'getFirstAsync' | 'runAsync' | 'withTransactionAsync'>;
 export type DayEdit = { cycleId: string | null; localDate: LocalDate; override: PlanOverride | null; plannedTimes?: { startLocalTime: string; endLocalTime: string } | null; status: WorkDayStatus | null; note: string | null; updatedAtUtc: string };
+
+export async function listDayEditNotes(database: DayEditDatabase, fromLocalDate: LocalDate, toLocalDateExclusive: LocalDate): Promise<{ localDate: LocalDate; note: string }[]> {
+  dayOrdinal(fromLocalDate); dayOrdinal(toLocalDateExclusive);
+  if (toLocalDateExclusive < fromLocalDate) throw new Error('Tarih aralığı ters olamaz.');
+  return withDatabaseOperation(database, async () => (await database.getAllAsync<{ local_date: LocalDate; note: string }>(
+    'SELECT local_date, note FROM day_edit_notes WHERE local_date >= ? AND local_date < ? ORDER BY local_date;', fromLocalDate, toLocalDateExclusive,
+  )).map((row) => ({ localDate: row.local_date, note: row.note })));
+}
 
 /** Persists a user's single-day plan and annotation together without touching actual WorkRecords. */
 export async function saveDayEdit(database: DayEditDatabase, edit: DayEdit): Promise<void> {
@@ -12,6 +20,7 @@ export async function saveDayEdit(database: DayEditDatabase, edit: DayEdit): Pro
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/.test(edit.updatedAtUtc) || !Number.isFinite(Date.parse(edit.updatedAtUtc))) throw new Error('Güncelleme zamanı geçersiz.');
   if (edit.note !== null && edit.note.length > 2000) throw new Error('Not 2000 karakteri aşamaz.');
   if (edit.status !== null && !['LEAVE', 'SICK_REPORT', 'NOT_WORKED'].includes(edit.status)) throw new Error('Gün durumu geçersiz.');
+  const note = edit.note?.trim() || null;
   if (edit.override && edit.override.localDate !== edit.localDate) throw new Error('Plan tarihi seçilen günle eşleşmiyor.');
   if (edit.override && !edit.cycleId) throw new Error('Vardiya planını düzenlemek için önce bir vardiya düzeni oluştur.');
   const validLocalTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -47,7 +56,14 @@ export async function saveDayEdit(database: DayEditDatabase, edit: DayEdit): Pro
     } else {
       await database.runAsync(`INSERT INTO work_day_statuses(local_date, status, note, updated_at_utc) VALUES (?, ?, ?, ?)
         ON CONFLICT(local_date) DO UPDATE SET status = excluded.status, note = excluded.note, updated_at_utc = excluded.updated_at_utc;`,
-        edit.localDate, edit.status, edit.note, edit.updatedAtUtc);
+        edit.localDate, edit.status, note, edit.updatedAtUtc);
+    }
+    if (note) {
+      await database.runAsync(`INSERT INTO day_edit_notes(local_date,note,updated_at_utc) VALUES(?,?,?)
+        ON CONFLICT(local_date) DO UPDATE SET note=excluded.note, updated_at_utc=excluded.updated_at_utc;`,
+        edit.localDate, note, edit.updatedAtUtc);
+    } else {
+      await database.runAsync('DELETE FROM day_edit_notes WHERE local_date = ?;', edit.localDate);
     }
   });
 }

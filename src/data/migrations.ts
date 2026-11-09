@@ -481,6 +481,18 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 9,
+    sql: `
+      CREATE TABLE day_edit_notes (
+        local_date TEXT PRIMARY KEY NOT NULL CHECK (${canonicalLocalDateCheck('local_date')}),
+        note TEXT NOT NULL CHECK (length(trim(note)) BETWEEN 1 AND 2000),
+        updated_at_utc TEXT NOT NULL CHECK (${canonicalUtcMinuteCheck('updated_at_utc')})
+      );
+      INSERT INTO day_edit_notes (local_date, note, updated_at_utc)
+        SELECT local_date, note, updated_at_utc FROM work_day_statuses WHERE note IS NOT NULL AND length(trim(note)) > 0;
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;
