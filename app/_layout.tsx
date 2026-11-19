@@ -34,6 +34,7 @@ function ThemedRouter() {
         <Stack.Screen name="welcome" />
         <Stack.Screen name="setup" />
         <Stack.Screen name="backup" />
+        <Stack.Screen name="day-edit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="shift-change" />
         <Stack.Screen name="additional-income" />
         <Stack.Screen name="legal/kvkk" />
