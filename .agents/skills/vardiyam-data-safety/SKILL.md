@@ -1,6 +1,6 @@
 ---
 name: vardiyam-data-safety
-description: Vardiyam'da SQLite migration, yerel kişisel ücret verileri, yedekleme/geri yükleme, silme, loglar, harici SDK veya mağaza gizlilik beyanları değişirken güvenlik incelemesi için kullanılır.
+description: Use when changing SQLite migrations, personal pay data, backup/restore, deletion, logs, SDK data flow, or privacy disclosures.
 ---
 
 # Vardiyam Data Safety — v1.0

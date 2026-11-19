@@ -1,0 +1,633 @@
+{
+  "fixtureVersion": 1,
+  "status": "DESIGN_FIXTURES_NOT_YET_RUN_AS_PRODUCT_TESTS",
+  "note": "Synthetic fixture contract for VDY-003; not a completed unit test. OFF does not imply legal weekly rest.",
+  "templates": {
+    "S": {
+      "startLocalTime": "08:00",
+      "endLocalTime": "16:00"
+    },
+    "A": {
+      "startLocalTime": "16:00",
+      "endLocalTime": "00:00"
+    },
+    "G": {
+      "startLocalTime": "22:00",
+      "endLocalTime": "06:00"
+    }
+  },
+  "cycles": {
+    "two_two_two": {
+      "anchorLocalDate": "2026-11-05",
+      "startIndex": 0,
+      "timezone": "Europe/Istanbul",
+      "entries": [
+        "S",
+        "S",
+        "A",
+        "A",
+        "G",
+        "G"
+      ]
+    },
+    "four_two": {
+      "anchorLocalDate": "2026-11-05",
+      "startIndex": 0,
+      "timezone": "Europe/Istanbul",
+      "entries": [
+        "S",
+        "S",
+        "S",
+        "S",
+        "OFF",
+        "OFF"
+      ]
+    },
+    "six_one": {
+      "anchorLocalDate": "2026-11-05",
+      "startIndex": 0,
+      "timezone": "Europe/Istanbul",
+      "entries": [
+        "S",
+        "S",
+        "S",
+        "S",
+        "S",
+        "S",
+        "OFF"
+      ]
+    },
+    "weekly_three": {
+      "anchorLocalDate": "2026-11-05",
+      "startIndex": 0,
+      "timezone": "Europe/Istanbul",
+      "entries": [
+        "S",
+        "S",
+        "S",
+        "S",
+        "S",
+        "S",
+        "S",
+        "A",
+        "A",
+        "A",
+        "A",
+        "A",
+        "A",
+        "A",
+        "G",
+        "G",
+        "G",
+        "G",
+        "G",
+        "G",
+        "G"
+      ]
+    },
+    "custom_offset": {
+      "anchorLocalDate": "2026-11-05",
+      "startIndex": 1,
+      "timezone": "Europe/Istanbul",
+      "entries": [
+        "S",
+        "OFF",
+        "G"
+      ]
+    },
+    "leap": {
+      "anchorLocalDate": "2028-02-28",
+      "startIndex": 0,
+      "timezone": "Europe/Istanbul",
+      "entries": [
+        "S",
+        "OFF",
+        "G"
+      ]
+    },
+    "year_boundary": {
+      "anchorLocalDate": "2026-12-31",
+      "startIndex": 0,
+      "timezone": "Europe/Istanbul",
+      "entries": [
+        "S",
+        "OFF"
+      ]
+    }
+  },
+  "projectionCases": [
+    {
+      "id": "C01",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-05",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C02",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-06",
+      "expected": {
+        "cycleIndex": 1,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C03",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-07",
+      "expected": {
+        "cycleIndex": 2,
+        "entry": "A"
+      }
+    },
+    {
+      "id": "C04",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-10",
+      "expected": {
+        "cycleIndex": 5,
+        "entry": "G"
+      }
+    },
+    {
+      "id": "C05",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-11",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C06",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-04",
+      "expected": {
+        "cycleIndex": 5,
+        "entry": "G"
+      }
+    },
+    {
+      "id": "C07",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2027-05-04",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C08",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-10-29",
+      "expected": {
+        "cycleIndex": 5,
+        "entry": "G"
+      }
+    },
+    {
+      "id": "C09",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2027-11-05",
+      "expected": {
+        "cycleIndex": 5,
+        "entry": "G"
+      }
+    },
+    {
+      "id": "C10",
+      "cycleId": "four_two",
+      "targetLocalDate": "2026-11-08",
+      "expected": {
+        "cycleIndex": 3,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C11",
+      "cycleId": "four_two",
+      "targetLocalDate": "2026-11-09",
+      "expected": {
+        "cycleIndex": 4,
+        "entry": "OFF"
+      }
+    },
+    {
+      "id": "C12",
+      "cycleId": "four_two",
+      "targetLocalDate": "2026-11-10",
+      "expected": {
+        "cycleIndex": 5,
+        "entry": "OFF"
+      }
+    },
+    {
+      "id": "C13",
+      "cycleId": "four_two",
+      "targetLocalDate": "2026-11-11",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C14",
+      "cycleId": "six_one",
+      "targetLocalDate": "2026-11-11",
+      "expected": {
+        "cycleIndex": 6,
+        "entry": "OFF"
+      }
+    },
+    {
+      "id": "C15",
+      "cycleId": "six_one",
+      "targetLocalDate": "2026-11-12",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C16",
+      "cycleId": "weekly_three",
+      "targetLocalDate": "2026-11-11",
+      "expected": {
+        "cycleIndex": 6,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C17",
+      "cycleId": "weekly_three",
+      "targetLocalDate": "2026-11-12",
+      "expected": {
+        "cycleIndex": 7,
+        "entry": "A"
+      }
+    },
+    {
+      "id": "C18",
+      "cycleId": "weekly_three",
+      "targetLocalDate": "2026-11-19",
+      "expected": {
+        "cycleIndex": 14,
+        "entry": "G"
+      }
+    },
+    {
+      "id": "C19",
+      "cycleId": "weekly_three",
+      "targetLocalDate": "2026-11-26",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C20",
+      "cycleId": "custom_offset",
+      "targetLocalDate": "2026-11-05",
+      "expected": {
+        "cycleIndex": 1,
+        "entry": "OFF"
+      }
+    },
+    {
+      "id": "C21",
+      "cycleId": "custom_offset",
+      "targetLocalDate": "2026-11-06",
+      "expected": {
+        "cycleIndex": 2,
+        "entry": "G"
+      }
+    },
+    {
+      "id": "C22",
+      "cycleId": "custom_offset",
+      "targetLocalDate": "2026-11-04",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C23",
+      "cycleId": "custom_offset",
+      "targetLocalDate": "2026-11-07",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C24",
+      "cycleId": "leap",
+      "targetLocalDate": "2028-02-28",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C25",
+      "cycleId": "leap",
+      "targetLocalDate": "2028-02-29",
+      "expected": {
+        "cycleIndex": 1,
+        "entry": "OFF"
+      }
+    },
+    {
+      "id": "C26",
+      "cycleId": "leap",
+      "targetLocalDate": "2028-03-01",
+      "expected": {
+        "cycleIndex": 2,
+        "entry": "G"
+      }
+    },
+    {
+      "id": "C27",
+      "cycleId": "leap",
+      "targetLocalDate": "2028-03-02",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C28",
+      "cycleId": "year_boundary",
+      "targetLocalDate": "2026-12-31",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    },
+    {
+      "id": "C29",
+      "cycleId": "year_boundary",
+      "targetLocalDate": "2027-01-01",
+      "expected": {
+        "cycleIndex": 1,
+        "entry": "OFF"
+      }
+    },
+    {
+      "id": "C30",
+      "cycleId": "year_boundary",
+      "targetLocalDate": "2027-01-02",
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "S"
+      }
+    }
+  ],
+  "overrideCases": [
+    {
+      "id": "O01",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-06",
+      "overrides": [
+        {
+          "localDate": "2026-11-06",
+          "kind": "OFF"
+        }
+      ],
+      "expected": {
+        "cycleIndex": 1,
+        "entry": "OFF",
+        "source": "OVERRIDE"
+      }
+    },
+    {
+      "id": "O02",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-07",
+      "overrides": [
+        {
+          "localDate": "2026-11-06",
+          "kind": "OFF"
+        }
+      ],
+      "expected": {
+        "cycleIndex": 2,
+        "entry": "A",
+        "source": "CYCLE"
+      }
+    },
+    {
+      "id": "O03",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-09",
+      "overrides": [
+        {
+          "localDate": "2026-11-09",
+          "kind": "SHIFT",
+          "templateId": "A"
+        }
+      ],
+      "expected": {
+        "cycleIndex": 4,
+        "entry": "A",
+        "source": "OVERRIDE"
+      }
+    },
+    {
+      "id": "O04",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-10",
+      "overrides": [
+        {
+          "localDate": "2026-11-09",
+          "kind": "SHIFT",
+          "templateId": "A"
+        }
+      ],
+      "expected": {
+        "cycleIndex": 5,
+        "entry": "G",
+        "source": "CYCLE"
+      }
+    },
+    {
+      "id": "O05",
+      "cycleId": "two_two_two",
+      "targetLocalDate": "2026-11-05",
+      "overrides": [
+        {
+          "localDate": "2026-11-05",
+          "kind": "LEAVE"
+        }
+      ],
+      "expected": {
+        "cycleIndex": 0,
+        "entry": "LEAVE",
+        "source": "OVERRIDE"
+      }
+    }
+  ],
+  "timeWindowCases": [
+    {
+      "id": "W01",
+      "startDate": "2026-11-05",
+      "startLocalTime": "08:00",
+      "endLocalTime": "16:00",
+      "expected": {
+        "endDate": "2026-11-05",
+        "crossesMidnight": false,
+        "nominalMinutes": 480
+      }
+    },
+    {
+      "id": "W02",
+      "startDate": "2026-11-05",
+      "startLocalTime": "22:00",
+      "endLocalTime": "06:00",
+      "expected": {
+        "endDate": "2026-11-06",
+        "crossesMidnight": true,
+        "nominalMinutes": 480
+      }
+    },
+    {
+      "id": "W03",
+      "startDate": "2026-12-31",
+      "startLocalTime": "22:00",
+      "endLocalTime": "06:00",
+      "expected": {
+        "endDate": "2027-01-01",
+        "crossesMidnight": true,
+        "nominalMinutes": 480
+      }
+    },
+    {
+      "id": "W04",
+      "startDate": "2026-11-05",
+      "startLocalTime": "20:00",
+      "endLocalTime": "08:00",
+      "expected": {
+        "endDate": "2026-11-06",
+        "crossesMidnight": true,
+        "nominalMinutes": 720
+      }
+    }
+  ],
+  "invalidCases": [
+    {
+      "id": "E01",
+      "description": "empty cycle",
+      "expectedError": "EMPTY_CYCLE",
+      "value": {
+        "entries": []
+      }
+    },
+    {
+      "id": "E02",
+      "description": "index out of bounds",
+      "expectedError": "INVALID_START_INDEX",
+      "value": {
+        "entries": [
+          "S",
+          "A",
+          "G"
+        ],
+        "startIndex": 3
+      }
+    },
+    {
+      "id": "E03",
+      "description": "non-integer start index",
+      "expectedError": "INVALID_START_INDEX",
+      "value": {
+        "entries": [
+          "S",
+          "A"
+        ],
+        "startIndex": 0.5
+      }
+    },
+    {
+      "id": "E04",
+      "description": "invalid leap date",
+      "expectedError": "INVALID_DATE",
+      "value": {
+        "localDate": "2026-02-29"
+      }
+    },
+    {
+      "id": "E05",
+      "description": "invalid day-of-month",
+      "expectedError": "INVALID_DATE",
+      "value": {
+        "localDate": "2026-02-30"
+      }
+    },
+    {
+      "id": "E06",
+      "description": "invalid date format",
+      "expectedError": "INVALID_DATE",
+      "value": {
+        "localDate": "05.11.2026"
+      }
+    },
+    {
+      "id": "E07",
+      "description": "invalid month",
+      "expectedError": "INVALID_DATE",
+      "value": {
+        "localDate": "2026-13-01"
+      }
+    },
+    {
+      "id": "E08",
+      "description": "unknown template",
+      "expectedError": "UNKNOWN_TEMPLATE",
+      "value": {
+        "entries": [
+          "UNKNOWN"
+        ]
+      }
+    },
+    {
+      "id": "E09",
+      "description": "duplicate overrides",
+      "expectedError": "DUPLICATE_OVERRIDE",
+      "value": {
+        "overrides": [
+          {
+            "localDate": "2026-11-06",
+            "kind": "OFF"
+          },
+          {
+            "localDate": "2026-11-06",
+            "kind": "SHIFT",
+            "templateId": "S"
+          }
+        ]
+      }
+    },
+    {
+      "id": "E10",
+      "description": "invalid local time",
+      "expectedError": "INVALID_LOCAL_TIME",
+      "value": {
+        "startLocalTime": "25:00",
+        "endLocalTime": "06:00"
+      }
+    },
+    {
+      "id": "E11",
+      "description": "equal start and end ambiguous",
+      "expectedError": "AMBIGUOUS_DURATION",
+      "value": {
+        "startLocalTime": "08:00",
+        "endLocalTime": "08:00"
+      }
+    }
+  ]
+}

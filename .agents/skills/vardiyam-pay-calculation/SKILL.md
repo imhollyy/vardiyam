@@ -1,6 +1,6 @@
 ---
 name: vardiyam-pay-calculation
-description: Vardiyam'ın vardiya süresi, mola, fazla mesai, tatil, brüt hakediş, bordro neti ve ödeme mutabakatı mantığı değişirken hesap doğruluğu ve mevzuat ayrımı denetimi için kullanılır.
+description: Use only when changing work-time segmentation, pay rules, gross estimates, payment reconciliation, or calculation snapshots.
 ---
 
 # Vardiyam Pay Calculation — v1.0
