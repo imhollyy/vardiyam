@@ -30,9 +30,16 @@ function canonicalLocalDateCheck(column: string): string {
   `;
 }
 
+/**
+ * Yeni şema 100'den başlar. Eski "Vardiyam" sürümleri 1–9 arasını kullanıyordu;
+ * bu aralıkta bir veritabanı bulunursa uyumsuz sayılır ve sıfırlanır.
+ * Yeni migration eklerken 101, 102… şeklinde devam et.
+ */
+export const FIRST_SCHEMA_VERSION = 100;
+
 export const migrations: readonly Migration[] = [
   {
-    version: 1,
+    version: 100,
     sql: `
       CREATE TABLE IF NOT EXISTS app_metadata (
         key TEXT PRIMARY KEY NOT NULL,
@@ -165,7 +172,8 @@ export async function runMigrations(database: MigrationDatabase): Promise<Migrat
       );
     }
 
-    if (initialVersion > 0 && initialVersion < CURRENT_SCHEMA_VERSION) {
+    // Eski Vardiyam şeması (1–9) veya yeni şemadan önceki herhangi bir sürüm: güvenle sıfırla.
+    if (initialVersion > 0 && initialVersion < FIRST_SCHEMA_VERSION) {
       return { previousVersion: initialVersion, currentVersion: initialVersion, needsReset: true };
     }
 

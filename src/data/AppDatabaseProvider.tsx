@@ -69,7 +69,8 @@ export function AppDatabaseProvider({ children }: PropsWithChildren) {
       setDatabase(opened);
       setError(null);
       setBusy(false);
-    }).catch(() => {
+    }).catch((openError: unknown) => {
+      console.error('[db] açılış hatası', openError);
       if (active) {
         setError('Yerel veritabanı açılamadı. Veriler değiştirilmedi. Uygulamayı yeniden başlatıp tekrar deneyin.');
         setBusy(false);
@@ -135,9 +136,11 @@ export function AppDatabaseProvider({ children }: PropsWithChildren) {
   return (
     <AppDatabaseContext.Provider value={value}>
       {!database ? (
-        <View accessibilityRole="progressbar" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          {busy && <ActivityIndicator />}
-          <Text accessibilityLiveRegion="polite" style={{ marginTop: 12, textAlign: 'center' }}>
+        // Tema henüz yüklenmediği için renkler sabit verilir; aksi halde koyu modda
+        // siyah zemin üstünde siyah yazı oluşur ve ekran tamamen siyah görünür.
+        <View accessibilityRole="progressbar" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFFFFF' }}>
+          {busy && <ActivityIndicator color="#1F2937" />}
+          <Text accessibilityLiveRegion="polite" style={{ marginTop: 12, textAlign: 'center', color: '#1F2937' }}>
             {error ?? (busy ? 'Yerel veritabanı hazırlanıyor…' : 'Veritabanı kullanılamıyor.')}
           </Text>
         </View>
