@@ -4,25 +4,19 @@
 
 ## CURRENT STATE
 
-- **Tarih:** 2026-11-09
-- **Proje:** Vardiyam
-- **Aktif aşama:** VDY-015B — kolay vardiya kurulumu ve 30 günlük önizleme
-- **Durum:** VDY-015B P1 kullanıcı durum regresyonu düzeltildi; kod commit'i ve GitHub CI PASS. Ayrı worktree `C:\Users\emrey\Documents\Codex\vdy-015b-easy-shift-onboarding`, dal `feat/vdy-015b-easy-shift-onboarding`. Ana/önceki worktree'nin `.gitignore`, `expo-env.d.ts`, VDY-015A raporu ve kullanıcı değişiklikleri korunuyor. PR #41 taslak kalacak. Fiziksel cihaz kabul testi yapılmadı.
-- **Aktif branch:** feat/vdy-015b-easy-shift-onboarding
-- **Ana depo:** `imhollyy/vardiyam`
-- **Ürün kodu:** VDY-003C calendar, VDY-004 actual work records, VDY-005A segmentation and VDY-005B timed breaks complete
-- **Expo/SQLite scaffold:** READY_FOR_PR
-- **Gerçek alt ajan çağrısı:** `r3_pay_expert` uzman alan sınırları önerisi verdi; `r3_earnings_reviewer` ara hesap bulguları verdi; `r3_final_reviewer` güncel diff'i bağımsız inceledi ve APPROVE etti. Uzman değerlendirmesi hukuk mütalaası değildir.
-- **Repo skill kullanımı:** VDY-005C1 için `vardiyam-task-flow`, `vardiyam-pay-calculation`, `vardiyam-test-gate`; MDN JavaScript `BigInt`/`Number.isSafeInteger` Context7 kaynağıyla doğrulandı.
-- **Yerel araçlar:** Node v24.20.0, npm 11.19.0, Codex CLI 0.165.0, Expo CLI 58.1.19.
-- **MCP:** Project Context7 MCP disabled; OpenAI Developer Docs enabled. UI Skills MCP yok. Context7 CLI/Skills setup authenticated/completed.
-- **VDY-005C1 doğrulama:** `npm run typecheck` PASS; `npm run lint` PASS; `npm test` PASS 184/184 (57 yeni domain testi, 40 sayı fixture'ı); focused earnings 57/57; `npx expo-doctor --verbose` PASS 20/20 (network retry); `git diff --check` PASS; GitHub CI run #22 code PASS and run #23 docs closure PASS. R08, R13 and Ethernet profile remain separate/open.
-- **Kurucu onayı:** PROJECT_CONSTITUTION v1.1 APPROVED; PRODUCT_SPEC v0.1 + Q1–Q3 APPROVED via GitHub Issue #3 (2026-11-05). Merge/release izni değildir.
+- **Tarih:** 2026-11-20
+- **Proje:** Mesai Pusulası (eski: Vardiyam)
+- **Aktif aşama:** Hibrit Yeniden Yapılanma — `feat/yeni-akis` branch
+- **Durum:** C1–C6 tamamlandı. Eski fiilî kayıt modülleri kaldırıldı; schema v1 single migration + needsReset guard; config + saf payroll engine + 23 unit test; welcome + 6-step setup; home week strip + calendar + day-edit modal + shift-change; earnings breakdown + reports + additional-income CRUD + settings rewrite (SIFIRLA, ücret bilgileri, yasal linkler) + KVKK/privacy draft sayfaları.
+- **Aktif branch:** feat/yeni-akis
+- **Commits:** aeac994 (C1) → 6fe9da2 (C2) → 93f5920 (C3) → 065f4dd (C4) → 9dfd975 (C5) → 640f8d7 (C6)
+- **Doğrulama:** `npm test` PASS 23/23 (payroll engine); `tsc --noEmit` yalnız pre-existing @expo/vector-icons ve datetimepicker tip eksikliği. Expo Doctor, gerçek cihaz, lint NOT RUN.
+- **Kurucu onayı:** Hibrit yeniden yapılanma planı "onaylıyorum" ile onaylandı. main merge/release izni verilmiş değil.
 - **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
 
 ## NEXT ACTION
 
-1. PR #41 için iPhone/Expo Go kullanıcı kabulini yap. VDY-015C'ye otomatik geçme.
+1. C7: Draft PR açma. main merge için kurucu onayı gerekli.
 
 ### 2026-11-07 — VDY-014 — IMPLEMENTATION / VERIFICATION CHECKPOINT
 
