@@ -1,8 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { runMigrations } from './migrations.ts';
+import { runMigrations, type MigrationResult } from './migrations.ts';
 
-export async function initializeDatabase(database: SQLiteDatabase): Promise<void> {
+export async function initializeDatabase(database: SQLiteDatabase): Promise<MigrationResult> {
   await database.execAsync('PRAGMA foreign_keys = ON;');
-  await runMigrations(database);
+  return runMigrations(database);
 }

@@ -94,7 +94,8 @@ export async function createEmptyDatabaseForWipe(): Promise<SQLiteDatabase> {
   try {
     await empty.execAsync('PRAGMA foreign_keys = ON;');
     const { initializeDatabase } = await import('./database.ts');
-    await initializeDatabase(empty);
+    const initResult = await initializeDatabase(empty);
+    if (initResult.needsReset) throw new Error('Boş veritabanı şeması beklenmeyen durumda.');
     const validation = await validateBackupDatabase(empty, { createReferenceDatabase, expectedSchemaVersion: CURRENT_SCHEMA_VERSION });
     if (validation.recordCount !== 0) throw new Error('Boş veritabanı hazırlanamadı.');
     return empty;

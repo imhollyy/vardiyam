@@ -11,24 +11,12 @@ export type ReferenceDatabase = { database: ValidationDatabase; close: () => Pro
 export type ReferenceDatabaseFactory = () => Promise<ReferenceDatabase>;
 
 const TABLES_BY_VERSION: Record<number, readonly string[]> = {
-  1: ['app_metadata'],
-  2: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides'],
-  3: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records'],
-  4: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals'],
-  5: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots'],
-  6: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events'],
-  7: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses'],
-  8: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses', 'plan_time_overrides'],
-  9: ['app_metadata', 'shift_templates', 'shift_cycles', 'cycle_entries', 'plan_overrides', 'work_records', 'break_intervals', 'earnings_profiles', 'earnings_rule_versions', 'earnings_snapshots', 'payroll_periods', 'payslip_net_versions', 'net_payments', 'payment_allocations', 'payment_ledger_events', 'active_work_sessions', 'work_day_statuses', 'plan_time_overrides', 'day_edit_notes'],
+  1: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes'],
 };
 
-const CRITICAL_V6_TRIGGERS = [
-  'cycle_entries_position_insert', 'cycle_entries_position_update',
-  'break_intervals_validate_insert', 'break_intervals_validate_update', 'work_records_validate_existing_breaks',
-  'earnings_snapshots_no_update', 'earnings_snapshots_no_delete', 'earnings_profiles_no_update', 'earnings_profiles_no_delete',
-  'earnings_rules_no_update', 'earnings_rules_no_delete', 'payroll_periods_no_update', 'payroll_periods_no_delete',
-  'payslip_net_versions_no_update', 'payslip_net_versions_no_delete', 'payment_allocations_limit_insert',
-  'payment_allocations_limit_update', 'net_payments_allocation_limit', 'payment_ledger_events_no_update', 'payment_ledger_events_no_delete',
+const CRITICAL_TRIGGERS = [
+  'cycle_entries_position_insert',
+  'cycle_entries_position_update',
 ];
 
 export type BackupDatabaseValidation = {
@@ -57,7 +45,8 @@ export async function validateBackupDatabase(
 
   const migrated = options.migrateToCurrent === true && version < CURRENT_SCHEMA_VERSION;
   if (migrated) {
-    await runMigrations(database);
+    const result = await runMigrations(database);
+    if (result.needsReset) throw new Error('Yedek veritabanı eski şemada; güncel şemaya taşınamıyor.');
     version = await readSchemaVersion(database);
     if (version !== CURRENT_SCHEMA_VERSION) throw new Error('Yedek veritabanı güncel şemaya taşınamadı.');
     await verifyDatabaseIntegrity(database);
@@ -100,14 +89,12 @@ async function verifyRequiredSchema(
     );
     if (!found) throw new Error('Yedekte gerekli tablolar eksik.');
   }
-  if (version >= 6) {
-    for (const trigger of CRITICAL_V6_TRIGGERS) {
-      const found = await database.getFirstAsync<{ name: string }>(
-        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?;",
-        trigger,
-      );
-      if (!found) throw new Error('Yedekte gerekli veri koruma kuralları eksik.');
-    }
+  for (const trigger of CRITICAL_TRIGGERS) {
+    const found = await database.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?;",
+      trigger,
+    );
+    if (!found) throw new Error('Yedekte gerekli veri koruma kuralları eksik.');
   }
   await verifyCanonicalSchema(database, version, createReferenceDatabase);
 }

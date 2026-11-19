@@ -28,10 +28,22 @@ async function openInitializedDatabase(recover = true): Promise<SQLiteDatabase> 
   if (recover) await recoverPendingDatabaseMaintenance();
   const database = await SQLite.openDatabaseAsync(DATABASE_NAME);
   try {
-    await initializeDatabase(database);
+    const result = await initializeDatabase(database);
+    if (result.needsReset) {
+      await database.closeAsync();
+      await SQLite.deleteDatabaseAsync(DATABASE_NAME);
+      const fresh = await SQLite.openDatabaseAsync(DATABASE_NAME);
+      try {
+        await initializeDatabase(fresh);
+        return fresh;
+      } catch (resetError) {
+        await fresh.closeAsync();
+        throw resetError;
+      }
+    }
     return database;
   } catch (error) {
-    await database.closeAsync();
+    await database.closeAsync().catch(() => undefined);
     throw error;
   }
 }
