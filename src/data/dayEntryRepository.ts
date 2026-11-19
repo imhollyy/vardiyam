@@ -83,7 +83,7 @@ export async function upsertDayEntry(
     if (patch.deductOverride !== undefined) { sets.push('deduct_override = ?'); values.push(patch.deductOverride === null ? null : patch.deductOverride ? 1 : 0); }
     if (patch.note !== undefined) { sets.push('note = ?'); values.push(patch.note); }
     if (sets.length === 0) return;
-    await database.runAsync(`UPDATE day_entries SET ${sets.join(', ')} WHERE local_date = ?;`, [...values, localDate]);
+    await database.runAsync(`UPDATE day_entries SET ${sets.join(', ')} WHERE local_date = ?;`, [...values, localDate] as (string | number | null)[]);
   } else {
     await database.runAsync(
       `INSERT INTO day_entries (local_date, shift_override_id, overtime_minutes, late_early_minutes, leave_type, leave_half_day, leave_hours, deduct_override, note)

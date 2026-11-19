@@ -49,7 +49,7 @@ export async function updateSettings(database: SQLiteDatabase, patch: Partial<Se
   if (patch.setupCompleted !== undefined) { sets.push('setup_completed = ?'); values.push(patch.setupCompleted ? 1 : 0); }
 
   if (sets.length === 0) return;
-  await database.runAsync(`UPDATE settings SET ${sets.join(', ')} WHERE id = 1;`, values);
+  await database.runAsync(`UPDATE settings SET ${sets.join(', ')} WHERE id = 1;`, values as (string | number | null)[]);
 }
 
 export async function markSetupCompleted(database: SQLiteDatabase): Promise<void> {

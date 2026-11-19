@@ -71,7 +71,7 @@ export async function updateExtraIncome(
   if (input.frequency !== undefined) { sets.push('frequency = ?'); values.push(input.frequency); }
   if (input.firstPaymentDate !== undefined) { sets.push('first_payment_date = ?'); values.push(input.firstPaymentDate); }
   if (sets.length === 0) return;
-  await database.runAsync(`UPDATE extra_incomes SET ${sets.join(', ')} WHERE id = ?;`, [...values, id]);
+  await database.runAsync(`UPDATE extra_incomes SET ${sets.join(', ')} WHERE id = ?;`, [...values, id] as (string | number | null)[]);
 }
 
 export async function deleteExtraIncome(database: SQLiteDatabase, id: string): Promise<void> {

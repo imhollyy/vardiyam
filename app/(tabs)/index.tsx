@@ -147,7 +147,7 @@ export default function HomeScreen() {
             )}
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push({ pathname: '/day-edit', params: { date: selectedDate } })}
+              onPress={() => router.push({ pathname: '/day-edit' as never, params: { date: selectedDate } })}
               style={[styles.editButton, { borderColor: theme.border }]}
             >
               <Text style={{ color: theme.accent, fontWeight: '600', fontSize: layout.type.body }}>Düzenle</Text>
