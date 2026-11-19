@@ -2,6 +2,72 @@ import { addCalendarDays, dayOrdinal, type LocalDate } from '../../domain/shift-
 
 export type YearMonth = { year: number; month: number };
 
+// --- Timezone resolution helpers (moved from domain/work-record.ts) ---
+
+function parseLocalDateTime(value: string): { localDate: string; hour: number; minute: number } {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) throw new Error('Tarih ve saat YYYY-MM-DDTHH:mm biçiminde olmalıdır.');
+  const [, localDate, hourText, minuteText] = match;
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  try { dayOrdinal(localDate); } catch { throw new Error('Tarih geçerli bir takvim günü olmalıdır.'); }
+  if (hour > 23 || minute > 59) throw new Error('Saat 00:00–23:59 aralığında olmalıdır.');
+  return { localDate, hour, minute };
+}
+
+function tzFormatterFor(timezone: string): Intl.DateTimeFormat {
+  if (typeof timezone !== 'string' || timezone.trim() === '') throw new Error('Zaman dilimi desteklenen bir IANA kimliği olmalıdır.');
+  try {
+    return new Intl.DateTimeFormat('en-CA-u-ca-gregory-nu-latn', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    });
+  } catch { throw new Error('Zaman dilimi desteklenen bir IANA kimliği olmalıdır.'); }
+}
+
+function utcMs(year: number, month: number, day: number, hour: number, minute: number, second: number): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(hour, minute, second, 0);
+  return date.getTime();
+}
+
+function partsAt(formatter: Intl.DateTimeFormat, instant: number): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+  const parts = Object.fromEntries(formatter.formatToParts(new Date(instant)).map(({ type, value }) => [type, Number(value)]));
+  return { year: parts.year, month: parts.month, day: parts.day, hour: parts.hour, minute: parts.minute, second: parts.second };
+}
+
+function sameLocalMinute(formatter: Intl.DateTimeFormat, instant: number, desired: { localDate: string; hour: number; minute: number }): boolean {
+  const parts = partsAt(formatter, instant);
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}` === desired.localDate &&
+    parts.hour === desired.hour && parts.minute === desired.minute && parts.second === 0;
+}
+
+export function getLocalDateTimeCandidates(value: string, timezone: string): string[] {
+  const desired = parseLocalDateTime(value);
+  const formatter = tzFormatterFor(timezone);
+  const [year, month, day] = desired.localDate.split('-').map(Number);
+  const wallMilliseconds = utcMs(year, month, day, desired.hour, desired.minute, 0);
+  const offsets = new Set<number>();
+  for (let sample = wallMilliseconds - 36 * 60 * 60_000; sample <= wallMilliseconds + 36 * 60 * 60_000; sample += 3 * 60 * 60_000) {
+    const parts = partsAt(formatter, sample);
+    offsets.add(utcMs(parts.year, parts.month, parts.day, parts.hour, parts.minute, parts.second) - sample);
+  }
+  const candidates = [...offsets]
+    .map((offset) => wallMilliseconds - offset)
+    .filter((instant) => sameLocalMinute(formatter, instant, desired))
+    .sort((left, right) => left - right)
+    .map((instant) => new Date(instant).toISOString());
+  return [...new Set(candidates)];
+}
+
+export function formatDuration(minutes: number): string {
+  const sign = minutes < 0 ? '−' : '';
+  const absolute = Math.abs(minutes);
+  return `${sign}${Math.floor(absolute / 60)} sa ${String(absolute % 60).padStart(2, '0')} dk`;
+}
+
 function padded(value: number): string {
   return String(value).padStart(2, '0');
 }

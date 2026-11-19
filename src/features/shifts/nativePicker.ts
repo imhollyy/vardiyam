@@ -1,4 +1,4 @@
-import { getLocalDateTimeCandidates } from '../../domain/work-record.ts';
+import { getLocalDateTimeCandidates } from './dates.ts';
 
 export type NativePickerMode = 'date' | 'time';
 

@@ -31,12 +31,13 @@ function ThemedRouter() {
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="work-records" />
-        <Stack.Screen name="earnings-settings" />
-        <Stack.Screen name="net-payments" />
+        <Stack.Screen name="welcome" />
+        <Stack.Screen name="setup" />
         <Stack.Screen name="backup" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="account" />
+        <Stack.Screen name="shift-change" />
+        <Stack.Screen name="additional-income" />
+        <Stack.Screen name="legal/kvkk" />
+        <Stack.Screen name="legal/privacy" />
       </Stack>
     </>
   );

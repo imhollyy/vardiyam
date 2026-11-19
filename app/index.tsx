@@ -8,13 +8,13 @@ import { useAppTheme } from '@/src/theme/AppThemeProvider';
 export default function EntryScreen() {
   const database = useAppDatabase();
   const { theme } = useAppTheme();
-  const [destination, setDestination] = useState<'/(tabs)' | '/onboarding' | null>(null);
+  const [destination, setDestination] = useState<'/(tabs)' | '/welcome' | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
     void getOnboardingState(database).then((state) => {
-      if (active) setDestination(state.completed ? '/(tabs)' : '/onboarding');
+      if (active) setDestination(state.completed ? '/(tabs)' : '/welcome');
     }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [database, attempt]);
