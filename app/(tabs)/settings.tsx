@@ -536,7 +536,7 @@ export default function SettingsScreen() {
           onPress={handleReset}
           style={[styles.dangerButton, { borderColor: theme.danger }]}
         >
-          <Text style={{ color: theme.danger, fontWeight: '700', fontSize: layout.type.body }}>SIFIRLA</Text>
+          <Text style={{ color: theme.danger, fontFamily: fonts.bold, fontSize: layout.type.body }}>SIFIRLA</Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -546,7 +546,7 @@ export default function SettingsScreen() {
         <View style={[styles.modalSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.modalTitle, { color: theme.ink }]}>Tüm verileri sil</Text>
           <Text style={[styles.body, { color: theme.muted }]}>Bu işlem geri alınamaz. Onaylamak için aşağıya{' '}
-            <Text style={{ fontWeight: '900', color: theme.danger }}>SIFIRLA</Text>
+            <Text style={{ fontFamily: fonts.extraBold, color: theme.danger }}>SIFIRLA</Text>
             {' '}yazın.</Text>
           <TextInput
             accessibilityLabel="Onay metni"
@@ -565,7 +565,7 @@ export default function SettingsScreen() {
             onPress={() => void confirmReset()}
             style={[styles.dangerButton, { borderColor: theme.danger, opacity: resetConfirmText === 'SIFIRLA' ? 1 : 0.35 }]}
           >
-            <Text style={{ color: theme.danger, fontWeight: '700', fontSize: layout.type.body }}>Onayla ve sıfırla</Text>
+            <Text style={{ color: theme.danger, fontFamily: fonts.bold, fontSize: layout.type.body }}>Onayla ve sıfırla</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => setShowResetModal(false)} style={styles.modalCancel}>
             <Text style={{ color: theme.muted, fontSize: layout.type.body }}>İptal</Text>
@@ -594,12 +594,12 @@ const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   codeField: { width: 92 },
   customRow: { borderTopWidth: 1, paddingVertical: 10, gap: 8 },
-  customDay: { fontSize: 13, fontWeight: '700' },
+  customDay: { fontSize: 13, fontFamily: fonts.bold },
   customControls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   removeEntry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
   previewWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   previewDay: { minWidth: 125, flexGrow: 1, flexBasis: '45%', borderWidth: 1, borderRadius: 12, padding: 8, gap: 5 },
-  previewDate: { fontSize: 12, fontWeight: '700' },
+  previewDate: { fontSize: 12, fontFamily: fonts.bold },
   previewTime: { fontSize: 12 },
   actionRow: { gap: 10 },
   statusRow: { minHeight: 100, alignItems: 'center', justifyContent: 'center', gap: 12 },

@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { fonts } from '@/src/theme/tokens';
 
 const destinations = [
   { name: 'index', title: 'Bugün', glyph: 'home-outline', label: 'Bugün sekmesi' },
@@ -27,7 +28,7 @@ export default function TabLayout() {
           paddingTop: 6,
           paddingBottom: 6,
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 12, fontFamily: fonts.semiBold },
         tabBarItemStyle: { paddingHorizontal: 0 },
         tabBarIconStyle: { marginTop: 1 },
       }}

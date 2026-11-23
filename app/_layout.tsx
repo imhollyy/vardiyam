@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { AppDatabaseProvider } from '@/src/data/AppDatabaseProvider';
 import { AppThemeProvider, useAppTheme } from '@/src/theme/AppThemeProvider';
+import { fonts } from '@/src/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -25,7 +26,7 @@ class RootErrorBoundary extends Component<PropsWithChildren, { error: Error | nu
       void SplashScreen.hideAsync().catch(() => undefined);
       return (
         <ScrollView contentContainerStyle={{ flex: 1, justifyContent: 'center', padding: 32, backgroundColor: '#FFF' }}>
-          <Text style={{ fontSize: 18, fontWeight: '800', color: '#C43D44', marginBottom: 12 }}>Uygulama hatası</Text>
+          <Text style={{ fontSize: 18, fontFamily: fonts.extraBold, color: '#C43D44', marginBottom: 12 }}>Uygulama hatası</Text>
           <Text style={{ fontSize: 14, color: '#333' }}>{this.state.error.message}</Text>
           <Text style={{ fontSize: 11, color: '#888', marginTop: 12 }}>{this.state.error.stack?.slice(0, 500)}</Text>
         </ScrollView>
