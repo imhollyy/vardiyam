@@ -8,7 +8,7 @@ import { getSettings, updateSettings } from '@/src/data/settingsRepository';
 import { listShiftTemplates, listShiftCycles, saveShiftSchedule } from '@/src/data/shiftCycleRepository';
 import type { WorkSchedule, ShiftPattern } from '@/src/domain/payroll/types';
 import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-cycle/index';
-import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, DAILY_STANDARD_BY_SCHEDULE } from '@/src/config/shifts';
+import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
 
@@ -25,7 +25,7 @@ const SHIFT_PATTERN_OPTIONS: { value: ShiftPattern; label: string }[] = [
   { value: 'THREE_SHIFT', label: '3 vardiya' },
 ];
 
-type TemplateDraft = { id: string; code: string; name: string; startLocalTime: string; endLocalTime: string };
+type TemplateDraft = { id: string; code: string; name: string; startLocalTime: string; endLocalTime: string; breakMinutes: number };
 
 function isValidTime(t: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
@@ -104,6 +104,7 @@ export default function ShiftChangeScreen() {
           name: t.name,
           startLocalTime: t.startLocalTime,
           endLocalTime: t.endLocalTime,
+          breakMinutes: t.breakMinutes,
         })));
       } else {
         const defaults = DEFAULT_SHIFT_HOURS[settings.workSchedule][settings.shiftPattern];
@@ -133,23 +134,28 @@ export default function ShiftChangeScreen() {
   const updateTemplateTime = useCallback((index: number, field: 'startLocalTime' | 'endLocalTime', value: string) => {
     setTemplateDrafts((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index]!, [field]: value };
+      const draft = updated[index]!;
+      const newDraft = { ...draft, [field]: value };
+      const start = field === 'startLocalTime' ? value : draft.startLocalTime;
+      const end = field === 'endLocalTime' ? value : draft.endLocalTime;
+      if (isValidTime(start) && isValidTime(end) && start !== end) {
+        const nominal = shiftNominalMinutes(start, end);
+        newDraft.breakMinutes = Math.max(draft.breakMinutes, legalMinBreakMinutes(nominal));
+      }
+      updated[index] = newDraft;
       return updated;
     });
   }, []);
 
-  const overtimeWarnings = useMemo(() => {
-    const dailyStd = DAILY_STANDARD_BY_SCHEDULE[workSchedule];
+  const breakWarnings = useMemo(() => {
     return templateDrafts.map((t) => {
       if (!isValidTime(t.startLocalTime) || !isValidTime(t.endLocalTime) || t.startLocalTime === t.endLocalTime) return null;
       const nominal = shiftNominalMinutes(t.startLocalTime, t.endLocalTime);
-      const delta = nominal - dailyStd;
-      if (delta <= 0) return null;
-      const hours = Math.floor(delta / 60);
-      const mins = delta % 60;
-      return mins > 0 ? `+${hours} saat ${mins} dk/gün` : `+${hours} saat/gün`;
+      const legalMin = legalMinBreakMinutes(nominal);
+      if (t.breakMinutes < legalMin) return `Yasal minimum mola: ${legalMin} dk`;
+      return null;
     });
-  }, [templateDrafts, workSchedule]);
+  }, [templateDrafts]);
 
   const canSave = templateDrafts.every((t) =>
     isValidTime(t.startLocalTime) && isValidTime(t.endLocalTime) && t.startLocalTime !== t.endLocalTime,
@@ -171,6 +177,7 @@ export default function ShiftChangeScreen() {
         startLocalTime: td.startLocalTime,
         endLocalTime: td.endLocalTime,
         standardMinutes: shiftNominalMinutes(td.startLocalTime, td.endLocalTime),
+        breakMinutes: td.breakMinutes,
       }));
 
       const entries = buildCycleEntries(workSchedule, shiftPattern, templateIds);
@@ -266,8 +273,8 @@ export default function ShiftChangeScreen() {
                 maxLength={5}
               />
             </View>
-            {overtimeWarnings[i] && (
-              <Text style={[styles.overtimeWarning, { color: theme.warning }]} accessibilityRole="alert">{overtimeWarnings[i]}</Text>
+            {breakWarnings[i] && (
+              <Text style={[styles.overtimeWarning, { color: theme.warning }]} accessibilityRole="alert">{breakWarnings[i]}</Text>
             )}
           </View>
         ))}

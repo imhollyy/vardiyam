@@ -1,35 +1,34 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
-import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
-import { getAllExtraIncomes } from '@/src/data/extraIncomeRepository';
-import { listShiftTemplates } from '@/src/data/shiftCycleRepository';
-import { generateMonthlyStatement, type MonthlyStatement } from '@/src/domain/payroll/index';
+import { type MonthlyStatement, getPayPeriodForDate } from '@/src/domain/payroll/index';
 import { formatTryMinor } from '@/src/domain/money';
+import { loadPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 
-const MONTH_NAMES = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
-];
-
-function currentYearMonth(): [number, number] {
+function todayLocal(): string {
   const now = new Date();
-  return [now.getFullYear(), now.getMonth() + 1];
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function overtimeHours(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h} sa ${m} dk` : `${h} sa`;
 }
 
 export default function EarningsScreen() {
   const { theme } = useAppTheme();
   const database = useAppDatabase();
-  const [year, month] = useMemo(currentYearMonth, []);
+  const [period, setPeriod] = useState<PeriodInfo | null>(null);
   const [statement, setStatement] = useState<MonthlyStatement | null>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -38,17 +37,37 @@ export default function EarningsScreen() {
       let active = true;
       void (async () => {
         const settings = await getSettings(database);
-        const entries = await getDayEntriesInRange(database, `${year}-01-01`, `${year}-12-31`);
-        const extras = await getAllExtraIncomes(database);
-        const templates = await listShiftTemplates(database);
-        const stmt = generateMonthlyStatement(settings, entries, extras, year, month, 0, templates);
-        if (active) setStatement(stmt);
+        const today = todayLocal();
+        const currentPeriod = getPayPeriodForDate(today, settings.payday);
+        const stmt = await loadPeriodStatement(database, currentPeriod);
+        if (active) {
+          setPeriod(currentPeriod);
+          setStatement(stmt);
+        }
       })();
       return () => { active = false; };
-    }, [database, year, month]),
+    }, [database]),
   );
 
-  if (!statement) {
+  const navigatePeriod = useCallback((direction: -1 | 1) => {
+    if (!period) return;
+    void (async () => {
+      const settings = await getSettings(database);
+      const [ey, em, ed] = period.end.split('-').map(Number) as [number, number, number];
+      let newMonth = em + direction;
+      let newYear = ey;
+      if (newMonth < 1) { newMonth = 12; newYear--; }
+      if (newMonth > 12) { newMonth = 1; newYear++; }
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const probeDate = `${newYear}-${pad(newMonth)}-${pad(ed)}`;
+      const newPeriod = getPayPeriodForDate(probeDate, settings.payday);
+      const stmt = await loadPeriodStatement(database, newPeriod);
+      setPeriod(newPeriod);
+      setStatement(stmt);
+    })();
+  }, [database, period]);
+
+  if (!statement || !period) {
     return (
       <Screen>
         <Text style={{ color: theme.muted, textAlign: 'center', marginTop: 100 }}>Yükleniyor…</Text>
@@ -56,10 +75,18 @@ export default function EarningsScreen() {
     );
   }
 
-  const mainRows: { label: string; value: string; icon: React.ComponentProps<typeof Ionicons>['name']; color?: string }[] = [
+  const mainRows: { label: string; value: string; icon: React.ComponentProps<typeof Ionicons>['name']; color?: string; detail?: string }[] = [
     { label: 'Taban maaş', value: formatTryMinor(statement.baseSalaryMinor), icon: 'wallet-outline' },
     { label: 'Çalışılan gün', value: `${statement.workedDays} / ${statement.totalDays}`, icon: 'calendar-outline' },
-    { label: 'Fazla mesai', value: formatTryMinor(statement.overtimeMinor), icon: 'timer-outline', color: theme.warning },
+    {
+      label: 'Fazla mesai',
+      value: formatTryMinor(statement.overtimeMinor),
+      icon: 'timer-outline',
+      color: statement.overtimeMinor > 0 ? theme.warning : undefined,
+      detail: statement.overtimeMinutes > 0
+        ? `Planlı: ${overtimeHours(statement.scheduledOvertimeMinutes)} · Elle: ${overtimeHours(statement.manualOvertimeMinutes)}`
+        : undefined,
+    },
     { label: 'Tatil primi', value: formatTryMinor(statement.holidayBonusMinor), icon: 'flag-outline' },
     { label: 'Ek gelirler', value: formatTryMinor(statement.extraIncomeMinor), icon: 'cash-outline', color: theme.success },
     { label: 'Kesintiler', value: `−${formatTryMinor(statement.deductionMinor)}`, icon: 'remove-circle-outline', color: theme.danger },
@@ -76,7 +103,28 @@ export default function EarningsScreen() {
 
   return (
     <Screen>
-      <PageHeading eyebrow="KAZANÇ" title={`${MONTH_NAMES[month - 1]} ${year}`} subtitle="Aylık tahmini kazanç dökümü" />
+      {/* Period navigation */}
+      <View style={styles.periodNav}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Önceki dönem"
+          onPress={() => navigatePeriod(-1)}
+          style={[styles.navBtn, { backgroundColor: theme.surface }]}
+        >
+          <Ionicons name="chevron-back" size={18} color={theme.foreground} />
+        </Pressable>
+        <Text style={[styles.periodLabel, { color: theme.foreground }]}>{period.label}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sonraki dönem"
+          onPress={() => navigatePeriod(1)}
+          style={[styles.navBtn, { backgroundColor: theme.surface }]}
+        >
+          <Ionicons name="chevron-forward" size={18} color={theme.foreground} />
+        </Pressable>
+      </View>
+
+      <PageHeading eyebrow="KAZANÇ" title={period.label} subtitle="Aylık tahmini kazanç dökümü" />
 
       {/* Net total */}
       <Card style={{ backgroundColor: theme.accentSurface, borderColor: theme.accent }}>
@@ -95,14 +143,21 @@ export default function EarningsScreen() {
       <Card>
         <CardHeader icon="list-outline" title="Gelir Kalemleri" />
         {mainRows.map((row) => (
-          <View key={row.label} style={[styles.row, { borderBottomColor: theme.border }]} accessibilityLabel={`${row.label}: ${row.value}`}>
-            <View style={styles.rowLeft}>
-              <Ionicons accessible={false} name={row.icon} size={16} color={row.color ?? theme.muted} />
-              <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
+          <View key={row.label}>
+            <View style={[styles.row, { borderBottomColor: theme.border }]} accessibilityLabel={`${row.label}: ${row.value}`}>
+              <View style={styles.rowLeft}>
+                <Ionicons accessible={false} name={row.icon} size={16} color={row.color ?? theme.muted} />
+                <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
+              </View>
+              <Text style={{ color: row.color ?? theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>
+                {row.value}
+              </Text>
             </View>
-            <Text style={{ color: row.color ?? theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>
-              {row.value}
-            </Text>
+            {row.detail && (
+              <Text style={{ color: theme.muted, fontSize: layout.type.caption, paddingLeft: 24, paddingBottom: 6 }}>
+                {row.detail}
+              </Text>
+            )}
           </View>
         ))}
       </Card>
@@ -135,6 +190,9 @@ export default function EarningsScreen() {
 }
 
 const styles = StyleSheet.create({
+  periodNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  periodLabel: { fontSize: 15, fontWeight: '600' },
+  navBtn: { padding: 8, borderRadius: 8 },
   netRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   netValue: { fontSize: 28, fontWeight: '900' },
   netIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

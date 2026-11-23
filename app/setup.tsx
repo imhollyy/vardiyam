@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -9,7 +9,7 @@ import { markSetupCompleted, updateSettings } from '@/src/data/settingsRepositor
 import { saveShiftSchedule } from '@/src/data/shiftCycleRepository';
 import type { SalaryType, WorkSchedule, ShiftPattern } from '@/src/domain/payroll/types';
 import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-cycle/index';
-import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, DAILY_STANDARD_BY_SCHEDULE } from '@/src/config/shifts';
+import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
 import { parseTryMinor, formatTryMinor } from '@/src/domain/money';
@@ -56,7 +56,7 @@ const BES_RATE_OPTIONS: { value: string; label: string }[] = [
   { value: '600', label: '%6' },
 ];
 
-type TemplateDraft = { code: string; name: string; startLocalTime: string; endLocalTime: string };
+type TemplateDraft = { code: string; name: string; startLocalTime: string; endLocalTime: string; breakMinutes: number };
 
 type Draft = {
   salaryText: string;
@@ -74,6 +74,14 @@ type Draft = {
 function defaultTemplateDrafts(ws: WorkSchedule, sp: ShiftPattern): TemplateDraft[] {
   return DEFAULT_SHIFT_HOURS[ws][sp].map((h) => ({ ...h }));
 }
+
+const BREAK_OPTIONS: { label: string; value: number }[] = [
+  { label: '15 dk', value: 15 },
+  { label: '30 dk', value: 30 },
+  { label: '45 dk', value: 45 },
+  { label: '60 dk', value: 60 },
+  { label: '90 dk', value: 90 },
+];
 
 const INITIAL_DRAFT: Draft = {
   salaryText: '',
@@ -199,6 +207,7 @@ export default function SetupScreen() {
         name: td.name,
         startLocalTime: td.startLocalTime,
         endLocalTime: td.endLocalTime,
+        breakMinutes: td.breakMinutes,
         standardMinutes: shiftNominalMinutes(td.startLocalTime, td.endLocalTime),
       }));
 
@@ -258,23 +267,55 @@ export default function SetupScreen() {
   const updateTemplateTime = useCallback((index: number, field: 'startLocalTime' | 'endLocalTime', value: string) => {
     setDraft((d) => {
       const updated = [...d.templateDrafts];
-      updated[index] = { ...updated[index]!, [field]: value };
+      const tpl = { ...updated[index]! };
+      (tpl as Record<string, unknown>)[field] = value;
+      // Auto-update legal minimum break when times change
+      if (isValidTime(tpl.startLocalTime) && isValidTime(tpl.endLocalTime) && tpl.startLocalTime !== tpl.endLocalTime) {
+        const nominal = shiftNominalMinutes(tpl.startLocalTime, tpl.endLocalTime);
+        const legalMin = legalMinBreakMinutes(nominal);
+        if (tpl.breakMinutes < legalMin) tpl.breakMinutes = legalMin;
+      }
+      updated[index] = tpl;
       return { ...d, templateDrafts: updated };
     });
   }, []);
 
-  const overtimeWarnings = useMemo(() => {
-    const dailyStd = DAILY_STANDARD_BY_SCHEDULE[draft.workSchedule];
+  const updateTemplateBreak = useCallback((index: number, value: number) => {
+    setDraft((d) => {
+      const updated = [...d.templateDrafts];
+      updated[index] = { ...updated[index]!, breakMinutes: value };
+      return { ...d, templateDrafts: updated };
+    });
+  }, []);
+
+  const weeklyNetPreview = useMemo(() => {
+    const workDays = draft.workSchedule === 'MON_FRI' ? 5 : draft.workSchedule === 'MON_SAT' ? 6 : 7;
+    if (draft.shiftPattern === 'FIXED_DAY' || draft.shiftPattern === 'FIXED_NIGHT') {
+      const tpl = draft.templateDrafts[0];
+      if (!tpl || !isValidTime(tpl.startLocalTime) || !isValidTime(tpl.endLocalTime)) return null;
+      const net = shiftNominalMinutes(tpl.startLocalTime, tpl.endLocalTime) - tpl.breakMinutes;
+      const weekly = net * workDays;
+      const excess = Math.max(0, weekly - 2700);
+      return { weeklyMinutes: weekly, excessMinutes: excess };
+    }
+    // For multi-shift patterns, use first template as reference
+    const tpl = draft.templateDrafts[0];
+    if (!tpl || !isValidTime(tpl.startLocalTime) || !isValidTime(tpl.endLocalTime)) return null;
+    const net = shiftNominalMinutes(tpl.startLocalTime, tpl.endLocalTime) - tpl.breakMinutes;
+    const weekly = net * workDays;
+    const excess = Math.max(0, weekly - 2700);
+    return { weeklyMinutes: weekly, excessMinutes: excess };
+  }, [draft.templateDrafts, draft.workSchedule, draft.shiftPattern]);
+
+  const breakWarnings = useMemo(() => {
     return draft.templateDrafts.map((t) => {
       if (!isValidTime(t.startLocalTime) || !isValidTime(t.endLocalTime) || t.startLocalTime === t.endLocalTime) return null;
       const nominal = shiftNominalMinutes(t.startLocalTime, t.endLocalTime);
-      const delta = nominal - dailyStd;
-      if (delta <= 0) return null;
-      const hours = Math.floor(delta / 60);
-      const mins = delta % 60;
-      return mins > 0 ? `+${hours} saat ${mins} dk/gün` : `+${hours} saat/gün`;
+      const legalMin = legalMinBreakMinutes(nominal);
+      if (t.breakMinutes < legalMin) return `Yasal asgari mola ${legalMin} dk (bilgi amaçlı)`;
+      return null;
     });
-  }, [draft.templateDrafts, draft.workSchedule]);
+  }, [draft.templateDrafts]);
 
   return (
     <KeyboardAvoidingView
@@ -391,14 +432,49 @@ export default function SetupScreen() {
                     maxLength={5}
                   />
                 </View>
-                {overtimeWarnings[i] && (
-                  <View style={[styles.warningBadge, { backgroundColor: theme.warningSurface }]}>
-                    <Ionicons name="alert-circle" size={14} color={theme.warning} />
-                    <Text style={{ color: theme.warning, fontSize: layout.type.caption, fontWeight: '600' }}>{overtimeWarnings[i]}</Text>
+                {/* Break selector */}
+                <View style={[styles.breakRow, { borderTopColor: theme.border }]}>
+                  <Text style={{ color: theme.muted, fontSize: layout.type.caption, fontWeight: '600' }}>Mola</Text>
+                  <View style={styles.breakOptions}>
+                    {BREAK_OPTIONS.map((opt) => (
+                      <Pressable
+                        key={opt.value}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Mola ${opt.label}`}
+                        onPress={() => updateTemplateBreak(i, opt.value)}
+                        style={[styles.breakChip, {
+                          backgroundColor: td.breakMinutes === opt.value ? theme.accent : theme.surface,
+                          borderColor: td.breakMinutes === opt.value ? theme.accent : theme.border,
+                        }]}
+                      >
+                        <Text style={{ color: td.breakMinutes === opt.value ? theme.onPrimaryAction : theme.foreground, fontSize: 12, fontWeight: '600' }}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+                <Text style={{ color: theme.muted, fontSize: layout.type.caption, paddingTop: 2 }}>
+                  Örn. 30 dk yemek + 2×15 dk çay = 60 dk
+                </Text>
+                {breakWarnings[i] && (
+                  <View style={[styles.warningBadge, { backgroundColor: theme.warningSurface, marginTop: 6 }]}>
+                    <Ionicons name="information-circle" size={14} color={theme.warning} />
+                    <Text style={{ color: theme.warning, fontSize: layout.type.caption }}>{breakWarnings[i]}</Text>
                   </View>
                 )}
               </Card>
             ))}
+            {weeklyNetPreview && (
+              <View style={[styles.warningBadge, { backgroundColor: weeklyNetPreview.excessMinutes > 0 ? theme.warningSurface : theme.successSurface }]}>
+                <Ionicons name={weeklyNetPreview.excessMinutes > 0 ? 'alert-circle' : 'checkmark-circle'} size={14} color={weeklyNetPreview.excessMinutes > 0 ? theme.warning : theme.success} />
+                <Text style={{ color: weeklyNetPreview.excessMinutes > 0 ? theme.warning : theme.success, fontSize: layout.type.caption, fontWeight: '600', flex: 1 }}>
+                  {weeklyNetPreview.excessMinutes > 0
+                    ? `Haftalık net çalışman ${Math.round(weeklyNetPreview.weeklyMinutes / 60 * 10) / 10} saat; haftada ${Math.round(weeklyNetPreview.excessMinutes / 60 * 10) / 10} saat fazla mesai eklenecek.`
+                    : `Haftalık net çalışman ${Math.round(weeklyNetPreview.weeklyMinutes / 60 * 10) / 10} saat; fazla mesai eklenmeyecek.`}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -496,6 +572,9 @@ const styles = StyleSheet.create({
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   timeInput: { borderWidth: 1, borderRadius: layout.radius.input, paddingHorizontal: 12, paddingVertical: 10, fontSize: layout.type.body, flex: 1, textAlign: 'center', minHeight: layout.control.minHeight },
   warningBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  breakRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  breakOptions: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', flex: 1 },
+  breakChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.2)' },
   buttons: { flexDirection: 'row', gap: 12, paddingHorizontal: layout.screen.horizontal, paddingTop: 12, paddingBottom: layout.screen.bottom },
   error: { marginTop: 4, textAlign: 'center', fontSize: layout.type.caption },

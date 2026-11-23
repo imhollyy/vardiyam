@@ -5,9 +5,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
-import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
-import { getAllExtraIncomes } from '@/src/data/extraIncomeRepository';
-import { generateMonthlyStatement, type MonthlyStatement } from '@/src/domain/payroll/index';
+import { type MonthlyStatement, getPayPeriod } from '@/src/domain/payroll/index';
+import { loadPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
 import { formatTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
@@ -26,23 +25,26 @@ export default function ReportsScreen() {
   const database = useAppDatabase();
   const year = useMemo(() => new Date().getFullYear(), []);
   const [statements, setStatements] = useState<MonthlyStatement[]>([]);
+  const [periods, setPeriods] = useState<PeriodInfo[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       void (async () => {
         const settings = await getSettings(database);
-        const entries = await getDayEntriesInRange(database, `${year}-01-01`, `${year}-12-31`);
-        const extras = await getAllExtraIncomes(database);
         const currentMonth = new Date().getMonth() + 1;
         const stmts: MonthlyStatement[] = [];
+        const pds: PeriodInfo[] = [];
         let cumulativeTaxable = 0;
         for (let m = 1; m <= currentMonth; m++) {
-          const stmt = generateMonthlyStatement(settings, entries, extras, year, m, cumulativeTaxable);
+          const { start, end } = getPayPeriod(year, m, settings.payday);
+          const period: PeriodInfo = { start, end, label: `${MONTH_NAMES[m - 1]!} ${year}` };
+          const stmt = await loadPeriodStatement(database, period, cumulativeTaxable);
           stmts.push(stmt);
+          pds.push(period);
           cumulativeTaxable += stmt.grossMinor - stmt.sgkWorkerMinor - stmt.unemploymentWorkerMinor;
         }
-        if (active) setStatements(stmts);
+        if (active) { setStatements(stmts); setPeriods(pds); }
       })();
       return () => { active = false; };
     }, [database, year]),
@@ -73,8 +75,9 @@ export default function ReportsScreen() {
         <CardHeader icon="bar-chart-outline" title="Aylık Dağılım" />
         {statements.map((stmt, i) => {
           const barWidth = Math.max(8, (stmt.netMinor / maxNet) * 100);
+          const periodLabel = periods[i]?.label ?? MONTH_NAMES[i] ?? '';
           return (
-            <View key={i} style={styles.monthRow} accessibilityLabel={`${MONTH_NAMES[i]}: ${formatTryMinor(stmt.netMinor)}`}>
+            <View key={i} style={styles.monthRow} accessibilityLabel={`${periodLabel}: ${formatTryMinor(stmt.netMinor)}`}>
               <Text style={[styles.monthLabel, { color: theme.foreground }]}>{MONTH_NAMES[i]?.slice(0, 3)}</Text>
               <View style={styles.barContainer}>
                 <View style={[styles.bar, { width: `${barWidth}%`, backgroundColor: theme.accent }]} />

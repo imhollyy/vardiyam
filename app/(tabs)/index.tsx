@@ -6,8 +6,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
-import { deriveDays, enumerateDays, type DerivedDay, type Settings } from '@/src/domain/payroll/index';
+import { deriveDays, type DerivedDay, type MonthlyStatement, type Settings } from '@/src/domain/payroll/index';
 import { formatTryMinor } from '@/src/domain/money';
+import { loadCurrentPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
@@ -78,7 +79,8 @@ export default function HomeScreen() {
   const week = useMemo(() => weekDates(today), [today]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [days, setDays] = useState<DerivedDay[]>([]);
-  const [monthDays, setMonthDays] = useState<DerivedDay[]>([]);
+  const [periodStatement, setPeriodStatement] = useState<MonthlyStatement | null>(null);
+  const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
   const [selectedDate, setSelectedDate] = useState(today);
 
   useFocusEffect(
@@ -88,16 +90,12 @@ export default function HomeScreen() {
         const s = await getSettings(database);
         const entries = await getDayEntriesInRange(database, week[0]!, week[6]!);
         const derived = deriveDays(week, entries, s);
-        const monthStart = `${today.slice(0, 8)}01`;
-        const daysInMonth = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0).getDate();
-        const monthEnd = `${today.slice(0, 8)}${String(daysInMonth).padStart(2, '0')}`;
-        const monthEntries = await getDayEntriesInRange(database, monthStart, monthEnd);
-        const monthDates = enumerateDays(monthStart, monthEnd);
-        const monthDerived = deriveDays(monthDates, monthEntries, s);
+        const { statement, period } = await loadCurrentPeriodStatement(database, today);
         if (active) {
           setSettings(s);
           setDays(derived);
-          setMonthDays(monthDerived);
+          setPeriodStatement(statement);
+          setPeriodInfo(period);
         }
       })();
       return () => { active = false; };
@@ -106,10 +104,6 @@ export default function HomeScreen() {
 
   const selectedDay = days.find((d) => d.localDate === selectedDate);
   const statusInfo = STATUS_ICONS[selectedDay?.status ?? 'OFF'] ?? STATUS_ICONS.OFF!;
-
-  const monthWorked = monthDays.filter((d) => d.status === 'WORKED').length;
-  const monthOvertime = monthDays.reduce((s, d) => s + d.overtimeMinutes, 0);
-  const monthLeave = monthDays.filter((d) => d.status === 'LEAVE').length;
 
   return (
     <Screen>
@@ -209,13 +203,13 @@ export default function HomeScreen() {
         </Card>
       )}
 
-      {/* Month stats */}
+      {/* Period stats */}
       <Card>
-        <CardHeader icon="stats-chart-outline" title="Bu Ay" />
+        <CardHeader icon="stats-chart-outline" title={periodInfo ? `Bu Dönem (${periodInfo.label})` : 'Bu Dönem'} />
         <View style={styles.statRow}>
-          <StatTile value={String(monthWorked)} label="Çalışılan" tone="success" style={{ flex: 1 }} />
-          <StatTile value={monthOvertime > 0 ? `${Math.floor(monthOvertime / 60)}sa` : '0'} label="Fazla mesai" tone="warning" style={{ flex: 1 }} />
-          <StatTile value={String(monthLeave)} label="İzin" tone="danger" style={{ flex: 1 }} />
+          <StatTile value={periodStatement ? String(periodStatement.workedDays) : '—'} label="Çalışılan" tone="success" style={{ flex: 1 }} />
+          <StatTile value={periodStatement && periodStatement.overtimeMinutes > 0 ? `${Math.floor(periodStatement.overtimeMinutes / 60)}sa` : '0'} label="Fazla mesai" tone="warning" style={{ flex: 1 }} />
+          <StatTile value={periodStatement ? String(periodStatement.totalDays - periodStatement.workedDays) : '—'} label="İzin/Tatil" tone="danger" style={{ flex: 1 }} />
         </View>
       </Card>
 

@@ -55,9 +55,9 @@ const PATTERNS: { id: ShiftPattern; title: string; hint: string }[] = [
 ];
 
 const DEFAULT_TEMPLATE_VALUES = [
-  { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00' },
-  { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00' },
-  { code: 'N', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00' },
+  { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
+  { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00', breakMinutes: 30 },
+  { code: 'N', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
 ];
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
