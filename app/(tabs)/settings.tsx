@@ -16,6 +16,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDatabase, useNotifyDataReset } from '@/src/data/AppDatabaseProvider';
+import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 
 import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 import {
@@ -175,22 +176,6 @@ function Action({ label, onPress, theme, secondary = false, disabled = false, ac
   return <ActionButton label={label} accessibilityLabel={accessibilityLabel} onPress={onPress} variant={secondary ? 'secondary' : 'primary'} disabled={disabled} />;
 }
 
-function Chip({ label, selected, onPress, theme, accessibilityLabel }: {
-  label: string; selected: boolean; onPress: () => void; theme: Theme; accessibilityLabel?: string;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel ?? label} accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress}
-      style={({ pressed }) => [styles.chip, {
-        backgroundColor: selected ? theme.accentSurface : theme.surface,
-        borderColor: selected ? theme.accent : theme.border,
-        opacity: pressed ? 0.72 : 1,
-      }]}
-    >
-      <Text style={{ color: selected ? theme.accent : theme.foreground, fontSize: 14, fontWeight: selected ? '700' : '500' }}>{label}</Text>
-    </Pressable>
-  );
-}
 
 function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; theme: Theme }) {
   return <View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: theme.accentSurface }]}><Ionicons name={icon} size={18} color={theme.accent} /></View><Text style={[styles.sectionTitle, { color: theme.foreground }]}>{title}</Text></View>;
@@ -402,7 +387,7 @@ export default function SettingsScreen() {
               <Text style={[styles.fieldLabel, { color: theme.muted }]}>Maaş türü</Text>
               <View style={styles.chipWrap}>
                 {(['GROSS', 'NET'] as const).map((type) => (
-                  <Chip key={type} label={type === 'GROSS' ? 'Brüt' : 'Net'} selected={salaryTypeEdit === type} onPress={() => setSalaryTypeEdit(type)} theme={theme} />
+                  <ChoiceChip key={type} label={type === 'GROSS' ? 'Brüt' : 'Net'} selected={salaryTypeEdit === type} onPress={() => setSalaryTypeEdit(type)} />
                 ))}
               </View>
               <Field label="Maaş günü (1–31, boş = ayın sonu)" value={paydayRaw} onChangeText={setPaydayRaw} theme={theme} placeholder="Boş = ayın sonu" keyboardType="numbers-and-punctuation" maxLength={2} />
@@ -485,7 +470,7 @@ export default function SettingsScreen() {
             <DateTimePickerField mode="date" label="Döngü başlangıç tarihi" value={draft.anchorLocalDate} timezone={draft.timezone} onChange={(anchorLocalDate) => setDraft({ ...draft, anchorLocalDate })} onError={setError} />
             <Text style={[styles.fieldLabel, { color: theme.muted }]}>Düzen türü</Text>
             <View style={styles.chipWrap}>
-              {PATTERNS.map((item) => <Chip key={item.id} label={item.title} selected={draft.pattern === item.id} onPress={() => choosePattern(item.id)} theme={theme} accessibilityLabel={`${item.title}: ${item.hint}`} />)}
+              {PATTERNS.map((item) => <ChoiceChip key={item.id} label={item.title} description={item.hint} selected={draft.pattern === item.id} onPress={() => choosePattern(item.id)} />)}
             </View>
           </View>
 
@@ -506,7 +491,7 @@ export default function SettingsScreen() {
             <Text style={[styles.fieldLabel, { color: theme.muted }]}>Başlangıç vardiyası</Text>
             <View style={styles.chipWrap}>
               {startTemplateOptions.map(({ template, index }) => (
-                <Chip key={template.id} label={`${template.code || `V${index + 1}`} · ${template.name || `V${index + 1}`}`} selected={draft.startTemplateIndex === index} onPress={() => setDraft({ ...draft, startTemplateIndex: index, preservedStartEntryIndex: undefined })} theme={theme} />
+                <ChoiceChip key={template.id} label={`${template.code || `V${index + 1}`} · ${template.name || `V${index + 1}`}`} selected={draft.startTemplateIndex === index} onPress={() => setDraft({ ...draft, startTemplateIndex: index, preservedStartEntryIndex: undefined })} />
               ))}
             </View>
             {draft.pattern === 'custom' ? (
@@ -515,9 +500,9 @@ export default function SettingsScreen() {
                   <View key={`custom-${index}`} style={[styles.customRow, { borderColor: theme.border }]}>
                     <Text style={[styles.customDay, { color: theme.muted }]}>{index + 1}. gün</Text>
                     <View style={styles.customControls}>
-                      <Chip label="Vardiya" selected={entry.kind === 'SHIFT'} onPress={() => updateCustomEntry(index, { kind: 'SHIFT', templateIndex: entry.kind === 'SHIFT' ? entry.templateIndex : draft.startTemplateIndex })} theme={theme} />
-                      <Chip label="OFF" selected={entry.kind === 'OFF'} onPress={() => updateCustomEntry(index, { kind: 'OFF' })} theme={theme} />
-                      {entry.kind === 'SHIFT' ? draft.templates.map((t, ti) => <Chip key={t.id} label={t.code || `V${ti + 1}`} selected={entry.templateIndex === ti} onPress={() => updateCustomEntry(index, { kind: 'SHIFT', templateIndex: ti })} theme={theme} />) : null}
+                      <ChoiceChip label="Vardiya" selected={entry.kind === 'SHIFT'} onPress={() => updateCustomEntry(index, { kind: 'SHIFT', templateIndex: entry.kind === 'SHIFT' ? entry.templateIndex : draft.startTemplateIndex })} />
+                      <ChoiceChip label="OFF" selected={entry.kind === 'OFF'} onPress={() => updateCustomEntry(index, { kind: 'OFF' })} />
+                      {entry.kind === 'SHIFT' ? draft.templates.map((t, ti) => <ChoiceChip key={t.id} label={t.code || `V${ti + 1}`} selected={entry.templateIndex === ti} onPress={() => updateCustomEntry(index, { kind: 'SHIFT', templateIndex: ti })} />) : null}
                     </View>
                     <Pressable accessibilityLabel={`${index + 1}. günü kaldır`} accessibilityRole="button" hitSlop={8} onPress={() => setDraft({ ...draft, customEntries: draft.customEntries.filter((_, c) => c !== index) })} style={styles.removeEntry}>
                       <Text style={{ color: theme.muted, fontSize: 14 }}>Kaldır</Text>
@@ -604,7 +589,6 @@ const styles = StyleSheet.create({
   fieldLabel: { marginTop: 2, fontSize: 13, fontWeight: '700' },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 16 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   templateBox: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
   twoColumns: { flexDirection: 'row', gap: 10 },
   flex: { flex: 1, minWidth: 0 },

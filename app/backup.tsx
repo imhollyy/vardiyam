@@ -9,7 +9,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
@@ -20,11 +19,10 @@ import { CURRENT_SCHEMA_VERSION } from '@/src/data/migrations';
 import { useAppDatabase, useDatabaseMaintenance, useNotifyDataReset } from '@/src/data/AppDatabaseProvider';
 import { applyPreparedRestore, createBackupFile, prepareRestoreFile, type RestorePreview } from '@/src/data/backupService';
 import { MAX_BACKUP_BYTES, validateBackupPassword } from '@/src/features/backup/backupContainer';
-import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
-
-type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
+import { Card, CardHeader } from '@/src/components/ui/Card';
+import { ActionButton } from '@/src/components/ui/ActionButton';
 
 export default function BackupScreen() {
   const database = useAppDatabase();
@@ -190,35 +188,35 @@ export default function BackupScreen() {
       <PageHeading eyebrow="VERİ GÜVENLİĞİ" title="Yedekleme ve veriler" subtitle="Dosyan cihazında oluşturulur; dışa aktarırken güvenli konum seç." />
       <Text style={[styles.body, { color: theme.muted }]}>Yedek cihazında oluşturulur. Vardiya, çalışma, ücret, bordro ve ödeme kayıtların içeride şifrelenir. Parolanı bu dosyadan ayrı ve güvenli yerde sakla; unutursan yedek açılamaz.</Text>
 
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <SectionHeading icon="lock-closed-outline" title="Şifreli yedek oluştur" theme={theme} />
+      <Card>
+        <CardHeader icon="lock-closed-outline" title="Şifreli yedek oluştur" />
         <Text style={[styles.body, { color: theme.muted }]}>En az 12 karakterlik bir parola belirle. Sonraki sistem menüsünde Dosyalar veya başka bir konuma kaydedebilirsin.</Text>
         <TextInput accessibilityLabel="Yeni yedek parolası" value={exportPassword} onChangeText={setExportPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
         <TextInput accessibilityLabel="Yedek parolası onayı" value={exportConfirm} onChangeText={setExportConfirm} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Parolayı tekrar yaz" placeholderTextColor={theme.muted} />
-        <Action label="Şifreli yedek oluştur" disabled={busy || maintenanceBusy} onPress={() => void makeBackup()} theme={theme} />
-      </View>
+        <ActionButton label="Şifreli yedek oluştur" disabled={busy || maintenanceBusy} onPress={() => void makeBackup()} variant="secondary" icon="lock-closed-outline" />
+      </Card>
 
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <SectionHeading icon="cloud-download-outline" title="Yedekten geri yükle" theme={theme} />
+      <Card>
+        <CardHeader icon="cloud-download-outline" title="Yedekten geri yükle" />
         <Text style={[styles.body, { color: theme.muted }]}>Yedek dosyanı seçip parolasını gir. Dosya doğrulanmadan mevcut veriler değişmez.</Text>
         <TextInput accessibilityLabel="Yedek dosyasının parolası" value={restorePassword} onChangeText={setRestorePassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
-        <Action label="Yedek dosyası seç ve doğrula" disabled={busy || maintenanceBusy} onPress={() => void chooseBackup()} theme={theme} />
+        <ActionButton label="Yedek dosyası seç ve doğrula" disabled={busy || maintenanceBusy} onPress={() => void chooseBackup()} variant="secondary" icon="folder-open-outline" />
         {preview ? (
           <View style={[styles.preview, { borderColor: theme.border }]}>
             <Text style={[styles.previewTitle, { color: theme.foreground }]}>Yedek doğrulandı</Text>
             <Text style={[styles.body, { color: theme.muted }]}>Şema v{preview.databaseSchemaVersion} → v{CURRENT_SCHEMA_VERSION} · SQLite {preview.sqliteVersion}</Text>
             <Text style={[styles.body, { color: theme.muted }]}>{new Date(preview.createdAtUtc).toLocaleString('tr-TR')} · {preview.recordCount} kayıt</Text>
             <Text style={[styles.hint, { color: theme.muted }]}>Geri yüklemek mevcut tüm uygulama verilerinin yerine geçer. Devam etmeden önce ikinci onay alınır.</Text>
-            <Action label="Bu yedeği geri yükle" disabled={busy || maintenanceBusy} onPress={confirmRestore} theme={theme} destructive />
+            <ActionButton label="Bu yedeği geri yükle" disabled={busy || maintenanceBusy} onPress={confirmRestore} variant="destructive" icon="cloud-upload-outline" />
           </View>
         ) : null}
-      </View>
+      </Card>
 
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <SectionHeading icon="trash-outline" title="Tüm verilerimi sil" theme={theme} />
+      <Card>
+        <CardHeader icon="trash-outline" title="Tüm verilerimi sil" />
         <Text style={[styles.body, { color: theme.muted }]}>Yerel veritabanı kapatılır, uygulama verileri ve SQLite yan dosyaları kaldırılır, ardından boş v{CURRENT_SCHEMA_VERSION} veritabanı açılır. Telefon hafızasındaki fiziksel blokların adli düzeyde üzerine yazılacağı garanti edilemez.</Text>
-        <Action label="Tüm verilerimi sil…" disabled={busy || maintenanceBusy} onPress={startWipe} theme={theme} destructive />
-      </View>
+        <ActionButton label="Tüm verilerimi sil…" disabled={busy || maintenanceBusy} onPress={startWipe} variant="destructive" icon="trash-outline" />
+      </Card>
 
       {busy || maintenanceBusy ? <View accessibilityLiveRegion="polite" style={styles.status}><ActivityIndicator color={theme.accent} /><Text style={{ color: theme.muted }}>Veri işlemi sürüyor; uygulamayı kapatma…</Text></View> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.feedback, { color: '#A12622' }]}>{error}</Text> : null}
@@ -227,36 +225,11 @@ export default function BackupScreen() {
   );
 }
 
-function Action({ label, disabled, onPress, theme, destructive = false }: {
-  label: string; disabled: boolean; onPress: () => void; theme: Theme; destructive?: boolean;
-}) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.action, {
-      borderColor: destructive ? '#B3261E' : theme.accent,
-      backgroundColor: destructive ? '#B3261E' : theme.accentSurface,
-      opacity: disabled ? 0.5 : pressed ? 0.72 : 1,
-    }]}>
-      <Text style={{ color: destructive ? '#FFFFFF' : theme.accent, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; theme: Theme }) {
-  return <View style={styles.sectionHeading} accessibilityRole="header"><View style={[styles.sectionIcon, { backgroundColor: theme.accentSurface }]}><Ionicons accessible={false} name={icon} size={19} color={theme.accent} /></View><Text style={[styles.heading, styles.sectionTitle, { color: theme.foreground }]}>{title}</Text></View>;
-}
-
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 16, paddingBottom: 36 },
   back: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  title: { fontSize: 27, lineHeight: 34, fontWeight: '800' },
-  heading: { fontSize: 18, lineHeight: 24, fontWeight: '800' },
-  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sectionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  sectionTitle: { flexShrink: 1 },
   body: { fontSize: 14, lineHeight: 21 },
-  card: { borderWidth: 1, borderRadius: 18, padding: 16, gap: 12 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 16 },
-  action: { minHeight: 48, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 10 },
   preview: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
   previewTitle: { fontSize: 16, fontWeight: '800' },
   hint: { fontSize: 13, lineHeight: 19 },

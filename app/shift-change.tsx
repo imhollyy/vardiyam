@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings, updateSettings } from '@/src/data/settingsRepository';
@@ -11,6 +12,11 @@ import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-c
 import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
+import { Card, CardHeader } from '@/src/components/ui/Card';
+import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
+import { ActionButton } from '@/src/components/ui/ActionButton';
+import { PageHeading } from '@/src/components/ui/PageHeading';
+import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 
 const WORK_SCHEDULE_OPTIONS: { value: WorkSchedule; label: string }[] = [
   { value: 'MON_FRI', label: 'Pazartesi – Cuma' },
@@ -77,6 +83,7 @@ export default function ShiftChangeScreen() {
   const { theme } = useAppTheme();
   const database = useAppDatabase();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule>('MON_FRI');
   const [shiftPattern, setShiftPattern] = useState<ShiftPattern>('FIXED_DAY');
   const [templateDrafts, setTemplateDrafts] = useState<TemplateDraft[]>([]);
@@ -204,140 +211,112 @@ export default function ShiftChangeScreen() {
 
   if (!loaded) return null;
 
+  const footerPaddingBottom = Math.max(insets.bottom, layout.screen.bottom);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.foreground }]}>Vardiya Değişikliği</Text>
-        <Pressable accessibilityRole="button" onPress={() => router.back()}>
-          <Text style={{ color: theme.accent, fontWeight: '600', fontSize: layout.type.body }}>İptal</Text>
-        </Pressable>
-      </View>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <PageHeading eyebrow="VARDİYA" title="Vardiya Değişikliği" />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Çalışma düzeni</Text>
-        {WORK_SCHEDULE_OPTIONS.map((opt) => {
-          const selected = opt.value === workSchedule;
-          return (
-            <Pressable
-              key={opt.value}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              onPress={() => handleWorkScheduleChange(opt.value)}
-              style={[styles.option, { backgroundColor: selected ? theme.accentSurface : theme.surface, borderColor: selected ? theme.accent : theme.border }]}
-            >
-              <Text style={{ color: selected ? theme.accent : theme.foreground, fontWeight: selected ? '700' : '500', fontSize: layout.type.body }}>{opt.label}</Text>
-            </Pressable>
-          );
-        })}
+        <Card>
+          <CardHeader icon="calendar-outline" title="Çalışma düzeni" />
+          <ChoiceGroup
+            options={WORK_SCHEDULE_OPTIONS}
+            selected={workSchedule}
+            onSelect={handleWorkScheduleChange}
+          />
+        </Card>
 
-        <Text style={[styles.sectionTitle, { color: theme.foreground, marginTop: 24 }]}>Vardiya düzeni</Text>
-        {SHIFT_PATTERN_OPTIONS.map((opt) => {
-          const selected = opt.value === shiftPattern;
-          return (
-            <Pressable
-              key={opt.value}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              onPress={() => handleShiftPatternChange(opt.value)}
-              style={[styles.option, { backgroundColor: selected ? theme.accentSurface : theme.surface, borderColor: selected ? theme.accent : theme.border }]}
-            >
-              <Text style={{ color: selected ? theme.accent : theme.foreground, fontWeight: selected ? '700' : '500', fontSize: layout.type.body }}>{opt.label}</Text>
-            </Pressable>
-          );
-        })}
+        <Card>
+          <CardHeader icon="repeat-outline" title="Vardiya düzeni" />
+          <ChoiceGroup
+            options={SHIFT_PATTERN_OPTIONS}
+            selected={shiftPattern}
+            onSelect={handleShiftPatternChange}
+          />
+        </Card>
 
-        <Text style={[styles.sectionTitle, { color: theme.foreground, marginTop: 24 }]}>Vardiya saatleri</Text>
-        {templateDrafts.map((td, i) => (
-          <View key={td.id} style={[styles.shiftRow, { borderColor: theme.border }]}>
-            <Text style={[styles.shiftLabel, { color: theme.foreground }]}>{td.name}</Text>
-            <View style={styles.timeRow}>
-              <TextInput
-                style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
-                value={td.startLocalTime}
-                onChangeText={(v) => updateTemplateTime(i, 'startLocalTime', v)}
-                placeholder="HH:MM"
-                placeholderTextColor={theme.muted}
-                keyboardType="number-pad"
-                accessibilityLabel={`${td.name} başlangıç saati`}
-                maxLength={5}
-              />
-              <Text style={{ color: theme.muted, fontSize: layout.type.body }}>–</Text>
-              <TextInput
-                style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
-                value={td.endLocalTime}
-                onChangeText={(v) => updateTemplateTime(i, 'endLocalTime', v)}
-                placeholder="HH:MM"
-                placeholderTextColor={theme.muted}
-                keyboardType="number-pad"
-                accessibilityLabel={`${td.name} bitiş saati`}
-                maxLength={5}
-              />
-            </View>
-            {breakWarnings[i] && (
-              <Text style={[styles.overtimeWarning, { color: theme.warning }]} accessibilityRole="alert">{breakWarnings[i]}</Text>
-            )}
-          </View>
-        ))}
+        <Card>
+          <CardHeader icon="time-outline" title="Vardiya saatleri" />
+          {templateDrafts.map((td, i) => {
+            const validTimes = isValidTime(td.startLocalTime) && isValidTime(td.endLocalTime) && td.startLocalTime !== td.endLocalTime;
+            const previewTemplate = validTimes ? {
+              id: td.id, code: td.code, name: td.name,
+              startLocalTime: td.startLocalTime, endLocalTime: td.endLocalTime,
+              standardMinutes: shiftNominalMinutes(td.startLocalTime, td.endLocalTime),
+              breakMinutes: td.breakMinutes,
+            } : undefined;
+            return (
+              <View key={td.id} style={styles.shiftRow}>
+                <View style={styles.shiftRowTop}>
+                  <Text style={[styles.shiftLabel, { color: theme.foreground }]}>{td.name}</Text>
+                  {previewTemplate ? <ShiftKindBadge kind="SHIFT" compact template={previewTemplate} /> : null}
+                </View>
+                <View style={styles.timeRow}>
+                  <TextInput
+                    style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                    value={td.startLocalTime}
+                    onChangeText={(v) => updateTemplateTime(i, 'startLocalTime', v)}
+                    placeholder="HH:MM"
+                    placeholderTextColor={theme.muted}
+                    keyboardType="number-pad"
+                    accessibilityLabel={`${td.name} başlangıç saati`}
+                    maxLength={5}
+                  />
+                  <Text style={{ color: theme.muted, fontSize: layout.type.body }}>–</Text>
+                  <TextInput
+                    style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                    value={td.endLocalTime}
+                    onChangeText={(v) => updateTemplateTime(i, 'endLocalTime', v)}
+                    placeholder="HH:MM"
+                    placeholderTextColor={theme.muted}
+                    keyboardType="number-pad"
+                    accessibilityLabel={`${td.name} bitiş saati`}
+                    maxLength={5}
+                  />
+                </View>
+                {breakWarnings[i] ? <Text style={[styles.warning, { color: theme.warning }]} accessibilityRole="alert">{breakWarnings[i]}</Text> : null}
+              </View>
+            );
+          })}
+        </Card>
 
         {needsShiftSelect && (
-          <>
-            <Text style={[styles.sectionTitle, { color: theme.foreground, marginTop: 24 }]}>Bu hafta hangi vardiyadasın?</Text>
-            {templateDrafts.map((td, i) => {
-              const selected = currentShiftIndex === i;
-              return (
-                <Pressable
-                  key={td.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setCurrentShiftIndex(i)}
-                  style={[styles.option, { backgroundColor: selected ? theme.accentSurface : theme.surface, borderColor: selected ? theme.accent : theme.border }]}
-                >
-                  <Text style={{ color: selected ? theme.accent : theme.foreground, fontWeight: selected ? '700' : '500', fontSize: layout.type.body }}>
-                    {td.name} ({td.startLocalTime} – {td.endLocalTime})
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </>
+          <Card>
+            <CardHeader icon="swap-horizontal-outline" title="Bu hafta hangi vardiyadasın?" />
+            <ChoiceGroup
+              options={templateDrafts.map((td, i) => ({ value: String(i), label: `${td.name} (${td.startLocalTime} – ${td.endLocalTime})` }))}
+              selected={String(currentShiftIndex)}
+              onSelect={(v) => setCurrentShiftIndex(Number(v))}
+            />
+          </Card>
         )}
 
-        {error && (
-          <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text>
-        )}
+        {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable
-          accessibilityRole="button"
+      <View style={[styles.footer, { borderTopColor: theme.border, paddingBottom: footerPaddingBottom }]}>
+        <ActionButton
+          label={saving ? 'Kaydediliyor…' : 'Kaydet'}
+          onPress={() => { void handleSave(); }}
           disabled={!canSave || saving}
-          onPress={handleSave}
-          style={({ pressed }) => [
-            styles.saveButton,
-            { backgroundColor: canSave ? theme.primaryAction : theme.border, opacity: pressed ? 0.85 : 1 },
-          ]}
-        >
-          <Text style={{ color: canSave ? theme.onPrimaryAction : theme.muted, fontWeight: '700', fontSize: layout.type.body }}>
-            {saving ? 'Kaydediliyor…' : 'Kaydet'}
-          </Text>
-        </Pressable>
+          loading={saving}
+          icon="checkmark"
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: layout.screen.horizontal, marginBottom: 24 },
-  title: { fontSize: layout.type.title, fontWeight: '800' },
-  content: { paddingHorizontal: layout.screen.horizontal, gap: 10, paddingBottom: 24 },
-  sectionTitle: { fontSize: layout.type.section, fontWeight: '700', marginBottom: 4 },
-  option: { borderWidth: 1.5, borderRadius: layout.radius.control, paddingHorizontal: 16, paddingVertical: 14, minHeight: layout.control.minHeight, justifyContent: 'center' },
-  shiftRow: { borderWidth: 1, borderRadius: layout.radius.card, padding: 12, gap: 8 },
+  container: { flex: 1 },
+  content: { paddingHorizontal: layout.screen.horizontal, paddingTop: layout.screen.top, gap: layout.space.md, paddingBottom: layout.space.lg },
+  shiftRow: { gap: layout.space.sm },
+  shiftRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   shiftLabel: { fontSize: layout.type.body, fontWeight: '700' },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeInput: { borderWidth: 1, borderRadius: layout.radius.input, paddingHorizontal: 12, paddingVertical: 10, fontSize: layout.type.body, flex: 1, textAlign: 'center' },
-  overtimeWarning: { fontSize: layout.type.caption, fontWeight: '600' },
-  error: { marginTop: 12, textAlign: 'center', fontSize: layout.type.caption },
-  footer: { paddingHorizontal: layout.screen.horizontal, paddingBottom: layout.screen.bottom, paddingTop: 8 },
-  saveButton: { borderRadius: layout.radius.control, paddingVertical: 16, alignItems: 'center', minHeight: layout.control.minHeight },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: layout.space.sm },
+  timeInput: { flex: 1, minHeight: layout.control.minHeight, borderWidth: 1.5, borderRadius: layout.radius.input, paddingHorizontal: 12, fontSize: layout.type.body, textAlign: 'center' },
+  warning: { fontSize: layout.type.caption, lineHeight: 18 },
+  error: { textAlign: 'center', fontSize: layout.type.caption },
+  footer: { paddingHorizontal: layout.screen.horizontal, paddingTop: layout.space.md, borderTopWidth: StyleSheet.hairlineWidth },
 });
