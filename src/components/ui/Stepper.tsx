@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 
 type StepperProps = {
   value: number;
@@ -34,7 +34,7 @@ export function Stepper({ value, onValueChange, min = 0, max = 24, step = 0.5, l
       accessibilityValue={{ text: format(value), min, max, now: value }}
       style={styles.container}
     >
-      {label ? <Text style={[styles.label, { color: theme.foreground }]}>{label}</Text> : null}
+      {label ? <Text style={[styles.label, { color: theme.ink }]}>{label}</Text> : null}
       <View style={[styles.controls, { borderColor: theme.border }]}>
         <Pressable
           accessibilityLabel="Azalt"
@@ -44,7 +44,7 @@ export function Stepper({ value, onValueChange, min = 0, max = 24, step = 0.5, l
         >
           <Ionicons name="remove" size={22} color={theme.accent} />
         </Pressable>
-        <Text style={[styles.value, { color: theme.foreground }]}>{format(value)}</Text>
+        <Text style={[styles.value, { color: theme.ink }]}>{format(value)}</Text>
         <Pressable
           accessibilityLabel="Artır"
           disabled={!canIncrease}
@@ -60,7 +60,7 @@ export function Stepper({ value, onValueChange, min = 0, max = 24, step = 0.5, l
 
 const styles = StyleSheet.create({
   container: { gap: layout.space.xs },
-  label: { fontSize: layout.type.body, fontWeight: '600' },
+  label: { fontFamily: fonts.semiBold, fontSize: layout.type.body },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -77,7 +77,8 @@ const styles = StyleSheet.create({
   value: {
     flex: 1,
     textAlign: 'center',
+    fontFamily: fonts.extraBold,
     fontSize: layout.type.body,
-    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
 });

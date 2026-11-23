@@ -3,6 +3,14 @@ import { ScrollView, Text } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { AppDatabaseProvider } from '@/src/data/AppDatabaseProvider';
 import { AppThemeProvider, useAppTheme } from '@/src/theme/AppThemeProvider';
 
@@ -41,12 +49,19 @@ export default function RootLayout() {
 
 function ThemedRouter() {
   const { mode, ready, theme } = useAppTheme();
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
 
   useEffect(() => {
-    if (ready) void SplashScreen.hideAsync().catch(() => undefined);
-  }, [ready]);
+    if (ready && fontsLoaded) void SplashScreen.hideAsync().catch(() => undefined);
+  }, [ready, fontsLoaded]);
 
-  if (!ready) return null;
+  if (!ready || !fontsLoaded) return null;
 
   return (
     <>
@@ -62,6 +77,7 @@ function ThemedRouter() {
         <Stack.Screen name="additional-income" />
         <Stack.Screen name="legal/kvkk" />
         <Stack.Screen name="legal/privacy" />
+        {__DEV__ && <Stack.Screen name="_dev/components" />}
       </Stack>
     </>
   );

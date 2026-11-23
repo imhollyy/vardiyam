@@ -45,6 +45,6 @@ const styles = StyleSheet.create({
     maxHeight: '85%',
   },
   handle: { alignItems: 'center', paddingVertical: layout.space.md },
-  handleBar: { width: 36, height: 4, borderRadius: 2 },
+  handleBar: { width: 36, height: 4, borderRadius: layout.radius.handle },
   content: { paddingHorizontal: layout.screen.horizontal, gap: layout.space.md, paddingBottom: layout.space.lg },
 });

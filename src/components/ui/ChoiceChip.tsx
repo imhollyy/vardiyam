@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 
 type ChoiceChipProps = {
   label: string;
@@ -23,15 +23,15 @@ export function ChoiceChip({ label, selected, onPress, icon, description, disabl
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? theme.accentSurface : theme.surface,
-          borderColor: selected ? theme.accent : theme.border,
+          backgroundColor: selected ? theme.surfaceMuted : theme.surface,
+          borderColor: selected ? theme.ink : theme.border,
           opacity: disabled ? 0.5 : pressed ? 0.82 : 1,
         },
       ]}
     >
       <View style={styles.row}>
-        {icon ? <Ionicons accessible={false} name={icon} size={20} color={selected ? theme.accent : theme.muted} /> : null}
-        <Text style={[styles.label, { color: selected ? theme.accent : theme.foreground }]}>{label}</Text>
+        {icon ? <Ionicons accessible={false} name={icon} size={20} color={selected ? theme.ink : theme.muted} /> : null}
+        <Text style={[styles.label, { color: selected ? theme.ink : theme.ink }]}>{label}</Text>
       </View>
       {description ? <Text style={[styles.description, { color: theme.muted }]}>{description}</Text> : null}
     </Pressable>
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: layout.space.sm },
-  label: { fontSize: layout.type.body, fontWeight: '700', flex: 1 },
+  label: { fontFamily: fonts.bold, fontSize: layout.type.body, flex: 1 },
   description: { fontSize: layout.type.caption, lineHeight: 18 },
   group: { gap: layout.space.sm },
 });

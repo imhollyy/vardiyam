@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 
 type StatTileProps = {
   value: string;
@@ -22,6 +22,6 @@ export function StatTile({ value, label, tone = 'accent', style }: StatTileProps
 
 const styles = StyleSheet.create({
   tile: { alignItems: 'center', gap: 2, minWidth: 64 },
-  value: { fontSize: layout.type.section, fontWeight: '900' },
-  label: { fontSize: layout.type.caption, fontWeight: '600' },
+  value: { fontFamily: fonts.extraBold, fontSize: layout.type.section, fontVariant: ['tabular-nums'] },
+  label: { fontFamily: fonts.semiBold, fontSize: layout.type.caption },
 });

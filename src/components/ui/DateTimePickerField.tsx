@@ -4,7 +4,7 @@ import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerChangeEvent }
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { formatPickerValue, localDateForPicker, localTimeForPicker, normalizePickerDraft, pickerDateValue } from '@/src/features/shifts/nativePicker';
 
 type Mode = 'date' | 'time';
@@ -52,7 +52,7 @@ export function DateTimePickerField({ mode, label, value, timezone, onChange, lo
       onPress={open}
       style={({ pressed }) => [styles.field, { backgroundColor: theme.surface, borderColor: theme.border, opacity: disabled ? 0.5 : pressed ? 0.8 : 1 }]}
     >
-      <View style={styles.texts}><Text style={[styles.label, { color: theme.muted }]}>{label}</Text><Text style={[styles.value, { color: theme.foreground }]}>{shownValue}</Text></View>
+      <View style={styles.texts}><Text style={[styles.label, { color: theme.muted }]}>{label}</Text><Text style={[styles.value, { color: theme.ink }]}>{shownValue}</Text></View>
       <Ionicons accessible={false} name={mode === 'date' ? 'calendar-outline' : 'time-outline'} size={20} color={theme.accent} />
       <Ionicons accessible={false} name="chevron-down" size={15} color={theme.muted} />
     </Pressable>
@@ -71,8 +71,8 @@ export function DateTimePickerField({ mode, label, value, timezone, onChange, lo
 
 const styles = StyleSheet.create({
   field: { minHeight: layout.control.minHeight, borderWidth: 1, borderRadius: layout.radius.control, paddingHorizontal: layout.space.md, paddingVertical: layout.space.sm, flexDirection: 'row', alignItems: 'center', gap: layout.space.sm },
-  texts: { flex: 1, gap: 2 }, label: { fontSize: layout.type.caption, fontWeight: '700' }, value: { fontSize: layout.type.body, fontWeight: '800' },
+  texts: { flex: 1, gap: 2 }, label: { fontFamily: fonts.bold, fontSize: layout.type.caption }, value: { fontFamily: fonts.extraBold, fontSize: layout.type.body },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#0008' }, sheet: { borderTopWidth: 1, borderTopLeftRadius: layout.radius.sheet, borderTopRightRadius: layout.radius.sheet, paddingHorizontal: layout.space.lg, paddingTop: layout.space.lg, gap: layout.space.md },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: layout.space.md }, title: { flex: 1, fontSize: layout.type.section, fontWeight: '800' }, picker: { width: '100%', height: 180 },
-  actions: { flexDirection: 'row', gap: layout.space.sm }, action: { minHeight: layout.control.minHeight, flex: 1, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderRadius: layout.radius.control }, confirm: { borderColor: 'transparent' }, confirmText: { color: '#fff', fontWeight: '800' }, error: { fontSize: 14, lineHeight: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: layout.space.md }, title: { fontFamily: fonts.extraBold, flex: 1, fontSize: layout.type.section }, picker: { width: '100%', height: 180 },
+  actions: { flexDirection: 'row', gap: layout.space.sm }, action: { minHeight: layout.control.minHeight, flex: 1, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderRadius: layout.radius.control }, confirm: { borderColor: 'transparent' }, confirmText: { fontFamily: fonts.extraBold, color: '#fff' }, error: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 20 },
 });

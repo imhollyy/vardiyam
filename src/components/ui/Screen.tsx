@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
@@ -38,8 +38,8 @@ export function Screen({ children, scroll = true, style, contentStyle }: ScreenP
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: layout.screen.horizontal },
-  scrollContent: { paddingHorizontal: layout.screen.horizontal, gap: layout.space.md },
-});
+const styles = {
+  container: { flex: 1 } as const,
+  content: { flex: 1, paddingHorizontal: layout.screen.horizontal } as const,
+  scrollContent: { paddingHorizontal: layout.screen.horizontal, gap: layout.space.md } as const,
+};

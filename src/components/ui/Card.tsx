@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 
 type CardProps = {
   children: React.ReactNode;
@@ -28,8 +28,8 @@ export function CardHeader({ icon, title, right }: CardHeaderProps) {
   return (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
-        {icon ? <Ionicons accessible={false} name={icon} size={18} color={theme.accent} /> : null}
-        <Text style={[styles.headerTitle, { color: theme.foreground }]}>{title}</Text>
+        {icon ? <Ionicons accessible={false} name={icon} size={18} color={theme.muted} /> : null}
+        <Text style={[styles.headerTitle, { color: theme.ink }]}>{title}</Text>
       </View>
       {right ?? null}
     </View>
@@ -55,8 +55,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: layout.type.body,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
+    fontSize: layout.type.section,
     flex: 1,
   },
 });
