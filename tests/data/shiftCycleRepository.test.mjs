@@ -66,6 +66,7 @@ const cycle = (id = 'cycle') => ({
   anchorLocalDate: '2026-01-01',
   startIndex: 0,
   entries: [{ kind: 'SHIFT', templateId: 'day' }, { kind: 'OFF' }],
+  effectiveFrom: '2026-01-01',
 });
 
 test('template CRUD round-trip preserves all fields including standardMinutes', async () => {
@@ -112,7 +113,7 @@ test('saveShiftSchedule atomically saves templates and cycle', async () => {
     const templates = [day(), night()];
     const c = {
       id: 'c1', name: 'Two-shift', timezone: 'Europe/Istanbul',
-      anchorLocalDate: '2026-01-05', startIndex: 0,
+      anchorLocalDate: '2026-01-05', startIndex: 0, effectiveFrom: '2026-01-05',
       entries: [
         { kind: 'SHIFT', templateId: 'day' },
         { kind: 'SHIFT', templateId: 'night' },
@@ -126,7 +127,7 @@ test('saveShiftSchedule atomically saves templates and cycle', async () => {
     const updatedTemplates = templates.map((t) =>
       t.id === 'day' ? { ...t, startLocalTime: '09:00', standardMinutes: 540 } : t,
     );
-    const updatedCycle = { ...c, name: 'Updated', anchorLocalDate: '2026-02-01', startIndex: 1 };
+    const updatedCycle = { ...c, name: 'Updated', anchorLocalDate: '2026-02-01', startIndex: 1, effectiveFrom: '2026-02-01' };
     await saveShiftSchedule(database, updatedTemplates, updatedCycle, '2026-02-01');
 
     assert.deepEqual(await getShiftCycle(database, 'c1'), updatedCycle);

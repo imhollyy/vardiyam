@@ -154,7 +154,7 @@ export default function SetupScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const effectiveSteps = useMemo(() => getEffectiveSteps(draft), [draft.shiftPattern]);
+  const effectiveSteps = useMemo(() => getEffectiveSteps(draft), [draft]);
   const currentStep = effectiveSteps[step]!;
   const meta = STEP_META[currentStep];
   const isFirst = step === 0;

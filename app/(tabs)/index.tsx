@@ -75,7 +75,7 @@ export default function HomeScreen() {
   const { theme } = useAppTheme();
   const database = useAppDatabase();
   const router = useRouter();
-  const today = useMemo(todayLocal, []);
+  const today = useMemo(() => todayLocal(), []);
   const week = useMemo(() => weekDates(today), [today]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [days, setDays] = useState<DerivedDay[]>([]);

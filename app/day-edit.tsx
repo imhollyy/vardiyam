@@ -44,8 +44,6 @@ export default function DayEditScreen() {
   const [leaveHalfDay, setLeaveHalfDay] = useState(false);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
   useEffect(() => {
     if (!localDate) return;
     let active = true;
@@ -58,7 +56,6 @@ export default function DayEditScreen() {
         setLeaveHalfDay(entry.leaveHalfDay);
         setNote(entry.note ?? '');
       }
-      setLoaded(true);
     });
     return () => { active = false; };
   }, [database, localDate]);

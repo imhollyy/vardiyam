@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { getSettings } from '../../data/settingsRepository.ts';
 import { getDayEntriesInRange } from '../../data/dayEntryRepository.ts';
 import { getAllExtraIncomes } from '../../data/extraIncomeRepository.ts';
-import { listShiftTemplates } from '../../data/shiftCycleRepository.ts';
+import { listShiftTemplates, listShiftCycles } from '../../data/shiftCycleRepository.ts';
 import { generateMonthlyStatement, getPayPeriodForDate, type MonthlyStatement } from '../../domain/payroll/index.ts';
 
 export type PeriodInfo = { start: string; end: string; label: string };
@@ -15,6 +15,7 @@ export async function loadPeriodStatement(
 ): Promise<MonthlyStatement> {
   const settings = await getSettings(database);
   const templates = await listShiftTemplates(database);
+  const cycles = await listShiftCycles(database);
   const extras = await getAllExtraIncomes(database);
 
   // Fetch a wider range to include partial weeks at the period boundaries
@@ -24,7 +25,7 @@ export async function loadPeriodStatement(
 
   const year = Number(period.end.split('-')[0]);
   const month = Number(period.end.split('-')[1]);
-  return generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates);
+  return generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates, cycles);
 }
 
 export async function loadCurrentPeriodStatement(

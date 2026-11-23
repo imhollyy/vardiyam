@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
@@ -47,7 +47,7 @@ export default function AdditionalIncomeScreen() {
     setIncomes(list);
   }, [database]);
 
-  useEffect(() => { void loadIncomes(); }, [loadIncomes]);
+  useFocusEffect(useCallback(() => { void loadIncomes(); }, [loadIncomes]));
 
   const handleAdd = useCallback(async () => {
     setSaving(true);

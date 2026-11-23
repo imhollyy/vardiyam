@@ -15,7 +15,7 @@ import {
 import { shiftNominalMinutes } from '../../config/shifts.ts';
 import { calculateScheduledOvertime } from './overtime.ts';
 import { isOfficialHoliday } from '../../config/holidays.ts';
-import type { ShiftTemplate } from '../shift-cycle/index.ts';
+import { getProjectedDay, type ShiftCycle, type ShiftTemplate } from '../shift-cycle/index.ts';
 import type {
   Settings,
   DayEntry,
@@ -124,6 +124,22 @@ function buildLabel(sy: number, sm: number, sd: number, ey: number, em: number, 
   return `${sd} ${SHORT_MONTHS[sm - 1]} – ${endDay} ${SHORT_MONTHS[em - 1]}`;
 }
 
+function mondayOfWeek(localDate: string): string {
+  const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay();
+  date.setDate(d + (dow === 0 ? -6 : 1 - dow));
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function sundayOfWeek(localDate: string): string {
+  const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay();
+  date.setDate(d + (dow === 0 ? 0 : 7 - dow));
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export function enumerateDays(start: string, end: string): string[] {
   const dates: string[] = [];
   const [sy, sm, sd] = start.split('-').map(Number) as [number, number, number];
@@ -140,13 +156,49 @@ export function enumerateDays(start: string, end: string): string[] {
   return dates;
 }
 
+export function resolvePlannedTemplates(
+  dates: readonly string[],
+  cycles: readonly ShiftCycle[],
+  templates: readonly ShiftTemplate[],
+  dayEntries: Map<string, DayEntry>,
+): Map<string, string | null> {
+  const result = new Map<string, string | null>();
+  for (const date of dates) {
+    const entry = dayEntries.get(date);
+    if (entry?.shiftOverrideId) {
+      result.set(date, entry.shiftOverrideId);
+      continue;
+    }
+    let best: ShiftCycle | null = null;
+    for (const cycle of cycles) {
+      const from = cycle.effectiveFrom ?? cycle.anchorLocalDate;
+      if (from <= date && (!best || from > (best.effectiveFrom ?? best.anchorLocalDate))) {
+        best = cycle;
+      }
+    }
+    if (!best) {
+      result.set(date, null);
+      continue;
+    }
+    try {
+      const planned = getProjectedDay(best, templates, date);
+      result.set(date, planned.kind === 'SHIFT' ? (planned.templateId ?? null) : null);
+    } catch {
+      result.set(date, null);
+    }
+  }
+  return result;
+}
+
 export function deriveDays(
   periodDates: string[],
   dayEntries: Map<string, DayEntry>,
   settings: Settings,
   templates: readonly ShiftTemplate[] = [],
+  cycles: readonly ShiftCycle[] = [],
 ): DerivedDay[] {
   const templateMap = new Map(templates.map((t) => [t.id, t]));
+  const resolvedTemplates = resolvePlannedTemplates(periodDates, cycles, templates, dayEntries);
 
   return periodDates.map((localDate) => {
     const entry = dayEntries.get(localDate);
@@ -172,7 +224,7 @@ export function deriveDays(
       status = 'WORKED';
     }
 
-    const tplId = entry?.shiftOverrideId ?? null;
+    const tplId = resolvedTemplates.get(localDate) ?? null;
     const tpl = tplId ? templateMap.get(tplId) : null;
     const nominalMin = tpl
       ? shiftNominalMinutes(tpl.startLocalTime, tpl.endLocalTime)
@@ -364,16 +416,26 @@ export function generateMonthlyStatement(
   month: number,
   cumulativeTaxableMinor: number = 0,
   templates: readonly ShiftTemplate[] = [],
+  cycles: readonly ShiftCycle[] = [],
 ): MonthlyStatement {
   const { start, end } = getPayPeriod(year, month, settings.payday);
   const periodDates = enumerateDays(start, end);
-  const days = deriveDays(periodDates, dayEntries, settings, templates);
+  const days = deriveDays(periodDates, dayEntries, settings, templates, cycles);
 
   const totalDays = periodDates.length;
   const workedDays = days.filter((d) => d.status === 'WORKED').length;
   const dailySalaryMinor = Math.round(settings.salaryMinor / 30);
 
-  const scheduledOvertimeByDay = calculateScheduledOvertime(days, templates);
+  // Expand to full Mon–Sun weeks so calculateScheduledOvertime groups correctly
+  const expandedStart = mondayOfWeek(start);
+  const expandedEnd = sundayOfWeek(end);
+  const expandedDates = enumerateDays(expandedStart, expandedEnd);
+  const expandedDays = deriveDays(expandedDates, dayEntries, settings, templates, cycles);
+  const scheduledOvertimeByDayAll = calculateScheduledOvertime(expandedDays, templates);
+  // Only count overtime that falls within the period
+  const scheduledOvertimeByDay = scheduledOvertimeByDayAll.filter(
+    (o) => o.localDate >= start && o.localDate <= end,
+  );
   const scheduledOvertimeMap = new Map(scheduledOvertimeByDay.map((o) => [o.localDate, o.scheduledOvertimeMinutes]));
 
   const manualOvertimeMinutes = days.reduce((s, d) => s + d.overtimeMinutes, 0);

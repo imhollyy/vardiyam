@@ -154,6 +154,7 @@ async function getShiftCycleInternal(
     anchorLocalDate: row.anchor_local_date,
     startIndex: row.start_index,
     entries,
+    effectiveFrom: row.effective_from,
   };
   validateShiftCycle(cycle, await listShiftTemplatesInternal(database));
   return cycle;

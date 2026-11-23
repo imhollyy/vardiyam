@@ -40,7 +40,7 @@ const MONTH_NAMES = [
 export default function CalendarScreen() {
   const { theme } = useAppTheme();
   const database = useAppDatabase();
-  const today = useMemo(todayLocal, []);
+  const today = useMemo(() => todayLocal(), []);
   const [year, setYear] = useState(() => Number(today.split('-')[0]));
   const [month, setMonth] = useState(() => Number(today.split('-')[1]));
   const [dayMap, setDayMap] = useState<Map<string, DerivedDay>>(new Map());

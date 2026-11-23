@@ -21,6 +21,7 @@ export type ShiftCycle = {
   anchorLocalDate: LocalDate;
   startIndex: number;
   entries: readonly CycleEntry[];
+  effectiveFrom?: LocalDate;
 };
 
 export type PlanOverride =
