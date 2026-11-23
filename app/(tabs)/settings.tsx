@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAppDatabase, useDatabaseMaintenance } from '@/src/data/AppDatabaseProvider';
+import { useAppDatabase, useNotifyDataReset } from '@/src/data/AppDatabaseProvider';
 
 import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
 import {
@@ -39,12 +39,11 @@ import {
 import { getSettings, updateSettings } from '@/src/data/settingsRepository';
 import type { Settings } from '@/src/domain/payroll/types';
 import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
-import { colors } from '@/src/theme/tokens';
+import { colors, layout } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
 import { ActionButton } from '@/src/components/ui/ActionButton';
-import { layout } from '@/src/theme/tokens';
 
 const PATTERNS: { id: ShiftPattern; title: string; hint: string }[] = [
   { id: 'fixed', title: 'Sabit', hint: 'Her gün seçilen vardiya' },
@@ -199,7 +198,7 @@ function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typ
 
 export default function SettingsScreen() {
   const database = useAppDatabase();
-  const { runDatabaseMaintenance } = useDatabaseMaintenance();
+  const notifyDataReset = useNotifyDataReset();
   const router = useRouter();
   const { theme, mode, toggleMode } = useAppTheme();
   const [cycle, setCycle] = useState<ShiftCycle | null>(null);
@@ -353,21 +352,14 @@ export default function SettingsScreen() {
 
   const confirmReset = async () => {
     setShowResetModal(false);
-    let empty: import('expo-sqlite').SQLiteDatabase | null = null;
     try {
-      const SQLiteModule = await import('expo-sqlite');
-      const { createEmptyDatabaseForWipe, applyDataWipe } = await import('@/src/data/backupService');
-      empty = await createEmptyDatabaseForWipe();
-      await runDatabaseMaintenance(async (current, controls) => { await applyDataWipe(current, empty!, controls); });
+      const { resetAllData, cleanupLocalArtifacts } = await import('@/src/data/resetRepository');
+      await resetAllData(database);
+      await cleanupLocalArtifacts();
+      notifyDataReset();
       router.replace('/welcome');
     } catch (err) {
       Alert.alert('Sıfırlama başarısız', err instanceof Error ? err.message : 'Veriler korundu.');
-    } finally {
-      if (empty) {
-        const SQLiteModule = await import('expo-sqlite');
-        await empty.closeAsync().catch(() => {});
-        await SQLiteModule.deleteDatabaseAsync('__vdywipe.db').catch(() => {});
-      }
     }
   };
 

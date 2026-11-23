@@ -54,7 +54,7 @@ function hex(bytes) { return Array.from(bytes, (byte) => byte.toString(16).padSt
 
 function fixtureMarker(candidate, rollback, state = 'committed') {
   return {
-    version: 2,
+    version: 3,
     state,
     stageName: STAGE,
     rollbackName: ROLLBACK,

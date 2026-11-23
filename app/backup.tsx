@@ -17,8 +17,8 @@ import { File, Paths } from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { CURRENT_SCHEMA_VERSION } from '@/src/data/migrations';
 
-import { useAppDatabase, useDatabaseMaintenance } from '@/src/data/AppDatabaseProvider';
-import { applyDataWipe, applyPreparedRestore, createBackupFile, createEmptyDatabaseForWipe, prepareRestoreFile, type RestorePreview } from '@/src/data/backupService';
+import { useAppDatabase, useDatabaseMaintenance, useNotifyDataReset } from '@/src/data/AppDatabaseProvider';
+import { applyPreparedRestore, createBackupFile, prepareRestoreFile, type RestorePreview } from '@/src/data/backupService';
 import { MAX_BACKUP_BYTES, validateBackupPassword } from '@/src/features/backup/backupContainer';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
@@ -29,6 +29,7 @@ type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 export default function BackupScreen() {
   const database = useAppDatabase();
   const { runDatabaseMaintenance, busy: maintenanceBusy } = useDatabaseMaintenance();
+  const notifyDataReset = useNotifyDataReset();
   const router = useRouter();
   const { theme } = useAppTheme();
   const candidate = useRef<SQLite.SQLiteDatabase | null>(null);
@@ -149,17 +150,15 @@ export default function BackupScreen() {
     candidate.current = null;
     setPreview(null);
     setRestorePassword('');
-    let empty: SQLite.SQLiteDatabase | null = null;
     try {
-      empty = await createEmptyDatabaseForWipe();
-      await runDatabaseMaintenance((current, controls) => applyDataWipe(current, empty!, controls));
-      await empty.closeAsync();
-      empty = null;
+      const { resetAllData, cleanupLocalArtifacts } = await import('@/src/data/resetRepository');
+      await resetAllData(database);
+      await cleanupLocalArtifacts();
+      notifyDataReset();
       setSuccess('Uygulamadaki yerel veriler kaldırıldı; boş veritabanı hazır.');
     } catch {
-      setError('Veriler silinemedi. Veritabanı korunmuş veya güvenlik kopyasından geri açılmıştır.');
+      setError('Veriler silinemedi. Lütfen tekrar deneyin.');
     } finally {
-      await empty?.closeAsync().catch(() => undefined);
       setBusy(false);
     }
   };

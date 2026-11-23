@@ -10,7 +10,7 @@ type ValidationDatabase = Pick<
 export type ReferenceDatabase = { database: ValidationDatabase; close: () => Promise<void> };
 export type ReferenceDatabaseFactory = () => Promise<ReferenceDatabase>;
 
-const TABLES_BY_VERSION: Record<number, readonly string[]> = {
+export const TABLES_BY_VERSION: Record<number, readonly string[]> = {
   100: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes'],
 };
 

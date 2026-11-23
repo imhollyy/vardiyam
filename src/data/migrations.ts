@@ -37,6 +37,8 @@ function canonicalLocalDateCheck(column: string): string {
  */
 export const FIRST_SCHEMA_VERSION = 100;
 
+export const DEFAULT_SETTINGS_INSERT_SQL = 'INSERT OR IGNORE INTO settings (id) VALUES (1);';
+
 export const migrations: readonly Migration[] = [
   {
     version: 100,
@@ -148,7 +150,7 @@ export const migrations: readonly Migration[] = [
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S.000Z', 'now'))
       );
 
-      INSERT OR IGNORE INTO settings (id) VALUES (1);
+      ${DEFAULT_SETTINGS_INSERT_SQL}
     `,
   },
 ];

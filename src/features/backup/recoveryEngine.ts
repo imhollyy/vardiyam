@@ -2,7 +2,7 @@ export type RecoveryState = 'staging' | 'prepared' | 'committed';
 export type RecoveryAction = 'discard-staging' | 'finish-commit' | 'restore-rollback' | 'finish-rollback';
 
 export type RecoveryMarker = {
-  version: 2;
+  version: 3;
   state: RecoveryState;
   stageName: string;
   rollbackName: string;
@@ -29,17 +29,23 @@ export function parseRecoveryMarker(value: string): RecoveryMarker {
   try { marker = JSON.parse(value); }
   catch { throw new Error('Veritabanı kurtarma bilgisi okunamıyor.'); }
   if (!marker || typeof marker !== 'object') throw new Error('Veritabanı kurtarma bilgisi geçersiz.');
-  const candidate = marker as Partial<RecoveryMarker>;
-  if (candidate.version !== 2 || !['staging', 'prepared', 'committed'].includes(candidate.state ?? '') ||
-    typeof candidate.stageName !== 'string' || typeof candidate.rollbackName !== 'string') {
+  const candidate = marker as Record<string, unknown>;
+  // v2 markers used byte-level digests that the current code cannot verify;
+  // treat them as staging so the recovery engine safely discards the incomplete operation.
+  if (candidate['version'] === 2 && typeof candidate['stageName'] === 'string' && typeof candidate['rollbackName'] === 'string') {
+    return { version: 3, state: 'staging', stageName: candidate['stageName'], rollbackName: candidate['rollbackName'] };
+  }
+  const typed = candidate as Partial<RecoveryMarker>;
+  if (typed.version !== 3 || !['staging', 'prepared', 'committed'].includes(typed.state ?? '') ||
+    typeof typed.stageName !== 'string' || typeof typed.rollbackName !== 'string') {
     throw new Error('Veritabanı kurtarma bilgisi geçersiz.');
   }
-  if (candidate.state !== 'staging' &&
-    (!isDigest(candidate.candidateDigest) || !isCount(candidate.candidateRecordCount) ||
-      !isDigest(candidate.rollbackDigest) || !isCount(candidate.rollbackRecordCount))) {
+  if (typed.state !== 'staging' &&
+    (!isDigest(typed.candidateDigest) || !isCount(typed.candidateRecordCount) ||
+      !isDigest(typed.rollbackDigest) || !isCount(typed.rollbackRecordCount))) {
     throw new Error('Veritabanı kurtarma bilgisi geçersiz.');
   }
-  return candidate as RecoveryMarker;
+  return typed as RecoveryMarker;
 }
 
 export async function recoverDatabaseState(liveName: string, marker: RecoveryMarker, port: RecoveryPort): Promise<RecoveryAction> {

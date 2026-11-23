@@ -89,36 +89,3 @@ export async function applyPreparedRestore(
   });
 }
 
-const WIPE_TEMP_NAME = '__vdywipe.db';
-
-export async function createEmptyDatabaseForWipe(): Promise<SQLiteDatabase> {
-  // Use a named temp file (not :memory:) to avoid sharing a connection with createReferenceDatabase,
-  // which also opens :memory: during validateBackupDatabase — Expo SQLite may return the same handle.
-  await SQLite.deleteDatabaseAsync(WIPE_TEMP_NAME).catch(() => {});
-  const empty = await SQLite.openDatabaseAsync(WIPE_TEMP_NAME);
-  try {
-    await empty.execAsync('PRAGMA foreign_keys = ON;');
-    const { initializeDatabase } = await import('./database.ts');
-    const initResult = await initializeDatabase(empty);
-    if (initResult.needsReset) throw new Error('Boş veritabanı şeması beklenmeyen durumda.');
-    const validation = await validateBackupDatabase(empty, { createReferenceDatabase, expectedSchemaVersion: CURRENT_SCHEMA_VERSION });
-    // settings table always has 1 default row after initialization; only user data tables must be empty
-    if (validation.recordCount !== 1) throw new Error('Boş veritabanı hazırlanamadı.');
-    return empty;
-  } catch (error) {
-    await empty.closeAsync();
-    await SQLite.deleteDatabaseAsync(WIPE_TEMP_NAME).catch(() => {});
-    throw error;
-  }
-}
-
-export async function applyDataWipe(
-  current: SQLiteDatabase,
-  emptyDatabase: SQLiteDatabase,
-  controls: DatabaseMaintenanceControls,
-): Promise<void> {
-  // validateCurrent is called on both the new stage AND the old rollback copy.
-  // The old live DB may have many records, so we must not assert count === 1 here;
-  // replaceLiveDatabase's own consistency checks (copyCount vs sourceCount, digest match) are sufficient.
-  await replaceLiveDatabase(current, emptyDatabase, controls, (restored) => validateCurrentSchema(restored));
-}
