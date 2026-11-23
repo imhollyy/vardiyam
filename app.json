@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Vardiyam",
-    "slug": "vardiyam",
+    "name": "Mesai Pusulası",
+    "slug": "mesai-pusulasi",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "vardiyam",
+    "scheme": "mesai-pusulasi",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true

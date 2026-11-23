@@ -89,6 +89,14 @@ export default function ReportsScreen() {
 
       <Card>
         <CardHeader icon="bar-chart-outline" title="Aylık Dağılım" />
+        {statements.length === 0 && (
+          <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
+            <Ionicons accessible={false} name="bar-chart-outline" size={32} color={theme.muted} />
+            <Text style={{ color: theme.muted, fontSize: layout.type.body, textAlign: 'center' }}>
+              Bu yıl için henüz hesaplama yok.{'\n'}Vardiya ve maaş ayarlarını tamamla.
+            </Text>
+          </View>
+        )}
         {statements.map((stmt, i) => {
           const barWidth = Math.max(8, (stmt.netMinor / maxNet) * 100);
           const periodLabel = periods[i]?.label ?? MONTH_NAMES[i] ?? '';

@@ -219,7 +219,7 @@ export default function BackupScreen() {
       </Card>
 
       {busy || maintenanceBusy ? <View accessibilityLiveRegion="polite" style={styles.status}><ActivityIndicator color={theme.accent} /><Text style={{ color: theme.muted }}>Veri işlemi sürüyor; uygulamayı kapatma…</Text></View> : null}
-      {error ? <Text accessibilityRole="alert" style={[styles.feedback, { color: '#A12622' }]}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={[styles.feedback, { color: theme.danger }]}>{error}</Text> : null}
       {success ? <Text accessibilityLiveRegion="polite" style={[styles.feedback, { color: theme.accent }]}>{success}</Text> : null}
     </ScrollView>
   );
