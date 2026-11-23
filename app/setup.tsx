@@ -12,7 +12,7 @@ import { getPayPeriodForDate } from '@/src/domain/payroll/index';
 import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-cycle/index';
 import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { parseTryMinor, formatTryMinor } from '@/src/domain/money';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card, CardHeader } from '@/src/components/ui/Card';
@@ -340,15 +340,15 @@ export default function SetupScreen() {
     >
       {/* Step indicator */}
       <View style={styles.stepIndicator}>
-        <View style={[styles.stepIconCircle, { backgroundColor: theme.accentSurface }]}>
-          <Ionicons accessible={false} name={meta.icon} size={22} color={theme.accent} />
+        <View style={[styles.stepIconCircle, { backgroundColor: theme.surfaceMuted }]}>
+          <Ionicons accessible={false} name={meta.icon} size={22} color={theme.ink} />
         </View>
-        <Text style={[styles.stepLabel, { color: theme.accent }]}>
+        <Text style={[styles.stepLabel, { color: theme.muted }]}>
           ADIM {step + 1}/{effectiveSteps.length}
         </Text>
         <View style={styles.dots}>
           {effectiveSteps.map((_, i) => (
-            <View key={i} style={[styles.dot, { backgroundColor: i <= step ? theme.accent : theme.border }]} />
+            <View key={i} style={[styles.dot, { backgroundColor: i <= step ? theme.ink : theme.border }]} />
           ))}
         </View>
       </View>
@@ -361,7 +361,7 @@ export default function SetupScreen() {
             <Card>
               <CardHeader icon="cash-outline" title="Aylık maaş" />
               <TextInput
-                style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
                 value={draft.salaryText}
                 onChangeText={(t) => setDraft((d) => ({ ...d, salaryText: t }))}
                 placeholder="Örn: 22.500"
@@ -377,7 +377,7 @@ export default function SetupScreen() {
             <Card>
               <CardHeader icon="calendar-number-outline" title="Maaş günü" />
               <TextInput
-                style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
                 value={draft.payday}
                 onChangeText={(t) => {
                   const upper = t.toUpperCase().trim();
@@ -427,7 +427,7 @@ export default function SetupScreen() {
                 <CardHeader icon="time-outline" title={td.name} />
                 <View style={styles.timeRow}>
                   <TextInput
-                    style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                    style={[styles.timeInput, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
                     value={td.startLocalTime}
                     onChangeText={(v) => updateTemplateTime(i, 'startLocalTime', v)}
                     placeholder="HH:MM"
@@ -438,7 +438,7 @@ export default function SetupScreen() {
                   />
                   <Ionicons name="arrow-forward" size={16} color={theme.muted} />
                   <TextInput
-                    style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                    style={[styles.timeInput, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
                     value={td.endLocalTime}
                     onChangeText={(v) => updateTemplateTime(i, 'endLocalTime', v)}
                     placeholder="HH:MM"
@@ -450,7 +450,7 @@ export default function SetupScreen() {
                 </View>
                 {/* Break selector */}
                 <View style={[styles.breakRow, { borderTopColor: theme.border }]}>
-                  <Text style={{ color: theme.muted, fontSize: layout.type.caption, fontWeight: '600' }}>Mola</Text>
+                  <Text style={{ fontFamily: fonts.semiBold, color: theme.muted, fontSize: layout.type.caption }}>Mola</Text>
                   <View style={styles.breakOptions}>
                     {BREAK_OPTIONS.map((opt) => (
                       <Pressable
@@ -459,11 +459,11 @@ export default function SetupScreen() {
                         accessibilityLabel={`Mola ${opt.label}`}
                         onPress={() => updateTemplateBreak(i, opt.value)}
                         style={[styles.breakChip, {
-                          backgroundColor: td.breakMinutes === opt.value ? theme.accent : theme.surface,
-                          borderColor: td.breakMinutes === opt.value ? theme.accent : theme.border,
+                          backgroundColor: td.breakMinutes === opt.value ? theme.ink : theme.surface,
+                          borderColor: td.breakMinutes === opt.value ? theme.ink : theme.border,
                         }]}
                       >
-                        <Text style={{ color: td.breakMinutes === opt.value ? theme.onPrimaryAction : theme.foreground, fontSize: 12, fontWeight: '600' }}>
+                        <Text style={{ fontFamily: fonts.semiBold, color: td.breakMinutes === opt.value ? theme.onInk : theme.ink, fontSize: 12 }}>
                           {opt.label}
                         </Text>
                       </Pressable>
@@ -484,7 +484,7 @@ export default function SetupScreen() {
             {weeklyNetPreview && (
               <View style={[styles.warningBadge, { backgroundColor: weeklyNetPreview.excessMinutes > 0 ? theme.warningSurface : theme.successSurface }]}>
                 <Ionicons name={weeklyNetPreview.excessMinutes > 0 ? 'alert-circle' : 'checkmark-circle'} size={14} color={weeklyNetPreview.excessMinutes > 0 ? theme.warning : theme.success} />
-                <Text style={{ color: weeklyNetPreview.excessMinutes > 0 ? theme.warning : theme.success, fontSize: layout.type.caption, fontWeight: '600', flex: 1 }}>
+                <Text style={{ fontFamily: fonts.semiBold, color: weeklyNetPreview.excessMinutes > 0 ? theme.warning : theme.success, fontSize: layout.type.caption, flex: 1 }}>
                   {weeklyNetPreview.excessMinutes > 0
                     ? `Haftalık net çalışman ${Math.round(weeklyNetPreview.weeklyMinutes / 60 * 10) / 10} saat; haftada ${Math.round(weeklyNetPreview.excessMinutes / 60 * 10) / 10} saat fazla mesai eklenecek.`
                     : `Haftalık net çalışman ${Math.round(weeklyNetPreview.weeklyMinutes / 60 * 10) / 10} saat; fazla mesai eklenmeyecek.`}
@@ -514,7 +514,7 @@ export default function SetupScreen() {
             <Card>
               <CardHeader icon="briefcase-outline" title="İşe başlama tarihi" />
               <TextInput
-                style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
                 value={draft.startDateText}
                 onChangeText={(t) => setDraft((d) => ({ ...d, startDateText: t }))}
                 placeholder="GG.AA.YYYY"
@@ -570,7 +570,7 @@ function SummaryRow({ label, value, theme }: { label: string; value: string; the
   return (
     <View style={styles.summaryRow} accessibilityLabel={`${label}: ${value}`}>
       <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{label}</Text>
-      <Text style={{ color: theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>{value}</Text>
+      <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>{value}</Text>
     </View>
   );
 }
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   stepIndicator: { alignItems: 'center', paddingTop: 56, paddingBottom: 8, gap: 8 },
   stepIconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  stepLabel: { fontSize: layout.type.caption, fontWeight: '900', letterSpacing: 1.5 },
+  stepLabel: { fontFamily: fonts.extraBold, fontSize: layout.type.caption, letterSpacing: 1.5 },
   dots: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   scrollContent: { paddingBottom: 16, gap: layout.space.md },

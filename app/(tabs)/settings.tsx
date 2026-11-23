@@ -40,7 +40,7 @@ import {
 import { getSettings, updateSettings } from '@/src/data/settingsRepository';
 import type { Settings } from '@/src/domain/payroll/types';
 import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
-import { colors, layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
@@ -61,7 +61,7 @@ const DEFAULT_TEMPLATE_VALUES = [
   { code: 'N', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
 ];
 
-type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
+type Theme = ReturnType<typeof useAppTheme>['theme'];
 
 function createDefaults(id = `cycle-${Date.now()}`): ScheduleDraft {
   const templates = DEFAULT_TEMPLATE_VALUES.map((template, index) => ({
@@ -163,7 +163,7 @@ function Field({
       <TextInput
         accessibilityLabel={label} autoCapitalize="none" keyboardType={keyboardType} maxLength={maxLength}
         onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={theme.muted}
-        style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.foreground }]} value={value}
+        style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.ink, fontFamily: fonts.medium }]} value={value}
       />
     </View>
   );
@@ -178,7 +178,7 @@ function Action({ label, onPress, theme, secondary = false, disabled = false, ac
 
 
 function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; theme: Theme }) {
-  return <View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: theme.accentSurface }]}><Ionicons name={icon} size={18} color={theme.accent} /></View><Text style={[styles.sectionTitle, { color: theme.foreground }]}>{title}</Text></View>;
+  return <View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: theme.surfaceMuted }]}><Ionicons name={icon} size={18} color={theme.ink} /></View><Text style={[styles.sectionTitle, { color: theme.ink }]}>{title}</Text></View>;
 }
 
 export default function SettingsScreen() {
@@ -408,15 +408,15 @@ export default function SettingsScreen() {
             <>
               <View style={styles.infoRow}>
                 <Text style={{ color: theme.muted }}>Maaş</Text>
-                <Text style={{ color: theme.foreground, fontWeight: '700' }}>{formatTryMinor(appSettings.salaryMinor)} ({appSettings.salaryType === 'GROSS' ? 'Brüt' : 'Net'})</Text>
+                <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{formatTryMinor(appSettings.salaryMinor)} ({appSettings.salaryType === 'GROSS' ? 'Brüt' : 'Net'})</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={{ color: theme.muted }}>Maaş günü</Text>
-                <Text style={{ color: theme.foreground, fontWeight: '700' }}>{appSettings.payday === 'LAST' ? 'Ayın sonu' : `Ayın ${appSettings.payday}`}</Text>
+                <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.payday === 'LAST' ? 'Ayın sonu' : `Ayın ${appSettings.payday}`}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={{ color: theme.muted }}>BES</Text>
-                <Text style={{ color: theme.foreground, fontWeight: '700' }}>{appSettings.besEnabled ? `%${(appSettings.besRateBp / 100).toFixed(0)}` : 'Kapalı'}</Text>
+                <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.besEnabled ? `%${(appSettings.besRateBp / 100).toFixed(0)}` : 'Kapalı'}</Text>
               </View>
               {success ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{success}</Text> : null}
               <Action label="Ücret bilgilerini düzenle" onPress={startSalaryEdit} theme={theme} secondary />
@@ -441,19 +441,19 @@ export default function SettingsScreen() {
       {/* Shift cycle editor */}
       {loading ? (
         <View accessibilityLiveRegion="polite" style={styles.statusRow}>
-          <ActivityIndicator color={theme.accent} />
+          <ActivityIndicator color={theme.ink} />
           <Text style={{ color: theme.muted }}>Vardiya düzeni yükleniyor…</Text>
         </View>
       ) : error && !editing ? (
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text accessibilityRole="alert" style={[styles.body, { color: theme.foreground }]}>{error}</Text>
+          <Text accessibilityRole="alert" style={[styles.body, { color: theme.ink }]}>{error}</Text>
           <Action label="Tekrar dene" onPress={() => void load()} theme={theme} />
         </View>
       ) : !editing && cycle ? (
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.rowBetween}>
             <View style={styles.flex}>
-              <Text style={[styles.cardTitle, { color: theme.foreground }]}>{cycle.name}</Text>
+              <Text style={[styles.cardTitle, { color: theme.ink }]}>{cycle.name}</Text>
               <Text style={[styles.body, { color: theme.muted }]}>{PATTERNS.find((item) => item.id === detectPattern(cycle))?.title} · {cycle.timezone}</Text>
             </View>
             {startEntry?.kind === 'SHIFT' ? <ShiftKindBadge kind="SHIFT" template={storedTemplates.find((item) => item.id === startEntry.templateId)} /> : null}
@@ -530,7 +530,7 @@ export default function SettingsScreen() {
       {/* Reset */}
       <View style={[styles.card, { backgroundColor: theme.dangerSurface, borderColor: theme.danger }]}>
         <SectionHeading icon="trash-outline" title="Sıfırla" theme={theme} />
-        <Text style={[styles.body, { color: theme.foreground }]}>Tüm verilerini sil ve uygulamayı baştan kur.</Text>
+        <Text style={[styles.body, { color: theme.ink }]}>Tüm verilerini sil ve uygulamayı baştan kur.</Text>
         <Pressable
           accessibilityRole="button"
           onPress={handleReset}
@@ -544,7 +544,7 @@ export default function SettingsScreen() {
     <Modal animationType="fade" transparent visible={showResetModal} onRequestClose={() => setShowResetModal(false)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackdrop}>
         <View style={[styles.modalSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.modalTitle, { color: theme.foreground }]}>Tüm verileri sil</Text>
+          <Text style={[styles.modalTitle, { color: theme.ink }]}>Tüm verileri sil</Text>
           <Text style={[styles.body, { color: theme.muted }]}>Bu işlem geri alınamaz. Onaylamak için aşağıya{' '}
             <Text style={{ fontWeight: '900', color: theme.danger }}>SIFIRLA</Text>
             {' '}yazın.</Text>
@@ -555,7 +555,7 @@ export default function SettingsScreen() {
             onChangeText={setResetConfirmText}
             placeholder="SIFIRLA"
             placeholderTextColor={theme.muted}
-            style={[styles.input, { backgroundColor: theme.background, borderColor: resetConfirmText === 'SIFIRLA' ? theme.danger : theme.border, color: theme.foreground }]}
+            style={[styles.input, { backgroundColor: theme.background, borderColor: resetConfirmText === 'SIFIRLA' ? theme.danger : theme.border, color: theme.ink }]}
             value={resetConfirmText}
           />
           <Pressable
@@ -582,12 +582,12 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: 20, padding: 16, gap: 14 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   sectionIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  sectionTitle: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
-  cardTitle: { fontSize: 21, fontWeight: '800' },
-  body: { fontSize: 15, lineHeight: 22 },
+  sectionTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.section, flexShrink: 1 },
+  cardTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.heading },
+  body: { fontFamily: fonts.regular, fontSize: layout.type.body, lineHeight: 22 },
   field: { gap: 6 },
-  fieldLabel: { marginTop: 2, fontSize: 13, fontWeight: '700' },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 16 },
+  fieldLabel: { fontFamily: fonts.bold, marginTop: 2, fontSize: layout.type.caption },
+  input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: layout.type.body },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   templateBox: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
   twoColumns: { flexDirection: 'row', gap: 10 },
@@ -604,12 +604,12 @@ const styles = StyleSheet.create({
   actionRow: { gap: 10 },
   statusRow: { minHeight: 100, alignItems: 'center', justifyContent: 'center', gap: 12 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  error: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
-  success: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  error: { fontFamily: fonts.bold, fontSize: layout.type.caption, lineHeight: 20 },
+  success: { fontFamily: fonts.bold, fontSize: layout.type.caption, lineHeight: 20 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   dangerButton: { borderWidth: 1.5, borderRadius: 14, paddingVertical: 14, alignItems: 'center', minHeight: 48 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', padding: 16 },
   modalSheet: { borderWidth: 1, borderRadius: 24, padding: 24, gap: 16 },
-  modalTitle: { fontSize: 21, fontWeight: '800' },
+  modalTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.heading },
   modalCancel: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
 });

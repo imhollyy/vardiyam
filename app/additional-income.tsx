@@ -8,11 +8,12 @@ import { getAllExtraIncomes, createExtraIncome, deleteExtraIncome, type CreateEx
 import type { ExtraIncome, ExtraIncomeType, ExtraIncomeFrequency } from '@/src/domain/payroll/types';
 import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { EmptyState } from '@/src/components/ui/EmptyState';
 
 const TYPE_OPTIONS: { value: ExtraIncomeType; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { value: 'BONUS', label: 'Prim', icon: 'trophy-outline' },
@@ -101,12 +102,7 @@ export default function AdditionalIncomeScreen() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Card>
-            <View style={styles.emptyState}>
-              <Ionicons name="cash-outline" size={32} color={theme.muted} />
-              <Text style={{ color: theme.muted, textAlign: 'center', fontSize: layout.type.body }}>
-                Henüz ek gelir eklenmemiş.
-              </Text>
-            </View>
+            <EmptyState icon="cash-outline" title="Ek gelir yok" body="Henüz ek gelir eklenmemiş." />
           </Card>
         }
         renderItem={({ item }) => {
@@ -114,14 +110,14 @@ export default function AdditionalIncomeScreen() {
           return (
             <Card>
               <View style={styles.incomeRow}>
-                <View style={[styles.typeIcon, { backgroundColor: theme.accentSurface }]}>
-                  <Ionicons accessible={false} name={info?.icon ?? 'cash-outline'} size={18} color={theme.accent} />
+                <View style={[styles.typeIcon, { backgroundColor: theme.surfaceMuted }]}>
+                  <Ionicons accessible={false} name={info?.icon ?? 'cash-outline'} size={18} color={theme.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.foreground, fontWeight: '700', fontSize: layout.type.body }}>
+                  <Text style={{ fontFamily: fonts.bold, color: theme.ink, fontSize: layout.type.body }}>
                     {info?.label ?? item.type}
                   </Text>
-                  <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>
+                  <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption }}>
                     {formatTryMinor(item.amountMinor)} · {FREQUENCY_OPTIONS.find((o) => o.value === item.frequency)?.label}
                   </Text>
                 </View>
@@ -148,7 +144,7 @@ export default function AdditionalIncomeScreen() {
             ))}
           </View>
           <TextInput
-            style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.background }]}
+            style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.background, fontFamily: fonts.extraBold }]}
             value={amountText}
             onChangeText={setAmountText}
             placeholder="Tutar (₺)"

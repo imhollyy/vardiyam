@@ -11,7 +11,7 @@ import type { WorkSchedule, ShiftPattern } from '@/src/domain/payroll/types';
 import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-cycle/index';
 import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
 import { ActionButton } from '@/src/components/ui/ActionButton';
@@ -249,12 +249,12 @@ export default function ShiftChangeScreen() {
             return (
               <View key={td.id} style={styles.shiftRow}>
                 <View style={styles.shiftRowTop}>
-                  <Text style={[styles.shiftLabel, { color: theme.foreground }]}>{td.name}</Text>
+                  <Text style={[styles.shiftLabel, { color: theme.ink }]}>{td.name}</Text>
                   {previewTemplate ? <ShiftKindBadge kind="SHIFT" compact template={previewTemplate} /> : null}
                 </View>
                 <View style={styles.timeRow}>
                   <TextInput
-                    style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                    style={[styles.timeInput, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface, fontFamily: fonts.extraBold }]}
                     value={td.startLocalTime}
                     onChangeText={(v) => updateTemplateTime(i, 'startLocalTime', v)}
                     placeholder="HH:MM"
@@ -265,7 +265,7 @@ export default function ShiftChangeScreen() {
                   />
                   <Text style={{ color: theme.muted, fontSize: layout.type.body }}>–</Text>
                   <TextInput
-                    style={[styles.timeInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+                    style={[styles.timeInput, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface, fontFamily: fonts.extraBold }]}
                     value={td.endLocalTime}
                     onChangeText={(v) => updateTemplateTime(i, 'endLocalTime', v)}
                     placeholder="HH:MM"
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: layout.screen.horizontal, paddingTop: layout.screen.top, gap: layout.space.md, paddingBottom: layout.space.lg },
   shiftRow: { gap: layout.space.sm },
   shiftRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  shiftLabel: { fontSize: layout.type.body, fontWeight: '700' },
+  shiftLabel: { fontFamily: fonts.bold, fontSize: layout.type.body },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: layout.space.sm },
   timeInput: { flex: 1, minHeight: layout.control.minHeight, borderWidth: 1.5, borderRadius: layout.radius.input, paddingHorizontal: 12, fontSize: layout.type.body, textAlign: 'center' },
   warning: { fontSize: layout.type.caption, lineHeight: 18 },

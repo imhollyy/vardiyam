@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -8,11 +8,13 @@ import { getSettings } from '@/src/data/settingsRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
 import { deriveDays, enumerateDays, type DerivedDay } from '@/src/domain/payroll/index';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
-import { Card, CardHeader } from '@/src/components/ui/Card';
+import { Card } from '@/src/components/ui/Card';
 import { StatTile } from '@/src/components/ui/StatTile';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { SkeletonCard } from '@/src/components/ui/Skeleton';
 
 const WEEKDAY_HEADERS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
@@ -38,7 +40,7 @@ const MONTH_NAMES = [
 ];
 
 export default function CalendarScreen() {
-  const { theme } = useAppTheme();
+  const { theme, mode } = useAppTheme();
   const database = useAppDatabase();
   const router = useRouter();
   const today = useMemo(() => todayLocal(), []);
@@ -88,24 +90,26 @@ export default function CalendarScreen() {
   if (loading) {
     return (
       <Screen>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-          <ActivityIndicator size="large" color={theme.accent} />
-        </View>
+        <SkeletonCard rows={3} />
+        <SkeletonCard rows={6} />
       </Screen>
     );
   }
 
   return (
     <Screen>
-      <PageHeading eyebrow="TAKVİM" title={`${MONTH_NAMES[month - 1]} ${year}`} />
-
-      <View style={styles.nav}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Önceki ay" onPress={prevMonth} style={styles.navButton}>
-          <Ionicons name="chevron-back" size={22} color={theme.accent} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Sonraki ay" onPress={nextMonth} style={styles.navButton}>
-          <Ionicons name="chevron-forward" size={22} color={theme.accent} />
-        </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <PageHeading eyebrow="TAKVİM" title={`${MONTH_NAMES[month - 1]} ${year}`} />
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Önceki ay" onPress={prevMonth}
+            style={{ width: 36, height: 36, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="chevron-back" size={18} color={theme.ink} />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Sonraki ay" onPress={nextMonth}
+            style={{ width: 36, height: 36, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="chevron-forward" size={18} color={theme.ink} />
+          </Pressable>
+        </View>
       </View>
 
       <Card>
@@ -119,11 +123,11 @@ export default function CalendarScreen() {
             if (!date) return <View key={`e-${i}`} style={styles.cell} />;
             const day = dayMap.get(date);
             const isToday = date === today;
-            const dotColor =
-              day?.status === 'WORKED' ? theme.success :
-              day?.status === 'HOLIDAY' ? theme.warning :
-              day?.status === 'LEAVE' ? theme.danger :
-              theme.border;
+            const dotBg =
+              day?.status === 'WORKED' ? shiftPalette.day[mode].background :
+              day?.status === 'HOLIDAY' ? shiftPalette.holiday[mode].background :
+              day?.status === 'LEAVE' ? shiftPalette.leave[mode].background :
+              'transparent';
             return (
               <Pressable
                 key={date}
@@ -132,14 +136,16 @@ export default function CalendarScreen() {
                 onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
                 style={({ pressed }) => [
                   styles.cell,
-                  isToday && { borderColor: theme.accent, borderWidth: 1.5, borderRadius: 10 },
+                  isToday && { borderColor: theme.ink, borderWidth: 2, borderRadius: 10 },
                   { opacity: pressed ? 0.7 : 1 },
                 ]}
               >
-                <Text style={[styles.cellText, { color: isToday ? theme.accent : theme.foreground }]}>
+                <Text style={[styles.cellText, { color: isToday ? theme.ink : theme.ink }]}>
                   {date.split('-')[2]}
                 </Text>
-                <View style={[styles.cellDot, { backgroundColor: dotColor }]} />
+                {day?.status && day.status !== 'OFF' ? (
+                  <View style={[styles.cellDot, { backgroundColor: dotBg }]} />
+                ) : <View style={styles.cellDot} />}
               </Pressable>
             );
           })}
@@ -147,14 +153,13 @@ export default function CalendarScreen() {
       </Card>
 
       <View style={styles.legend}>
-        <LegendItem color={theme.success} label="Çalışma" />
-        <LegendItem color={theme.warning} label="Tatil" />
-        <LegendItem color={theme.danger} label="İzin" />
-        <LegendItem color={theme.border} label="OFF" />
+        <LegendItem color={shiftPalette.day[mode].background} label="Çalışma" />
+        <LegendItem color={shiftPalette.holiday[mode].background} label="Tatil" />
+        <LegendItem color={shiftPalette.leave[mode].background} label="İzin" />
       </View>
 
+      <SectionHeader title="Ay Özeti" />
       <Card>
-        <CardHeader icon="pie-chart-outline" title="Ay Özeti" />
         <View style={styles.statRow}>
           <StatTile value={String(worked)} label="Çalışılan" tone="success" style={{ flex: 1 }} />
           <StatTile value={overtime > 0 ? `${Math.floor(overtime / 60)}sa` : '0'} label="Fazla mesai" tone="warning" style={{ flex: 1 }} />
@@ -169,23 +174,21 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   return (
     <View style={styles.legendItem}>
       <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text style={[styles.legendText, { color }]}>{label}</Text>
+      <Text style={[styles.legendText]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  nav: { flexDirection: 'row', justifyContent: 'space-between' },
-  navButton: { padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   weekHeaders: { flexDirection: 'row' },
-  weekHeader: { flex: 1, textAlign: 'center', fontSize: layout.type.caption, fontWeight: '600' },
+  weekHeader: { flex: 1, textAlign: 'center', fontSize: layout.type.caption, fontFamily: fonts.semiBold },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  cellText: { fontSize: layout.type.body, fontWeight: '600' },
-  cellDot: { width: 5, height: 5, borderRadius: 3 },
+  cellText: { fontFamily: fonts.semiBold, fontSize: layout.type.body },
+  cellDot: { width: 20, height: 5, borderRadius: 3 },
   legend: { flexDirection: 'row', justifyContent: 'center', gap: 16 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: layout.type.caption, fontWeight: '600' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 12, height: 12, borderRadius: 6 },
+  legendText: { fontFamily: fonts.semiBold, fontSize: layout.type.caption },
   statRow: { flexDirection: 'row', gap: layout.space.md },
 });

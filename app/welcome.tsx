@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { APP_NAME } from '@/src/config/app';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 
@@ -27,10 +27,10 @@ export default function WelcomeScreen() {
   return (
     <Screen scroll={false}>
       <View style={styles.hero}>
-        <View style={[styles.logoCircle, { backgroundColor: theme.accentSurface }]}>
-          <Ionicons name="briefcase" size={48} color={theme.accent} />
+        <View style={[styles.logoCircle, { backgroundColor: theme.surfaceMuted }]}>
+          <Ionicons name="briefcase" size={48} color={theme.ink} />
         </View>
-        <Text style={[styles.title, { color: theme.foreground }]}>{APP_NAME}</Text>
+        <Text style={[styles.title, { color: theme.ink }]}>{APP_NAME}</Text>
         <Text style={[styles.subtitle, { color: theme.muted }]}>
           Vardiyalarını takip et, kazancını hesapla.
         </Text>
@@ -38,10 +38,10 @@ export default function WelcomeScreen() {
         <View style={styles.steps}>
           {STEPS.map((step, i) => (
             <View key={i} style={styles.stepRow} accessibilityLabel={`${i + 1}. ${step.text}`}>
-              <View style={[styles.stepIcon, { backgroundColor: theme.accentSurface }]}>
-                <Ionicons accessible={false} name={step.icon} size={20} color={theme.accent} />
+              <View style={[styles.stepIcon, { backgroundColor: theme.surfaceMuted }]}>
+                <Ionicons accessible={false} name={step.icon} size={20} color={theme.ink} />
               </View>
-              <Text style={[styles.stepText, { color: theme.foreground }]}>{step.text}</Text>
+              <Text style={[styles.stepText, { color: theme.ink }]}>{step.text}</Text>
             </View>
           ))}
         </View>
@@ -78,8 +78,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
+    fontFamily: fonts.extraBold,
     fontSize: 34,
-    fontWeight: '900',
     textAlign: 'center',
   },
   subtitle: {
@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepText: {
+    fontFamily: fonts.semiBold,
     fontSize: layout.type.body,
-    fontWeight: '600',
     flex: 1,
   },
   bottom: {
@@ -123,8 +123,8 @@ const styles = StyleSheet.create({
     maxWidth: 100,
   },
   trustText: {
+    fontFamily: fonts.semiBold,
     fontSize: 11,
-    fontWeight: '600',
     textAlign: 'center',
   },
 });

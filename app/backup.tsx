@@ -20,6 +20,7 @@ import { useAppDatabase, useDatabaseMaintenance, useNotifyDataReset } from '@/sr
 import { applyPreparedRestore, createBackupFile, prepareRestoreFile, type RestorePreview } from '@/src/data/backupService';
 import { MAX_BACKUP_BYTES, validateBackupPassword } from '@/src/features/backup/backupContainer';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { fonts } from '@/src/theme/tokens';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { ActionButton } from '@/src/components/ui/ActionButton';
@@ -183,7 +184,7 @@ export default function BackupScreen() {
   return (
     <ScrollView contentContainerStyle={[styles.screen, { backgroundColor: theme.background }]} keyboardShouldPersistTaps="handled">
       <Pressable accessibilityRole="button" accessibilityLabel="Ayarlar ekranına dön" onPress={() => router.back()} style={styles.back}>
-        <Text style={{ color: theme.accent, fontWeight: '700' }}>‹ Ayarlar</Text>
+        <Text style={{ color: theme.ink, fontFamily: fonts.bold }}>‹ Ayarlar</Text>
       </Pressable>
       <PageHeading eyebrow="VERİ GÜVENLİĞİ" title="Yedekleme ve veriler" subtitle="Dosyan cihazında oluşturulur; dışa aktarırken güvenli konum seç." />
       <Text style={[styles.body, { color: theme.muted }]}>Yedek cihazında oluşturulur. Vardiya, çalışma, ücret, bordro ve ödeme kayıtların içeride şifrelenir. Parolanı bu dosyadan ayrı ve güvenli yerde sakla; unutursan yedek açılamaz.</Text>
@@ -191,19 +192,19 @@ export default function BackupScreen() {
       <Card>
         <CardHeader icon="lock-closed-outline" title="Şifreli yedek oluştur" />
         <Text style={[styles.body, { color: theme.muted }]}>En az 12 karakterlik bir parola belirle. Sonraki sistem menüsünde Dosyalar veya başka bir konuma kaydedebilirsin.</Text>
-        <TextInput accessibilityLabel="Yeni yedek parolası" value={exportPassword} onChangeText={setExportPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
-        <TextInput accessibilityLabel="Yedek parolası onayı" value={exportConfirm} onChangeText={setExportConfirm} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Parolayı tekrar yaz" placeholderTextColor={theme.muted} />
+        <TextInput accessibilityLabel="Yeni yedek parolası" value={exportPassword} onChangeText={setExportPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.ink }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
+        <TextInput accessibilityLabel="Yedek parolası onayı" value={exportConfirm} onChangeText={setExportConfirm} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.ink }]} placeholder="Parolayı tekrar yaz" placeholderTextColor={theme.muted} />
         <ActionButton label="Şifreli yedek oluştur" disabled={busy || maintenanceBusy} onPress={() => void makeBackup()} variant="secondary" icon="lock-closed-outline" />
       </Card>
 
       <Card>
         <CardHeader icon="cloud-download-outline" title="Yedekten geri yükle" />
         <Text style={[styles.body, { color: theme.muted }]}>Yedek dosyanı seçip parolasını gir. Dosya doğrulanmadan mevcut veriler değişmez.</Text>
-        <TextInput accessibilityLabel="Yedek dosyasının parolası" value={restorePassword} onChangeText={setRestorePassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.foreground }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
+        <TextInput accessibilityLabel="Yedek dosyasının parolası" value={restorePassword} onChangeText={setRestorePassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { borderColor: theme.border, color: theme.ink }]} placeholder="Yedek parolası" placeholderTextColor={theme.muted} />
         <ActionButton label="Yedek dosyası seç ve doğrula" disabled={busy || maintenanceBusy} onPress={() => void chooseBackup()} variant="secondary" icon="folder-open-outline" />
         {preview ? (
           <View style={[styles.preview, { borderColor: theme.border }]}>
-            <Text style={[styles.previewTitle, { color: theme.foreground }]}>Yedek doğrulandı</Text>
+            <Text style={[styles.previewTitle, { color: theme.ink }]}>Yedek doğrulandı</Text>
             <Text style={[styles.body, { color: theme.muted }]}>Şema v{preview.databaseSchemaVersion} → v{CURRENT_SCHEMA_VERSION} · SQLite {preview.sqliteVersion}</Text>
             <Text style={[styles.body, { color: theme.muted }]}>{new Date(preview.createdAtUtc).toLocaleString('tr-TR')} · {preview.recordCount} kayıt</Text>
             <Text style={[styles.hint, { color: theme.muted }]}>Geri yüklemek mevcut tüm uygulama verilerinin yerine geçer. Devam etmeden önce ikinci onay alınır.</Text>
@@ -218,9 +219,9 @@ export default function BackupScreen() {
         <ActionButton label="Tüm verilerimi sil…" disabled={busy || maintenanceBusy} onPress={startWipe} variant="destructive" icon="trash-outline" />
       </Card>
 
-      {busy || maintenanceBusy ? <View accessibilityLiveRegion="polite" style={styles.status}><ActivityIndicator color={theme.accent} /><Text style={{ color: theme.muted }}>Veri işlemi sürüyor; uygulamayı kapatma…</Text></View> : null}
+      {busy || maintenanceBusy ? <View accessibilityLiveRegion="polite" style={styles.status}><ActivityIndicator color={theme.ink} /><Text style={{ color: theme.muted }}>Veri işlemi sürüyor; uygulamayı kapatma…</Text></View> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.feedback, { color: theme.danger }]}>{error}</Text> : null}
-      {success ? <Text accessibilityLiveRegion="polite" style={[styles.feedback, { color: theme.accent }]}>{success}</Text> : null}
+      {success ? <Text accessibilityLiveRegion="polite" style={[styles.feedback, { color: theme.ink }]}>{success}</Text> : null}
     </ScrollView>
   );
 }
@@ -231,8 +232,8 @@ const styles = StyleSheet.create({
   body: { fontSize: 14, lineHeight: 21 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 16 },
   preview: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
-  previewTitle: { fontSize: 16, fontWeight: '800' },
+  previewTitle: { fontSize: 16, fontFamily: fonts.extraBold },
   hint: { fontSize: 13, lineHeight: 19 },
-  feedback: { fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  feedback: { fontSize: 14, lineHeight: 21, fontFamily: fonts.bold },
   status: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
 });
