@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -14,6 +14,7 @@ import { layout } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { StatTile } from '@/src/components/ui/StatTile';
+import { ActionButton } from '@/src/components/ui/ActionButton';
 
 const DAY_LABELS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
@@ -82,20 +83,26 @@ export default function HomeScreen() {
   const [periodStatement, setPeriodStatement] = useState<MonthlyStatement | null>(null);
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
   const [selectedDate, setSelectedDate] = useState(today);
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setLoading(true);
       void (async () => {
-        const s = await getSettings(database);
-        const entries = await getDayEntriesInRange(database, week[0]!, week[6]!);
-        const derived = deriveDays(week, entries, s);
-        const { statement, period } = await loadCurrentPeriodStatement(database, today);
-        if (active) {
-          setSettings(s);
-          setDays(derived);
-          setPeriodStatement(statement);
-          setPeriodInfo(period);
+        try {
+          const s = await getSettings(database);
+          const entries = await getDayEntriesInRange(database, week[0]!, week[6]!);
+          const derived = deriveDays(week, entries, s);
+          const { statement, period } = await loadCurrentPeriodStatement(database, today);
+          if (active) {
+            setSettings(s);
+            setDays(derived);
+            setPeriodStatement(statement);
+            setPeriodInfo(period);
+          }
+        } finally {
+          if (active) setLoading(false);
         }
       })();
       return () => { active = false; };
@@ -104,6 +111,16 @@ export default function HomeScreen() {
 
   const selectedDay = days.find((d) => d.localDate === selectedDate);
   const statusInfo = STATUS_ICONS[selectedDay?.status ?? 'OFF'] ?? STATUS_ICONS.OFF!;
+
+  if (loading) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -191,15 +208,12 @@ export default function HomeScreen() {
           {selectedDay.note && (
             <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>{selectedDay.note}</Text>
           )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Düzenle"
+          <ActionButton
+            label="Düzenle"
+            variant="secondary"
+            icon="create-outline"
             onPress={() => router.push({ pathname: '/day-edit' as never, params: { date: selectedDate } })}
-            style={({ pressed }) => [styles.inlineAction, { borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}
-          >
-            <Ionicons accessible={false} name="create-outline" size={16} color={theme.accent} />
-            <Text style={{ color: theme.accent, fontWeight: '600', fontSize: layout.type.body }}>Düzenle</Text>
-          </Pressable>
+          />
         </Card>
       )}
 
@@ -216,24 +230,18 @@ export default function HomeScreen() {
       {/* Quick actions */}
       <Card>
         <CardHeader icon="add-circle-outline" title="Hızlı Erişim" />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Ek gelir ekle"
+        <ActionButton
+          label="Ek gelir ekle"
+          variant="secondary"
+          icon="cash-outline"
           onPress={() => router.push('/additional-income' as never)}
-          style={({ pressed }) => [styles.inlineAction, { borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Ionicons accessible={false} name="cash-outline" size={16} color={theme.accent} />
-          <Text style={{ color: theme.accent, fontWeight: '600', fontSize: layout.type.body }}>Ek gelir ekle</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Vardiya değişikliği"
+        />
+        <ActionButton
+          label="Vardiya değişikliği"
+          variant="secondary"
+          icon="swap-horizontal-outline"
           onPress={() => router.push('/shift-change' as never)}
-          style={({ pressed }) => [styles.inlineAction, { borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Ionicons accessible={false} name="swap-horizontal-outline" size={16} color={theme.accent} />
-          <Text style={{ color: theme.accent, fontWeight: '600', fontSize: layout.type.body }}>Vardiya değişikliği</Text>
-        </Pressable>
+        />
       </Card>
     </Screen>
   );
@@ -258,5 +266,4 @@ const styles = StyleSheet.create({
   dayStatus: { fontSize: layout.type.body, fontWeight: '700' },
   infoBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   statRow: { flexDirection: 'row', gap: layout.space.md },
-  inlineAction: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: layout.radius.control, paddingVertical: 10, paddingHorizontal: 14, minHeight: layout.control.touchTarget },
 });

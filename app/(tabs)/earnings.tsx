@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -70,7 +70,9 @@ export default function EarningsScreen() {
   if (!statement || !period) {
     return (
       <Screen>
-        <Text style={{ color: theme.muted, textAlign: 'center', marginTop: 100 }}>Yükleniyor…</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
       </Screen>
     );
   }

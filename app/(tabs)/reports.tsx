@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -26,25 +26,31 @@ export default function ReportsScreen() {
   const year = useMemo(() => new Date().getFullYear(), []);
   const [statements, setStatements] = useState<MonthlyStatement[]>([]);
   const [periods, setPeriods] = useState<PeriodInfo[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setLoading(true);
       void (async () => {
-        const settings = await getSettings(database);
-        const currentMonth = new Date().getMonth() + 1;
-        const stmts: MonthlyStatement[] = [];
-        const pds: PeriodInfo[] = [];
-        let cumulativeTaxable = 0;
-        for (let m = 1; m <= currentMonth; m++) {
-          const { start, end } = getPayPeriod(year, m, settings.payday);
-          const period: PeriodInfo = { start, end, label: `${MONTH_NAMES[m - 1]!} ${year}` };
-          const stmt = await loadPeriodStatement(database, period, cumulativeTaxable);
-          stmts.push(stmt);
-          pds.push(period);
-          cumulativeTaxable += stmt.grossMinor - stmt.sgkWorkerMinor - stmt.unemploymentWorkerMinor;
+        try {
+          const settings = await getSettings(database);
+          const currentMonth = new Date().getMonth() + 1;
+          const stmts: MonthlyStatement[] = [];
+          const pds: PeriodInfo[] = [];
+          let cumulativeTaxable = 0;
+          for (let m = 1; m <= currentMonth; m++) {
+            const { start, end } = getPayPeriod(year, m, settings.payday);
+            const period: PeriodInfo = { start, end, label: `${MONTH_NAMES[m - 1]!} ${year}` };
+            const stmt = await loadPeriodStatement(database, period, cumulativeTaxable);
+            stmts.push(stmt);
+            pds.push(period);
+            cumulativeTaxable += stmt.grossMinor - stmt.sgkWorkerMinor - stmt.unemploymentWorkerMinor;
+          }
+          if (active) { setStatements(stmts); setPeriods(pds); }
+        } finally {
+          if (active) setLoading(false);
         }
-        if (active) { setStatements(stmts); setPeriods(pds); }
       })();
       return () => { active = false; };
     }, [database, year]),
@@ -55,6 +61,16 @@ export default function ReportsScreen() {
   const totalOvertime = statements.reduce((s, st) => s + st.overtimeMinor, 0);
   const totalWorkedDays = statements.reduce((s, st) => s + st.workedDays, 0);
   const maxNet = Math.max(...statements.map((s) => s.netMinor), 1);
+
+  if (loading) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

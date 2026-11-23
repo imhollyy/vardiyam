@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
@@ -40,26 +40,33 @@ const MONTH_NAMES = [
 export default function CalendarScreen() {
   const { theme } = useAppTheme();
   const database = useAppDatabase();
+  const router = useRouter();
   const today = useMemo(() => todayLocal(), []);
   const [year, setYear] = useState(() => Number(today.split('-')[0]));
   const [month, setMonth] = useState(() => Number(today.split('-')[1]));
   const [dayMap, setDayMap] = useState<Map<string, DerivedDay>>(new Map());
+  const [loading, setLoading] = useState(true);
 
   const cells = useMemo(() => monthDays(year, month), [year, month]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setLoading(true);
       void (async () => {
-        const s = await getSettings(database);
-        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-        const daysInMonth = new Date(year, month, 0).getDate();
-        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
-        const entries = await getDayEntriesInRange(database, startDate, endDate);
-        const dates = enumerateDays(startDate, endDate);
-        const derived = deriveDays(dates, entries, s);
-        const map = new Map(derived.map((d) => [d.localDate, d]));
-        if (active) setDayMap(map);
+        try {
+          const s = await getSettings(database);
+          const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+          const daysInMonth = new Date(year, month, 0).getDate();
+          const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+          const entries = await getDayEntriesInRange(database, startDate, endDate);
+          const dates = enumerateDays(startDate, endDate);
+          const derived = deriveDays(dates, entries, s);
+          const map = new Map(derived.map((d) => [d.localDate, d]));
+          if (active) setDayMap(map);
+        } finally {
+          if (active) setLoading(false);
+        }
       })();
       return () => { active = false; };
     }, [database, year, month]),
@@ -77,6 +84,16 @@ export default function CalendarScreen() {
   const worked = Array.from(dayMap.values()).filter((d) => d.status === 'WORKED').length;
   const overtime = Array.from(dayMap.values()).reduce((s, d) => s + d.overtimeMinutes, 0);
   const leave = Array.from(dayMap.values()).filter((d) => d.status === 'LEAVE').length;
+
+  if (loading) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -108,16 +125,22 @@ export default function CalendarScreen() {
               day?.status === 'LEAVE' ? theme.danger :
               theme.border;
             return (
-              <View
+              <Pressable
                 key={date}
+                accessibilityRole="button"
                 accessibilityLabel={`${date.split('-')[2]}, ${day?.status ?? 'OFF'}`}
-                style={[styles.cell, isToday && { borderColor: theme.accent, borderWidth: 1.5, borderRadius: 10 }]}
+                onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
+                style={({ pressed }) => [
+                  styles.cell,
+                  isToday && { borderColor: theme.accent, borderWidth: 1.5, borderRadius: 10 },
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
               >
                 <Text style={[styles.cellText, { color: isToday ? theme.accent : theme.foreground }]}>
                   {date.split('-')[2]}
                 </Text>
                 <View style={[styles.cellDot, { backgroundColor: dotColor }]} />
-              </View>
+              </Pressable>
             );
           })}
         </View>
