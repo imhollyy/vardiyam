@@ -11,6 +11,7 @@ type DayBlockProps = {
   status: DayBlockStatus;
   isToday?: boolean;
   hasOvertime?: boolean;
+  overtimeLabel?: string; // '+2sa'
   onPress?: () => void;
 };
 
@@ -31,7 +32,7 @@ function useDayColors(status: DayBlockStatus, mode: 'light' | 'dark') {
   return { bg: theme.surfaceSunken, text: theme.muted };
 }
 
-export function DayBlock({ dayLabel, dateNumber, code, status, isToday = false, hasOvertime = false, onPress }: DayBlockProps) {
+export function DayBlock({ dayLabel, dateNumber, code, status, isToday = false, hasOvertime = false, overtimeLabel, onPress }: DayBlockProps) {
   const { theme, mode } = useAppTheme();
   const { bg, text } = useDayColors(status, mode);
   const isPlanned = status === 'planned';
@@ -60,8 +61,10 @@ export function DayBlock({ dayLabel, dateNumber, code, status, isToday = false, 
       <View style={{ minWidth: 22, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.12)', alignItems: 'center' }}>
         <Text style={{ fontFamily: fonts.extraBold, fontSize: 9, color: text, letterSpacing: 0.3 }}>{code}</Text>
       </View>
-      {hasOvertime ? (
-        <View style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#FFD166' }} />
+      {hasOvertime && overtimeLabel ? (
+        <Text style={{ fontFamily: fonts.semiBold, fontSize: 9, color: text, opacity: 0.85 }}>{overtimeLabel}</Text>
+      ) : hasOvertime ? (
+        <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#FFD166' }} />
       ) : null}
     </Pressable>
   );

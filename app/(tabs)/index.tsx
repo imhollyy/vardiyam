@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -176,24 +176,21 @@ export default function HomeScreen() {
           const dow = new Date(date.replace(/-/g, '/')).getDay();
           const day = days.find((d) => d.localDate === date);
           const dateNum = date.split('-')[2] ?? '';
+          const otMin = day?.overtimeMinutes ?? 0;
+          const otLabel = otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined;
           return (
-            <Pressable
-              key={date}
-              accessibilityRole="button"
-              accessibilityLabel={`${DAY_LABELS[dow]} ${dateNum}`}
-              accessibilityState={{ selected: date === selectedDate }}
-              onPress={() => setSelectedDate(date)}
-              style={{ flex: 1 }}
-            >
+            <View key={date} style={{ flex: 1 }}>
               <DayBlock
                 dayLabel={DAY_LABELS[dow] ?? ''}
                 dateNumber={dateNum}
                 code={toDayCode(day)}
                 status={toDayBlockStatus(day)}
                 isToday={date === today}
-                hasOvertime={(day?.overtimeMinutes ?? 0) > 0}
+                hasOvertime={otMin > 0}
+                overtimeLabel={otLabel}
+                onPress={() => setSelectedDate(date)}
               />
-            </Pressable>
+            </View>
           );
         })}
       </View>
