@@ -8,6 +8,7 @@ import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { markSetupCompleted, updateSettings } from '@/src/data/settingsRepository';
 import { saveShiftSchedule } from '@/src/data/shiftCycleRepository';
 import type { SalaryType, WorkSchedule, ShiftPattern } from '@/src/domain/payroll/types';
+import { getPayPeriodForDate } from '@/src/domain/payroll/index';
 import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-cycle/index';
 import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
@@ -96,13 +97,20 @@ const INITIAL_DRAFT: Draft = {
   startDateText: '',
 };
 
+function mondayOfDate(localDate: string): string {
+  const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay();
+  date.setDate(d + (dow === 0 ? -6 : 1 - dow));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function mondayOfThisWeek(): string {
   const now = new Date();
-  const dow = now.getDay();
-  const diff = dow === 0 ? -6 : 1 - dow;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`;
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return mondayOfDate(today);
 }
 
 function isValidTime(t: string): boolean {
@@ -224,7 +232,15 @@ export default function SetupScreen() {
         entries,
       };
 
-      await saveShiftSchedule(database, templates, cycle, anchor);
+      // effectiveFrom = Monday of the week containing the current pay period's start,
+      // so the cycle covers the full period even for days before this week.
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const periodStart = getPayPeriodForDate(todayStr, draft.payday).start;
+      const effectiveFrom = mondayOfDate(periodStart);
+
+      await saveShiftSchedule(database, templates, cycle, effectiveFrom);
       await markSetupCompleted(database);
       router.replace('/(tabs)');
     } catch (e) {
