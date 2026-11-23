@@ -78,20 +78,6 @@ function toDayCode(day: DerivedDay | undefined): string {
   return '—';
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  WORKED: 'Çalışma günü',
-  OFF: 'Planlı boş gün',
-  LEAVE: 'İzin günü',
-  HOLIDAY: 'Resmî tatil',
-};
-
-const STATUS_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
-  WORKED: 'checkmark-circle',
-  HOLIDAY: 'flag',
-  LEAVE: 'bed',
-  OFF: 'moon',
-};
-
 export default function HomeScreen() {
   const { theme } = useAppTheme();
   const database = useAppDatabase();
@@ -102,7 +88,6 @@ export default function HomeScreen() {
   const [days, setDays] = useState<DerivedDay[]>([]);
   const [periodStatement, setPeriodStatement] = useState<MonthlyStatement | null>(null);
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
-  const [selectedDate, setSelectedDate] = useState(today);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -128,8 +113,6 @@ export default function HomeScreen() {
       return () => { active = false; };
     }, [database, week, today]),
   );
-
-  const selectedDay = days.find((d) => d.localDate === selectedDate);
 
   if (loading) {
     return (
@@ -188,49 +171,12 @@ export default function HomeScreen() {
                 isToday={date === today}
                 hasOvertime={otMin > 0}
                 overtimeLabel={otLabel}
-                onPress={() => setSelectedDate(date)}
+                onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
               />
             </View>
           );
         })}
       </View>
-
-      {/* Selected day detail */}
-      {selectedDay && (
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons accessible={false} name={STATUS_ICON[selectedDay.status] ?? 'moon'} size={22} color={theme.ink} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: fonts.bold, fontSize: layout.type.body, color: theme.ink }}>
-                {STATUS_LABEL[selectedDay.status] ?? selectedDay.status}
-              </Text>
-              {selectedDay.leaveType && selectedDay.leaveType !== 'HOLIDAY' && (
-                <Text style={{ fontFamily: fonts.medium, color: theme.muted, fontSize: layout.type.caption }}>
-                  {selectedDay.leaveType}{selectedDay.leaveHalfDay ? ' (yarım gün)' : ''}
-                </Text>
-              )}
-            </View>
-            {selectedDay.overtimeMinutes > 0 && (
-              <View style={{ backgroundColor: theme.warningSurface, paddingHorizontal: 8, paddingVertical: 4, borderRadius: layout.radius.pill }}>
-                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.warning }}>
-                  +{Math.floor(selectedDay.overtimeMinutes / 60)} sa
-                </Text>
-              </View>
-            )}
-          </View>
-          {selectedDay.note ? (
-            <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption }}>{selectedDay.note}</Text>
-          ) : null}
-          <ActionButton
-            label="Düzenle"
-            variant="secondary"
-            icon="create-outline"
-            onPress={() => router.push({ pathname: '/day-edit' as never, params: { date: selectedDate } })}
-          />
-        </Card>
-      )}
 
       {/* Quick actions */}
       <SectionHeader title="Hızlı Erişim" />
