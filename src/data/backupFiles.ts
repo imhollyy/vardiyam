@@ -118,8 +118,9 @@ export async function replaceLiveDatabase(
       await cleanupCommittedMarker({ stageName, rollbackName });
       await deleteMarker();
     },
-  }).catch(() => {
-    throw new Error('Geri yükleme tamamlanamadı; önceki veritabanı geri yüklendi veya güvenlik kopyası korunuyor.');
+  }).catch((err: unknown) => {
+    const detail = err instanceof Error ? ` [${err.message}]` : '';
+    throw new Error(`Geri yükleme tamamlanamadı${detail}; önceki veritabanı geri yüklendi veya güvenlik kopyası korunuyor.`);
   });
 }
 

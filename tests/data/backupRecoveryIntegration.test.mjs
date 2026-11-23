@@ -9,6 +9,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import { validateBackupDatabase } from '../../src/data/backupValidation.ts';
 import { initializeDatabase } from '../../src/data/database.ts';
+import { CURRENT_SCHEMA_VERSION } from '../../src/data/migrations.ts';
 import { recoverDatabaseState, parseRecoveryMarker } from '../../src/features/backup/recoveryEngine.ts';
 
 const LIVE = 'vardiyam.db';
@@ -35,13 +36,13 @@ async function openReference() {
   return { database: adapter(sqlite), close: async () => sqlite.close() };
 }
 
-async function createV8(path, value = null) {
+async function createCurrentDb(path, value = null) {
   const sqlite = new DatabaseSync(path);
   const db = adapter(sqlite);
   await db.execAsync('PRAGMA foreign_keys = ON;');
   await initializeDatabase(db);
   if (value !== null) await db.runAsync('INSERT INTO app_metadata (key,value) VALUES (?,?);', 'synthetic_recovery_fixture', value);
-  const validation = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 9 });
+  const validation = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: CURRENT_SCHEMA_VERSION });
   const image = sqlite.serialize();
   const digest = hex(sha256(image));
   image.fill(0);
@@ -111,7 +112,7 @@ async function verify(path, digest, expectedCount) {
   try {
     sqlite = new DatabaseSync(path);
     const db = adapter(sqlite);
-    const result = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: 9 });
+    const result = await validateBackupDatabase(db, { createReferenceDatabase: openReference, expectedSchemaVersion: CURRENT_SCHEMA_VERSION });
     const image = sqlite.serialize();
     const actualDigest = hex(sha256(image));
     image.fill(0);
@@ -124,8 +125,8 @@ async function writeMarker(path, marker) { await writeFile(path, JSON.stringify(
 
 test('committed recovery verifies the candidate before deleting the old rollback copy', async (t) => {
   const h = await createHarness(t);
-  const old = await createV8(h.path(ROLLBACK), 'old-data');
-  const candidate = await createV8(h.path(STAGE), 'new-data');
+  const old = await createCurrentDb(h.path(ROLLBACK), 'old-data');
+  const candidate = await createCurrentDb(h.path(STAGE), 'new-data');
   await copyFile(h.path(STAGE), h.path(LIVE));
   const marker = fixtureMarker(candidate, old);
   await writeMarker(h.path(MARKER), marker);
@@ -139,11 +140,11 @@ test('committed recovery verifies the candidate before deleting the old rollback
   live.close();
 });
 
-test('committed all-data wipe validates empty v9 candidate while retaining rollback until validation', async (t) => {
+test(`committed all-data wipe validates empty v${CURRENT_SCHEMA_VERSION} candidate while retaining rollback until validation`, async (t) => {
   const h = await createHarness(t);
-  const old = await createV8(h.path(ROLLBACK), 'old-data');
-  const empty = await createV8(h.path(STAGE));
-  assert.equal(empty.count, 0);
+  const old = await createCurrentDb(h.path(ROLLBACK), 'old-data');
+  const empty = await createCurrentDb(h.path(STAGE));
+  assert.equal(empty.count, 1); // settings table always has 1 default row in v100 schema
   await copyFile(h.path(STAGE), h.path(LIVE));
   const marker = fixtureMarker(empty, old);
   await writeMarker(h.path(MARKER), marker);
@@ -151,7 +152,7 @@ test('committed all-data wipe validates empty v9 candidate while retaining rollb
 
   assert.equal(await run.recover(), 'finish-commit');
   const live = new DatabaseSync(h.path(LIVE));
-  assert.equal(live.prepare('PRAGMA user_version;').get().user_version, 9);
+  assert.equal(live.prepare('PRAGMA user_version;').get().user_version, CURRENT_SCHEMA_VERSION);
   assert.equal(live.prepare('SELECT COUNT(*) AS count FROM app_metadata;').get().count, 0);
   live.close();
   assert.equal(await exists(h.path(ROLLBACK)), false);
@@ -159,8 +160,8 @@ test('committed all-data wipe validates empty v9 candidate while retaining rollb
 
 test('corrupt committed live database is replaced from verified rollback and survives a second startup', async (t) => {
   const h = await createHarness(t);
-  const old = await createV8(h.path(ROLLBACK), 'old-data');
-  const candidate = await createV8(h.path(STAGE), 'new-data');
+  const old = await createCurrentDb(h.path(ROLLBACK), 'old-data');
+  const candidate = await createCurrentDb(h.path(STAGE), 'new-data');
   await writeFile(h.path(LIVE), Buffer.from('corrupt live sqlite bytes'));
   const marker = fixtureMarker(candidate, old);
   await writeMarker(h.path(MARKER), marker);
@@ -182,7 +183,7 @@ test('missing or corrupt rollback fails closed without changing a corrupt live d
     await t.test(rollbackKind, async (t2) => {
       const h = await createHarness(t2);
       const old = { digest: '0'.repeat(64), count: 1 };
-      const candidate = await createV8(h.path(STAGE), 'new-data');
+      const candidate = await createCurrentDb(h.path(STAGE), 'new-data');
       const liveBytes = Buffer.from('damaged-live');
       await writeFile(h.path(LIVE), liveBytes);
       if (rollbackKind === 'corrupt') await writeFile(h.path(ROLLBACK), Buffer.from('damaged-rollback'));
@@ -199,8 +200,8 @@ test('missing or corrupt rollback fails closed without changing a corrupt live d
 
 test('recovery retries after cleanup failure and after a stop during rollback copy', async (t) => {
   const h = await createHarness(t);
-  const old = await createV8(join(h.directory, 'cleanup-old.db'), 'old-data');
-  const candidate = await createV8(h.path(STAGE), 'new-data');
+  const old = await createCurrentDb(join(h.directory, 'cleanup-old.db'), 'old-data');
+  const candidate = await createCurrentDb(h.path(STAGE), 'new-data');
   await copyFile(join(h.directory, 'cleanup-old.db'), h.path(ROLLBACK));
   await copyFile(h.path(STAGE), h.path(LIVE));
   const marker = fixtureMarker(candidate, old);
@@ -212,8 +213,8 @@ test('recovery retries after cleanup failure and after a stop during rollback co
   assert.equal(await exists(h.path(ROLLBACK)), false);
 
   // A second fixture simulates process termination after restoring bytes but before clearing the marker.
-  const secondOld = await createV8(join(h.directory, 'old.db'), 'old-again');
-  const secondCandidate = await createV8(join(h.directory, 'candidate.db'), 'candidate-again');
+  const secondOld = await createCurrentDb(join(h.directory, 'old.db'), 'old-again');
+  const secondCandidate = await createCurrentDb(join(h.directory, 'candidate.db'), 'candidate-again');
   await copyFile(join(h.directory, 'old.db'), h.path(ROLLBACK));
   await writeFile(h.path(LIVE), Buffer.from('corrupt live'));
   const secondMarker = fixtureMarker(secondCandidate, secondOld);

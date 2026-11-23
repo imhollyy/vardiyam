@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
@@ -10,6 +11,10 @@ import { generateMonthlyStatement, type MonthlyStatement } from '@/src/domain/pa
 import { formatTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
+import { Screen } from '@/src/components/ui/Screen';
+import { Card, CardHeader } from '@/src/components/ui/Card';
+import { StatTile } from '@/src/components/ui/StatTile';
+import { PageHeading } from '@/src/components/ui/PageHeading';
 
 const MONTH_NAMES = [
   'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
@@ -45,41 +50,62 @@ export default function ReportsScreen() {
 
   const totalNet = statements.reduce((s, st) => s + st.netMinor, 0);
   const totalGross = statements.reduce((s, st) => s + st.grossMinor, 0);
+  const totalOvertime = statements.reduce((s, st) => s + st.overtimeMinor, 0);
+  const totalWorkedDays = statements.reduce((s, st) => s + st.workedDays, 0);
+  const maxNet = Math.max(...statements.map((s) => s.netMinor), 1);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.header, { color: theme.foreground }]}>{year} Raporu</Text>
+    <Screen>
+      <PageHeading eyebrow="RAPORLAR" title={`${year} Yılı`} subtitle="Yıllık gelir ve çalışma özeti" />
 
-      <ScrollView contentContainerStyle={styles.list}>
-        <View style={[styles.summaryCard, { backgroundColor: theme.accentSurface, borderColor: theme.accent }]}>
-          <View>
-            <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>Toplam brüt</Text>
-            <Text style={{ color: theme.foreground, fontSize: layout.type.section, fontWeight: '700' }}>{formatTryMinor(totalGross)}</Text>
-          </View>
-          <View>
-            <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>Toplam net</Text>
-            <Text style={{ color: theme.accent, fontSize: layout.type.section, fontWeight: '800' }}>{formatTryMinor(totalNet)}</Text>
-          </View>
+      <Card style={{ backgroundColor: theme.accentSurface, borderColor: theme.accent }}>
+        <View style={styles.summaryRow}>
+          <StatTile value={formatTryMinor(totalGross)} label="Toplam brüt" tone="muted" style={{ flex: 1 }} />
+          <StatTile value={formatTryMinor(totalNet)} label="Toplam net" tone="accent" style={{ flex: 1 }} />
         </View>
+        <View style={styles.summaryRow}>
+          <StatTile value={String(totalWorkedDays)} label="Çalışılan gün" tone="success" style={{ flex: 1 }} />
+          <StatTile value={formatTryMinor(totalOvertime)} label="Fazla mesai" tone="warning" style={{ flex: 1 }} />
+        </View>
+      </Card>
 
-        {statements.map((stmt, i) => (
-          <View key={i} style={[styles.monthRow, { borderBottomColor: theme.border }]}>
-            <Text style={{ color: theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>{MONTH_NAMES[i]}</Text>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ color: theme.foreground, fontSize: layout.type.body, fontWeight: '700' }}>{formatTryMinor(stmt.netMinor)}</Text>
-              <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>{stmt.workedDays} gün</Text>
+      <Card>
+        <CardHeader icon="bar-chart-outline" title="Aylık Dağılım" />
+        {statements.map((stmt, i) => {
+          const barWidth = Math.max(8, (stmt.netMinor / maxNet) * 100);
+          return (
+            <View key={i} style={styles.monthRow} accessibilityLabel={`${MONTH_NAMES[i]}: ${formatTryMinor(stmt.netMinor)}`}>
+              <Text style={[styles.monthLabel, { color: theme.foreground }]}>{MONTH_NAMES[i]?.slice(0, 3)}</Text>
+              <View style={styles.barContainer}>
+                <View style={[styles.bar, { width: `${barWidth}%`, backgroundColor: theme.accent }]} />
+              </View>
+              <View style={styles.monthValues}>
+                <Text style={[styles.monthNet, { color: theme.foreground }]}>{formatTryMinor(stmt.netMinor)}</Text>
+                <Text style={{ color: theme.muted, fontSize: 11 }}>{stmt.workedDays} gün</Text>
+              </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
+          );
+        })}
+      </Card>
+
+      <View style={styles.disclaimer}>
+        <Ionicons accessible={false} name="information-circle-outline" size={14} color={theme.muted} />
+        <Text style={[styles.disclaimerText, { color: theme.muted }]}>
+          Tahmini hesaplamadır. Gerçek bordro değerlerinden farklılık gösterebilir.
+        </Text>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60 },
-  header: { fontSize: layout.type.title, fontWeight: '800', paddingHorizontal: layout.screen.horizontal, marginBottom: 16 },
-  list: { paddingHorizontal: layout.screen.horizontal, paddingBottom: layout.screen.bottom, gap: 4 },
-  summaryCard: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderRadius: layout.radius.card, borderWidth: 1.5, marginBottom: 12 },
-  monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  summaryRow: { flexDirection: 'row', gap: layout.space.md },
+  monthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
+  monthLabel: { width: 32, fontSize: layout.type.caption, fontWeight: '700' },
+  barContainer: { flex: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(128,128,128,0.1)' },
+  bar: { height: 8, borderRadius: 4 },
+  monthValues: { alignItems: 'flex-end', minWidth: 80 },
+  monthNet: { fontSize: layout.type.caption, fontWeight: '700' },
+  disclaimer: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 4 },
+  disclaimerText: { fontSize: layout.type.caption, flex: 1, lineHeight: 18 },
 });

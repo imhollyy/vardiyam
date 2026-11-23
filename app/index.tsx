@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
-import { getOnboardingState } from '@/src/data/appPreferencesRepository';
+import { getSettings } from '@/src/data/settingsRepository';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 
 export default function EntryScreen() {
@@ -13,8 +13,8 @@ export default function EntryScreen() {
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    void getOnboardingState(database).then((state) => {
-      if (active) setDestination(state.completed ? '/(tabs)' : '/welcome');
+    void getSettings(database).then((settings) => {
+      if (active) setDestination(settings.setupCompleted ? '/(tabs)' : '/welcome');
     }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [database, attempt]);

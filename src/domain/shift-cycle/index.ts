@@ -6,6 +6,7 @@ export type ShiftTemplate = {
   name: string;
   startLocalTime: string;
   endLocalTime: string;
+  standardMinutes?: number;
   colorToken?: string;
   iconKey?: string;
 };

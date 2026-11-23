@@ -1,15 +1,25 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
 import { getAllExtraIncomes } from '@/src/data/extraIncomeRepository';
+import { listShiftTemplates } from '@/src/data/shiftCycleRepository';
 import { generateMonthlyStatement, type MonthlyStatement } from '@/src/domain/payroll/index';
 import { formatTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { layout } from '@/src/theme/tokens';
+import { Screen } from '@/src/components/ui/Screen';
+import { Card, CardHeader } from '@/src/components/ui/Card';
+import { PageHeading } from '@/src/components/ui/PageHeading';
+
+const MONTH_NAMES = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+];
 
 function currentYearMonth(): [number, number] {
   const now = new Date();
@@ -21,6 +31,7 @@ export default function EarningsScreen() {
   const database = useAppDatabase();
   const [year, month] = useMemo(currentYearMonth, []);
   const [statement, setStatement] = useState<MonthlyStatement | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,7 +40,8 @@ export default function EarningsScreen() {
         const settings = await getSettings(database);
         const entries = await getDayEntriesInRange(database, `${year}-01-01`, `${year}-12-31`);
         const extras = await getAllExtraIncomes(database);
-        const stmt = generateMonthlyStatement(settings, entries, extras, year, month);
+        const templates = await listShiftTemplates(database);
+        const stmt = generateMonthlyStatement(settings, entries, extras, year, month, 0, templates);
         if (active) setStatement(stmt);
       })();
       return () => { active = false; };
@@ -38,20 +50,22 @@ export default function EarningsScreen() {
 
   if (!statement) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <Screen>
         <Text style={{ color: theme.muted, textAlign: 'center', marginTop: 100 }}>Yükleniyor…</Text>
-      </View>
+      </Screen>
     );
   }
 
-  const rows: { label: string; value: string; color?: string }[] = [
-    { label: 'Taban maaş', value: formatTryMinor(statement.baseSalaryMinor) },
-    { label: 'Çalışılan gün', value: `${statement.workedDays} / ${statement.totalDays}` },
-    { label: 'Fazla mesai', value: formatTryMinor(statement.overtimeMinor), color: theme.warning },
-    { label: 'Tatil primi', value: formatTryMinor(statement.holidayBonusMinor) },
-    { label: 'Hafta sonu primi', value: formatTryMinor(statement.weekendBonusMinor) },
-    { label: 'Ek gelirler', value: formatTryMinor(statement.extraIncomeMinor), color: theme.success },
-    { label: 'Kesintiler', value: `−${formatTryMinor(statement.deductionMinor)}`, color: theme.danger },
+  const mainRows: { label: string; value: string; icon: React.ComponentProps<typeof Ionicons>['name']; color?: string }[] = [
+    { label: 'Taban maaş', value: formatTryMinor(statement.baseSalaryMinor), icon: 'wallet-outline' },
+    { label: 'Çalışılan gün', value: `${statement.workedDays} / ${statement.totalDays}`, icon: 'calendar-outline' },
+    { label: 'Fazla mesai', value: formatTryMinor(statement.overtimeMinor), icon: 'timer-outline', color: theme.warning },
+    { label: 'Tatil primi', value: formatTryMinor(statement.holidayBonusMinor), icon: 'flag-outline' },
+    { label: 'Ek gelirler', value: formatTryMinor(statement.extraIncomeMinor), icon: 'cash-outline', color: theme.success },
+    { label: 'Kesintiler', value: `−${formatTryMinor(statement.deductionMinor)}`, icon: 'remove-circle-outline', color: theme.danger },
+  ];
+
+  const taxRows: { label: string; value: string }[] = [
     { label: 'Brüt', value: formatTryMinor(statement.grossMinor) },
     { label: 'SGK işçi payı', value: `−${formatTryMinor(statement.sgkWorkerMinor)}` },
     { label: 'İşsizlik sigortası', value: `−${formatTryMinor(statement.unemploymentWorkerMinor)}` },
@@ -61,32 +75,72 @@ export default function EarningsScreen() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.header, { color: theme.foreground }]}>Aylık Kazanç Dökümü</Text>
-      <ScrollView contentContainerStyle={styles.list}>
-        {rows.map((row) => (
-          <View key={row.label} style={[styles.row, { borderBottomColor: theme.border }]}>
-            <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
+    <Screen>
+      <PageHeading eyebrow="KAZANÇ" title={`${MONTH_NAMES[month - 1]} ${year}`} subtitle="Aylık tahmini kazanç dökümü" />
+
+      {/* Net total */}
+      <Card style={{ backgroundColor: theme.accentSurface, borderColor: theme.accent }}>
+        <View style={styles.netRow}>
+          <View>
+            <Text style={{ color: theme.muted, fontSize: layout.type.caption, fontWeight: '600' }}>Tahmini Net</Text>
+            <Text style={[styles.netValue, { color: theme.accent }]}>{formatTryMinor(statement.netMinor)}</Text>
+          </View>
+          <View style={[styles.netIcon, { backgroundColor: theme.accent }]}>
+            <Ionicons name="trending-up" size={22} color={theme.onPrimaryAction} />
+          </View>
+        </View>
+      </Card>
+
+      {/* Main breakdown */}
+      <Card>
+        <CardHeader icon="list-outline" title="Gelir Kalemleri" />
+        {mainRows.map((row) => (
+          <View key={row.label} style={[styles.row, { borderBottomColor: theme.border }]} accessibilityLabel={`${row.label}: ${row.value}`}>
+            <View style={styles.rowLeft}>
+              <Ionicons accessible={false} name={row.icon} size={16} color={row.color ?? theme.muted} />
+              <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
+            </View>
             <Text style={{ color: row.color ?? theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>
               {row.value}
             </Text>
           </View>
         ))}
-        <View style={[styles.totalRow, { backgroundColor: theme.accentSurface, borderColor: theme.accent }]}>
-          <Text style={{ color: theme.accent, fontSize: layout.type.section, fontWeight: '800' }}>Net</Text>
-          <Text style={{ color: theme.accent, fontSize: layout.type.section, fontWeight: '800' }}>
-            {formatTryMinor(statement.netMinor)}
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
+      </Card>
+
+      {/* Tax details - expandable */}
+      <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)}>
+        <Card>
+          <View style={styles.expandHeader}>
+            <CardHeader icon="document-text-outline" title="Vergi ve Kesinti Detayı" />
+            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.muted} />
+          </View>
+          {expanded && taxRows.map((row) => (
+            <View key={row.label} style={[styles.row, { borderBottomColor: theme.border }]} accessibilityLabel={`${row.label}: ${row.value}`}>
+              <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
+              <Text style={{ color: theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>{row.value}</Text>
+            </View>
+          ))}
+        </Card>
+      </Pressable>
+
+      {/* Disclaimer */}
+      <View style={styles.disclaimer}>
+        <Ionicons accessible={false} name="information-circle-outline" size={14} color={theme.muted} />
+        <Text style={[styles.disclaimerText, { color: theme.muted }]}>
+          Tahmini hesaplamadır. Gerçek bordro değerlerinden farklılık gösterebilir.
+        </Text>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60 },
-  header: { fontSize: layout.type.title, fontWeight: '800', paddingHorizontal: layout.screen.horizontal, marginBottom: 16 },
-  list: { paddingHorizontal: layout.screen.horizontal, paddingBottom: layout.screen.bottom },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderRadius: layout.radius.card, borderWidth: 1.5, marginTop: 16 },
+  netRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  netValue: { fontSize: 28, fontWeight: '900' },
+  netIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  expandHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  disclaimer: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 4 },
+  disclaimerText: { fontSize: layout.type.caption, flex: 1, lineHeight: 18 },
 });

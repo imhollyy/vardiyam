@@ -2,9 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -32,9 +36,9 @@ import {
   type ScheduleDraft,
   type ShiftPattern,
 } from '@/src/features/shifts/schedule';
-import { getSettings } from '@/src/data/settingsRepository';
+import { getSettings, updateSettings } from '@/src/data/settingsRepository';
 import type { Settings } from '@/src/domain/payroll/types';
-import { formatTryMinor } from '@/src/domain/money';
+import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
 import { colors } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
@@ -207,6 +211,15 @@ export default function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<Settings | null>(null);
+  const [editingSalary, setEditingSalary] = useState(false);
+  const [salaryRaw, setSalaryRaw] = useState('');
+  const [salaryTypeEdit, setSalaryTypeEdit] = useState<'GROSS' | 'NET'>('GROSS');
+  const [paydayRaw, setPaydayRaw] = useState('');
+  const [besEnabledEdit, setBesEnabledEdit] = useState(false);
+  const [besRateBpRaw, setBesRateBpRaw] = useState('3');
+  const [savingSalary, setSavingSalary] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
   const loadedOnce = useRef(false);
   const startEntry = cycle?.entries[cycle.startIndex];
 
@@ -300,28 +313,62 @@ export default function SettingsScreen() {
     }));
   };
 
-  const handleReset = () => {
-    Alert.alert(
-      'SIFIRLA',
-      'Tüm veriler silinecek ve uygulama ilk kurulum ekranına dönecek. Bu işlem geri alınamaz.',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Sıfırla', style: 'destructive', onPress: async () => {
-            try {
-              const { createEmptyDatabaseForWipe, applyDataWipe } = await import('@/src/data/backupService');
-              const empty = await createEmptyDatabaseForWipe();
-              await runDatabaseMaintenance(async (current, controls) => {
-                await applyDataWipe(current, empty, controls);
-              });
-              router.replace('/welcome');
-            } catch {
-              Alert.alert('Sıfırlama başarısız', 'Veriler korundu.');
-            }
-          },
-        },
-      ],
-    );
+  const startSalaryEdit = () => {
+    if (!appSettings) return;
+    setSalaryRaw((appSettings.salaryMinor / 100).toFixed(2));
+    setSalaryTypeEdit(appSettings.salaryType);
+    setPaydayRaw(appSettings.payday === 'LAST' ? '' : String(appSettings.payday));
+    setBesEnabledEdit(appSettings.besEnabled);
+    setBesRateBpRaw(String(appSettings.besRateBp / 100));
+    setEditingSalary(true);
+    setError(null);
+  };
+
+  const cancelSalaryEdit = () => { setEditingSalary(false); setError(null); };
+
+  const saveSalaryEdit = async () => {
+    let salaryMinor: number;
+    try { salaryMinor = parseTryMinor(salaryRaw); } catch { setError('Maaş tutarı geçersiz.'); return; }
+    const paydayNum = paydayRaw.trim() === '' ? undefined : Number(paydayRaw.trim());
+    if (paydayRaw.trim() !== '' && (isNaN(paydayNum!) || paydayNum! < 1 || paydayNum! > 31)) {
+      setError('Maaş günü 1–31 arasında olmalı veya boş bırakın (ayın sonu).'); return;
+    }
+    const payday = (paydayRaw.trim() === '' ? 'LAST' : String(paydayNum!)) as Settings['payday'];
+    const besRateBp = Math.round(Number(besRateBpRaw) * 100);
+    if (besEnabledEdit && (isNaN(besRateBp) || besRateBp < 100 || besRateBp > 2500)) {
+      setError('BES oranı %1–%25 arasında olmalı.'); return;
+    }
+    setSavingSalary(true); setError(null);
+    try {
+      await updateSettings(database, { salaryMinor, salaryType: salaryTypeEdit, payday, besEnabled: besEnabledEdit, besRateBp: besEnabledEdit ? besRateBp : appSettings?.besRateBp ?? 300 });
+      const updated = await getSettings(database);
+      setAppSettings(updated);
+      setEditingSalary(false);
+      setSuccess('Ücret bilgileri güncellendi.');
+    } catch (err) { setError(err instanceof Error ? err.message : 'Kaydedilemedi.'); }
+    finally { setSavingSalary(false); }
+  };
+
+  const handleReset = () => { setResetConfirmText(''); setShowResetModal(true); };
+
+  const confirmReset = async () => {
+    setShowResetModal(false);
+    let empty: import('expo-sqlite').SQLiteDatabase | null = null;
+    try {
+      const SQLiteModule = await import('expo-sqlite');
+      const { createEmptyDatabaseForWipe, applyDataWipe } = await import('@/src/data/backupService');
+      empty = await createEmptyDatabaseForWipe();
+      await runDatabaseMaintenance(async (current, controls) => { await applyDataWipe(current, empty!, controls); });
+      router.replace('/welcome');
+    } catch (err) {
+      Alert.alert('Sıfırlama başarısız', err instanceof Error ? err.message : 'Veriler korundu.');
+    } finally {
+      if (empty) {
+        const SQLiteModule = await import('expo-sqlite');
+        await empty.closeAsync().catch(() => {});
+        await SQLiteModule.deleteDatabaseAsync('__vdywipe.db').catch(() => {});
+      }
+    }
   };
 
   const renderCyclePreview = (items: typeof preview) => (
@@ -341,6 +388,7 @@ export default function SettingsScreen() {
   );
 
   return (
+    <>
     <ScrollView contentContainerStyle={[styles.screen, { backgroundColor: theme.background }]} keyboardShouldPersistTaps="handled">
       <PageHeading eyebrow="TERCİHLER" title="Ayarlar" subtitle="Vardiya düzenin ve ücret ayarların cihazında saklanır." />
 
@@ -352,22 +400,51 @@ export default function SettingsScreen() {
         <Action label="Ek gelirler" onPress={() => router.push('/additional-income' as never)} theme={theme} secondary />
       </View>
 
-      {/* Payroll summary */}
+      {/* Payroll summary / edit */}
       {appSettings && (
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <SectionHeading icon="wallet-outline" title="Ücret bilgileri" theme={theme} />
-          <View style={styles.infoRow}>
-            <Text style={{ color: theme.muted }}>Maaş</Text>
-            <Text style={{ color: theme.foreground, fontWeight: '700' }}>{formatTryMinor(appSettings.salaryMinor)} ({appSettings.salaryType === 'GROSS' ? 'Brüt' : 'Net'})</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={{ color: theme.muted }}>Maaş günü</Text>
-            <Text style={{ color: theme.foreground, fontWeight: '700' }}>{appSettings.payday === 'LAST' ? 'Ayın sonu' : `Ayın ${appSettings.payday}`}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={{ color: theme.muted }}>BES</Text>
-            <Text style={{ color: theme.foreground, fontWeight: '700' }}>{appSettings.besEnabled ? `%${(appSettings.besRateBp / 100).toFixed(0)}` : 'Kapalı'}</Text>
-          </View>
+          {editingSalary ? (
+            <>
+              <Field label="Maaş (TL)" value={salaryRaw} onChangeText={setSalaryRaw} theme={theme} placeholder="Örn. 25000.00" keyboardType="numbers-and-punctuation" />
+              <Text style={[styles.fieldLabel, { color: theme.muted }]}>Maaş türü</Text>
+              <View style={styles.chipWrap}>
+                {(['GROSS', 'NET'] as const).map((type) => (
+                  <Chip key={type} label={type === 'GROSS' ? 'Brüt' : 'Net'} selected={salaryTypeEdit === type} onPress={() => setSalaryTypeEdit(type)} theme={theme} />
+                ))}
+              </View>
+              <Field label="Maaş günü (1–31, boş = ayın sonu)" value={paydayRaw} onChangeText={setPaydayRaw} theme={theme} placeholder="Boş = ayın sonu" keyboardType="numbers-and-punctuation" maxLength={2} />
+              <View style={styles.infoRow}>
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>BES aktif</Text>
+                <Switch value={besEnabledEdit} onValueChange={setBesEnabledEdit} trackColor={{ true: theme.accent }} />
+              </View>
+              {besEnabledEdit && (
+                <Field label="BES oranı (%)" value={besRateBpRaw} onChangeText={setBesRateBpRaw} theme={theme} placeholder="Örn. 3" keyboardType="numbers-and-punctuation" maxLength={4} />
+              )}
+              {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
+              <View style={styles.actionRow}>
+                <Action label={savingSalary ? 'Kaydediliyor…' : 'Kaydet'} onPress={() => void saveSalaryEdit()} theme={theme} disabled={savingSalary} />
+                <Action label="Vazgeç" onPress={cancelSalaryEdit} theme={theme} secondary disabled={savingSalary} />
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={{ color: theme.muted }}>Maaş</Text>
+                <Text style={{ color: theme.foreground, fontWeight: '700' }}>{formatTryMinor(appSettings.salaryMinor)} ({appSettings.salaryType === 'GROSS' ? 'Brüt' : 'Net'})</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={{ color: theme.muted }}>Maaş günü</Text>
+                <Text style={{ color: theme.foreground, fontWeight: '700' }}>{appSettings.payday === 'LAST' ? 'Ayın sonu' : `Ayın ${appSettings.payday}`}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={{ color: theme.muted }}>BES</Text>
+                <Text style={{ color: theme.foreground, fontWeight: '700' }}>{appSettings.besEnabled ? `%${(appSettings.besRateBp / 100).toFixed(0)}` : 'Kapalı'}</Text>
+              </View>
+              {success ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{success}</Text> : null}
+              <Action label="Ücret bilgilerini düzenle" onPress={startSalaryEdit} theme={theme} secondary />
+            </>
+          )}
         </View>
       )}
 
@@ -486,6 +563,40 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
     </ScrollView>
+
+    <Modal animationType="fade" transparent visible={showResetModal} onRequestClose={() => setShowResetModal(false)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackdrop}>
+        <View style={[styles.modalSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.modalTitle, { color: theme.foreground }]}>Tüm verileri sil</Text>
+          <Text style={[styles.body, { color: theme.muted }]}>Bu işlem geri alınamaz. Onaylamak için aşağıya{' '}
+            <Text style={{ fontWeight: '900', color: theme.danger }}>SIFIRLA</Text>
+            {' '}yazın.</Text>
+          <TextInput
+            accessibilityLabel="Onay metni"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            onChangeText={setResetConfirmText}
+            placeholder="SIFIRLA"
+            placeholderTextColor={theme.muted}
+            style={[styles.input, { backgroundColor: theme.background, borderColor: resetConfirmText === 'SIFIRLA' ? theme.danger : theme.border, color: theme.foreground }]}
+            value={resetConfirmText}
+          />
+          <Pressable
+            accessibilityLabel="Sıfırlamayı onayla"
+            accessibilityRole="button"
+            disabled={resetConfirmText !== 'SIFIRLA'}
+            onPress={() => void confirmReset()}
+            style={[styles.dangerButton, { borderColor: theme.danger, opacity: resetConfirmText === 'SIFIRLA' ? 1 : 0.35 }]}
+          >
+            <Text style={{ color: theme.danger, fontWeight: '700', fontSize: layout.type.body }}>Onayla ve sıfırla</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => setShowResetModal(false)} style={styles.modalCancel}>
+            <Text style={{ color: theme.muted, fontSize: layout.type.body }}>İptal</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+    </>
   );
 }
 
@@ -521,4 +632,8 @@ const styles = StyleSheet.create({
   success: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   dangerButton: { borderWidth: 1.5, borderRadius: 14, paddingVertical: 14, alignItems: 'center', minHeight: 48 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', padding: 16 },
+  modalSheet: { borderWidth: 1, borderRadius: 24, padding: 24, gap: 16 },
+  modalTitle: { fontSize: 21, fontWeight: '800' },
+  modalCancel: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
 });
