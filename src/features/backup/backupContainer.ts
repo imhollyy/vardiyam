@@ -101,7 +101,7 @@ export async function decryptEncryptedBackup(
 
 function parseContainer(bytes: Uint8Array): { header: BackupHeader; ciphertext: Uint8Array; aad: Uint8Array } {
   if (bytes.length < 64 || bytes.length > MAX_BACKUP_BYTES) throw new Error('Yedek dosyası eksik veya desteklenen boyutun dışında.');
-  for (let i = 0; i < MAGIC.length; i += 1) if (bytes[i] !== MAGIC[i]) throw new Error('Bu dosya Vardiyam yedeği değil.');
+  for (let i = 0; i < MAGIC.length; i += 1) if (bytes[i] !== MAGIC[i]) throw new Error('Bu dosya Mesai Pusulası yedeği değil.');
   const headerLength = readUint16(bytes, MAGIC.length);
   if (headerLength < 2 || headerLength > MAX_HEADER_BYTES) throw new Error('Yedek başlığı geçersiz.');
   const headerStart = MAGIC.length + 2;

@@ -65,7 +65,7 @@ export default function BackupScreen() {
       bytes.fill(0);
       bytes = null;
       if (!(await Sharing.isAvailableAsync())) throw new Error('Bu cihazda güvenli dosya paylaşımı kullanılamıyor.');
-      await Sharing.shareAsync(file.uri, { dialogTitle: 'Şifreli Vardiyam yedeğini kaydet veya paylaş', mimeType: 'application/octet-stream' });
+      await Sharing.shareAsync(file.uri, { dialogTitle: 'Şifreli Mesai Pusulası yedeğini kaydet veya paylaş', mimeType: 'application/octet-stream' });
       setSuccess('Sistem paylaşım menüsü kapandı. Yedeği seçtiğin güvenli konuma kaydettiğini doğrula.');
     } catch {
       setError('Yedek oluşturulamadı veya paylaşım açılamadı. Veritabanında değişiklik yapılmadı.');
