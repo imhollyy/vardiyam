@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -9,10 +9,13 @@ import { type MonthlyStatement, getPayPeriodForDate } from '@/src/domain/payroll
 import { formatTryMinor } from '@/src/domain/money';
 import { loadPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { InkCard, InkCardRow, InkCardStat } from '@/src/components/ui/InkCard';
+import { ListRow } from '@/src/components/ui/ListRow';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
 
 function todayLocal(): string {
   const now = new Date();
@@ -77,23 +80,6 @@ export default function EarningsScreen() {
     );
   }
 
-  const mainRows: { label: string; value: string; icon: React.ComponentProps<typeof Ionicons>['name']; color?: string; detail?: string }[] = [
-    { label: 'Taban maaş', value: formatTryMinor(statement.baseSalaryMinor), icon: 'wallet-outline' },
-    { label: 'Çalışılan gün', value: `${statement.workedDays} / ${statement.totalDays}`, icon: 'calendar-outline' },
-    {
-      label: 'Fazla mesai',
-      value: formatTryMinor(statement.overtimeMinor),
-      icon: 'timer-outline',
-      color: statement.overtimeMinor > 0 ? theme.warning : undefined,
-      detail: statement.overtimeMinutes > 0
-        ? `Planlı: ${overtimeHours(statement.scheduledOvertimeMinutes)} · Elle: ${overtimeHours(statement.manualOvertimeMinutes)}`
-        : undefined,
-    },
-    { label: 'Tatil primi', value: formatTryMinor(statement.holidayBonusMinor), icon: 'flag-outline' },
-    { label: 'Ek gelirler', value: formatTryMinor(statement.extraIncomeMinor), icon: 'cash-outline', color: theme.success },
-    { label: 'Kesintiler', value: `−${formatTryMinor(statement.deductionMinor)}`, icon: 'remove-circle-outline', color: theme.danger },
-  ];
-
   const taxRows: { label: string; value: string }[] = [
     { label: 'Brüt', value: formatTryMinor(statement.grossMinor) },
     { label: 'SGK işçi payı', value: `−${formatTryMinor(statement.sgkWorkerMinor)}` },
@@ -106,101 +92,114 @@ export default function EarningsScreen() {
   return (
     <Screen>
       {/* Period navigation */}
-      <View style={styles.periodNav}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Önceki dönem"
           onPress={() => navigatePeriod(-1)}
-          style={[styles.navBtn, { backgroundColor: theme.surface }]}
+          style={{ width: 36, height: 36, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Ionicons name="chevron-back" size={18} color={theme.foreground} />
+          <Ionicons name="chevron-back" size={18} color={theme.ink} />
         </Pressable>
-        <Text style={[styles.periodLabel, { color: theme.foreground }]}>{period.label}</Text>
+        <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.muted }}>{period.label}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Sonraki dönem"
           onPress={() => navigatePeriod(1)}
-          style={[styles.navBtn, { backgroundColor: theme.surface }]}
+          style={{ width: 36, height: 36, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Ionicons name="chevron-forward" size={18} color={theme.foreground} />
+          <Ionicons name="chevron-forward" size={18} color={theme.ink} />
         </Pressable>
       </View>
 
       <PageHeading eyebrow="KAZANÇ" title={period.label} subtitle="Aylık tahmini kazanç dökümü" />
 
-      {/* Net total */}
-      <Card style={{ backgroundColor: theme.accentSurface, borderColor: theme.accent }}>
-        <View style={styles.netRow}>
-          <View>
-            <Text style={{ color: theme.muted, fontSize: layout.type.caption, fontWeight: '600' }}>Tahmini Net</Text>
-            <Text style={[styles.netValue, { color: theme.accent }]}>{formatTryMinor(statement.netMinor)}</Text>
-          </View>
-          <View style={[styles.netIcon, { backgroundColor: theme.accent }]}>
-            <Ionicons name="trending-up" size={22} color={theme.onPrimaryAction} />
-          </View>
-        </View>
-      </Card>
+      {/* Net total ink card */}
+      <InkCard
+        eyebrow="Tahmini Net"
+        amount={formatTryMinor(statement.netMinor)}
+        daysLabel={`${statement.workedDays} / ${statement.totalDays} gün`}
+      >
+        <InkCardRow>
+          <InkCardStat label="Brüt" value={formatTryMinor(statement.grossMinor)} />
+          <InkCardStat label="Fazla mesai" value={formatTryMinor(statement.overtimeMinor)} />
+        </InkCardRow>
+      </InkCard>
 
       {/* Main breakdown */}
+      <SectionHeader title="Gelir Kalemleri" />
       <Card>
-        <CardHeader icon="list-outline" title="Gelir Kalemleri" />
-        {mainRows.map((row) => (
-          <View key={row.label}>
-            <View style={[styles.row, { borderBottomColor: theme.border }]} accessibilityLabel={`${row.label}: ${row.value}`}>
-              <View style={styles.rowLeft}>
-                <Ionicons accessible={false} name={row.icon} size={16} color={row.color ?? theme.muted} />
-                <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
-              </View>
-              <Text style={{ color: row.color ?? theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>
-                {row.value}
-              </Text>
-            </View>
-            {row.detail && (
-              <Text style={{ color: theme.muted, fontSize: layout.type.caption, paddingLeft: 24, paddingBottom: 6 }}>
-                {row.detail}
-              </Text>
-            )}
-          </View>
-        ))}
+        <ListRow
+          icon="wallet-outline"
+          label="Taban maaş"
+          value={formatTryMinor(statement.baseSalaryMinor)}
+        />
+        <ListRow
+          icon="calendar-outline"
+          label="Çalışılan gün"
+          value={`${statement.workedDays} / ${statement.totalDays}`}
+        />
+        <View>
+          <ListRow
+            icon="timer-outline"
+            label="Fazla mesai"
+            value={formatTryMinor(statement.overtimeMinor)}
+          />
+          {statement.overtimeMinutes > 0 && (
+            <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption, paddingLeft: 44, paddingBottom: 6 }}>
+              {`Planlı: ${overtimeHours(statement.scheduledOvertimeMinutes)} · Elle: ${overtimeHours(statement.manualOvertimeMinutes)}`}
+            </Text>
+          )}
+        </View>
+        <ListRow
+          icon="flag-outline"
+          label="Tatil primi"
+          value={formatTryMinor(statement.holidayBonusMinor)}
+        />
+        <ListRow
+          icon="cash-outline"
+          label="Ek gelirler"
+          value={formatTryMinor(statement.extraIncomeMinor)}
+        />
+        <ListRow
+          icon="remove-circle-outline"
+          label="Kesintiler"
+          value={`−${formatTryMinor(statement.deductionMinor)}`}
+        />
       </Card>
 
       {/* Tax details - expandable */}
-      <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={expanded ? 'Vergi detayını kapat' : 'Vergi detayını aç'}
+        onPress={() => setExpanded((v) => !v)}
+      >
         <Card>
-          <View style={styles.expandHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <CardHeader icon="document-text-outline" title="Vergi ve Kesinti Detayı" />
             <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.muted} />
           </View>
           {expanded && taxRows.map((row) => (
-            <View key={row.label} style={[styles.row, { borderBottomColor: theme.border }]} accessibilityLabel={`${row.label}: ${row.value}`}>
-              <Text style={{ color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
-              <Text style={{ color: theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>{row.value}</Text>
+            <View
+              key={row.label}
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.border }}
+              accessibilityLabel={`${row.label}: ${row.value}`}
+            >
+              <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.body }}>{row.label}</Text>
+              <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>{row.value}</Text>
             </View>
           ))}
         </Card>
       </Pressable>
 
       {/* Disclaimer */}
-      <View style={styles.disclaimer}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 4 }}>
         <Ionicons accessible={false} name="information-circle-outline" size={14} color={theme.muted} />
-        <Text style={[styles.disclaimerText, { color: theme.muted }]}>
+        <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption, flex: 1, lineHeight: 18 }}>
           Tahmini hesaplamadır. Gerçek bordro değerlerinden farklılık gösterebilir.
         </Text>
       </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  periodNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
-  periodLabel: { fontSize: 15, fontWeight: '600' },
-  navBtn: { padding: 8, borderRadius: 8 },
-  netRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  netValue: { fontSize: 28, fontWeight: '900' },
-  netIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  expandHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  disclaimer: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 4 },
-  disclaimerText: { fontSize: layout.type.caption, flex: 1, lineHeight: 18 },
-});

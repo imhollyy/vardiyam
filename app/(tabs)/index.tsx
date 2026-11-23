@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -10,11 +10,15 @@ import { deriveDays, type DerivedDay, type MonthlyStatement, type Settings } fro
 import { formatTryMinor } from '@/src/domain/money';
 import { loadCurrentPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
-import { Card, CardHeader } from '@/src/components/ui/Card';
-import { StatTile } from '@/src/components/ui/StatTile';
+import { Card } from '@/src/components/ui/Card';
+import { PageHeading } from '@/src/components/ui/PageHeading';
+import { InkCard, InkCardRow, InkCardStat } from '@/src/components/ui/InkCard';
+import { DayBlock, type DayBlockStatus } from '@/src/components/ui/DayBlock';
 import { ActionButton } from '@/src/components/ui/ActionButton';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { SkeletonCard } from '@/src/components/ui/Skeleton';
 
 const DAY_LABELS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
@@ -58,18 +62,34 @@ function formatDate(localDate: string): string {
   return `${Number(d)} ${months[Number(m) - 1]} ${y}`;
 }
 
-const STATUS_LABELS: Record<string, string> = {
+function toDayBlockStatus(day: DerivedDay | undefined): DayBlockStatus {
+  if (!day) return 'off';
+  if (day.status === 'WORKED') return day.overtimeMinutes > 0 ? 'overtime' : 'shift';
+  if (day.status === 'LEAVE') return 'leave';
+  if (day.status === 'HOLIDAY') return 'holiday';
+  return 'off';
+}
+
+function toDayCode(day: DerivedDay | undefined): string {
+  if (!day) return '—';
+  if (day.status === 'WORKED') return 'G';
+  if (day.status === 'LEAVE') return day.leaveType === 'ANNUAL' ? 'İZN' : 'İZ';
+  if (day.status === 'HOLIDAY') return 'T';
+  return '—';
+}
+
+const STATUS_LABEL: Record<string, string> = {
   WORKED: 'Çalışma günü',
-  OFF: 'İzinli',
-  LEAVE: 'İzin',
+  OFF: 'Planlı boş gün',
+  LEAVE: 'İzin günü',
   HOLIDAY: 'Resmî tatil',
 };
 
-const STATUS_ICONS: Record<string, { name: React.ComponentProps<typeof Ionicons>['name']; tone: 'success' | 'warning' | 'danger' | 'muted' }> = {
-  WORKED: { name: 'checkmark-circle', tone: 'success' },
-  HOLIDAY: { name: 'flag', tone: 'warning' },
-  LEAVE: { name: 'bed', tone: 'danger' },
-  OFF: { name: 'moon', tone: 'muted' },
+const STATUS_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  WORKED: 'checkmark-circle',
+  HOLIDAY: 'flag',
+  LEAVE: 'bed',
+  OFF: 'moon',
 };
 
 export default function HomeScreen() {
@@ -110,104 +130,102 @@ export default function HomeScreen() {
   );
 
   const selectedDay = days.find((d) => d.localDate === selectedDate);
-  const statusInfo = STATUS_ICONS[selectedDay?.status ?? 'OFF'] ?? STATUS_ICONS.OFF!;
 
   if (loading) {
     return (
       <Screen>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-          <ActivityIndicator size="large" color={theme.accent} />
-        </View>
+        <PageHeading eyebrow={formatGreeting()} title={formatDate(today)} />
+        <SkeletonCard rows={2} />
+        <SkeletonCard rows={4} />
       </Screen>
     );
   }
 
   return (
     <Screen>
-      {/* Greeting + date */}
-      <View style={styles.greetingRow}>
-        <View>
-          <Text style={[styles.greeting, { color: theme.foreground }]}>{formatGreeting()}</Text>
-          <Text style={[styles.dateText, { color: theme.muted }]}>{formatDate(today)}</Text>
-        </View>
+      {/* Heading: greeting + date, salary pill */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <PageHeading eyebrow={formatGreeting()} title={formatDate(today)} />
         {settings && (
-          <View style={[styles.salaryBadge, { backgroundColor: theme.accentSurface }]}>
-            <Ionicons accessible={false} name="wallet" size={14} color={theme.accent} />
-            <Text style={[styles.salaryText, { color: theme.accent }]}>{formatTryMinor(settings.salaryMinor)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.surfaceMuted, paddingHorizontal: 10, paddingVertical: 6, borderRadius: layout.radius.pill, marginTop: 6 }}>
+            <Ionicons accessible={false} name="wallet" size={14} color={theme.muted} />
+            <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.caption, color: theme.muted }}>
+              {formatTryMinor(settings.salaryMinor)}
+            </Text>
           </View>
         )}
       </View>
 
+      {/* Period summary ink card */}
+      <InkCard
+        eyebrow={periodInfo?.label ?? 'Bu dönem'}
+        amount={periodStatement ? formatTryMinor(periodStatement.netMinor) : '—'}
+        daysLabel={periodStatement ? `${periodStatement.workedDays} gün` : undefined}
+      >
+        <InkCardRow>
+          <InkCardStat label="Çalışılan" value={periodStatement ? String(periodStatement.workedDays) : '—'} />
+          <InkCardStat label="Fazla mesai" value={periodStatement && periodStatement.overtimeMinutes > 0 ? `${Math.floor(periodStatement.overtimeMinutes / 60)} sa` : '0 sa'} />
+          <InkCardStat label="İzin/Tatil" value={periodStatement ? String(periodStatement.totalDays - periodStatement.workedDays) : '—'} />
+        </InkCardRow>
+      </InkCard>
+
       {/* Week strip */}
-      <Card>
-        <CardHeader icon="calendar-outline" title="Bu Hafta" />
-        <View style={styles.weekStrip}>
-          {week.map((date) => {
-            const dow = new Date(date.replace(/-/g, '/')).getDay();
-            const day = days.find((d) => d.localDate === date);
-            const isToday = date === today;
-            const isSelected = date === selectedDate;
-            const dotColor =
-              day?.status === 'WORKED' ? theme.success :
-              day?.status === 'HOLIDAY' ? theme.warning :
-              day?.status === 'LEAVE' ? theme.danger :
-              theme.border;
-            return (
-              <Pressable
-                key={date}
-                accessibilityRole="button"
-                accessibilityLabel={`${DAY_LABELS[dow]} ${date.split('-')[2]}`}
-                onPress={() => setSelectedDate(date)}
-                style={[
-                  styles.weekDay,
-                  {
-                    backgroundColor: isSelected ? theme.accentSurface : 'transparent',
-                    borderColor: isToday ? theme.accent : 'transparent',
-                  },
-                ]}
-              >
-                <Text style={[styles.weekDayLabel, { color: isSelected ? theme.accent : theme.muted }]}>
-                  {DAY_LABELS[dow]}
-                </Text>
-                <Text style={[styles.weekDayNumber, { color: isSelected ? theme.accent : theme.foreground }]}>
-                  {date.split('-')[2]}
-                </Text>
-                <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
+      <SectionHeader title="Bu Hafta" />
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        {week.map((date) => {
+          const dow = new Date(date.replace(/-/g, '/')).getDay();
+          const day = days.find((d) => d.localDate === date);
+          const dateNum = date.split('-')[2] ?? '';
+          return (
+            <Pressable
+              key={date}
+              accessibilityRole="button"
+              accessibilityLabel={`${DAY_LABELS[dow]} ${dateNum}`}
+              accessibilityState={{ selected: date === selectedDate }}
+              onPress={() => setSelectedDate(date)}
+              style={{ flex: 1 }}
+            >
+              <DayBlock
+                dayLabel={DAY_LABELS[dow] ?? ''}
+                dateNumber={dateNum}
+                code={toDayCode(day)}
+                status={toDayBlockStatus(day)}
+                isToday={date === today}
+                hasOvertime={(day?.overtimeMinutes ?? 0) > 0}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
 
       {/* Selected day detail */}
       {selectedDay && (
         <Card>
-          <View style={styles.dayHeader}>
-            <View style={[styles.dayStatusIcon, { backgroundColor: { success: theme.successSurface, warning: theme.warningSurface, danger: theme.dangerSurface, muted: theme.surface }[statusInfo.tone] }]}>
-              <Ionicons accessible={false} name={statusInfo.name} size={20} color={theme[statusInfo.tone]} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons accessible={false} name={STATUS_ICON[selectedDay.status] ?? 'moon'} size={22} color={theme.ink} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.dayStatus, { color: theme.foreground }]}>
-                {STATUS_LABELS[selectedDay.status] ?? selectedDay.status}
+              <Text style={{ fontFamily: fonts.bold, fontSize: layout.type.body, color: theme.ink }}>
+                {STATUS_LABEL[selectedDay.status] ?? selectedDay.status}
               </Text>
               {selectedDay.leaveType && selectedDay.leaveType !== 'HOLIDAY' && (
-                <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>
+                <Text style={{ fontFamily: fonts.medium, color: theme.muted, fontSize: layout.type.caption }}>
                   {selectedDay.leaveType}{selectedDay.leaveHalfDay ? ' (yarım gün)' : ''}
                 </Text>
               )}
             </View>
+            {selectedDay.overtimeMinutes > 0 && (
+              <View style={{ backgroundColor: theme.warningSurface, paddingHorizontal: 8, paddingVertical: 4, borderRadius: layout.radius.pill }}>
+                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.warning }}>
+                  +{Math.floor(selectedDay.overtimeMinutes / 60)} sa
+                </Text>
+              </View>
+            )}
           </View>
-          {selectedDay.overtimeMinutes > 0 && (
-            <View style={[styles.infoBadge, { backgroundColor: theme.warningSurface }]}>
-              <Ionicons accessible={false} name="timer-outline" size={14} color={theme.warning} />
-              <Text style={{ color: theme.warning, fontSize: layout.type.caption, fontWeight: '600' }}>
-                Fazla mesai: {Math.floor(selectedDay.overtimeMinutes / 60)} sa {selectedDay.overtimeMinutes % 60} dk
-              </Text>
-            </View>
-          )}
-          {selectedDay.note && (
-            <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>{selectedDay.note}</Text>
-          )}
+          {selectedDay.note ? (
+            <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption }}>{selectedDay.note}</Text>
+          ) : null}
           <ActionButton
             label="Düzenle"
             variant="secondary"
@@ -217,19 +235,9 @@ export default function HomeScreen() {
         </Card>
       )}
 
-      {/* Period stats */}
-      <Card>
-        <CardHeader icon="stats-chart-outline" title={periodInfo ? `Bu Dönem (${periodInfo.label})` : 'Bu Dönem'} />
-        <View style={styles.statRow}>
-          <StatTile value={periodStatement ? String(periodStatement.workedDays) : '—'} label="Çalışılan" tone="success" style={{ flex: 1 }} />
-          <StatTile value={periodStatement && periodStatement.overtimeMinutes > 0 ? `${Math.floor(periodStatement.overtimeMinutes / 60)}sa` : '0'} label="Fazla mesai" tone="warning" style={{ flex: 1 }} />
-          <StatTile value={periodStatement ? String(periodStatement.totalDays - periodStatement.workedDays) : '—'} label="İzin/Tatil" tone="danger" style={{ flex: 1 }} />
-        </View>
-      </Card>
-
       {/* Quick actions */}
+      <SectionHeader title="Hızlı Erişim" />
       <Card>
-        <CardHeader icon="add-circle-outline" title="Hızlı Erişim" />
         <ActionButton
           label="Ek gelir ekle"
           variant="secondary"
@@ -246,24 +254,3 @@ export default function HomeScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  greetingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  greeting: { fontSize: layout.type.title, fontWeight: '900' },
-  dateText: { fontSize: layout.type.caption, fontWeight: '600', marginTop: 2 },
-  salaryBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: layout.radius.pill },
-  salaryText: { fontSize: layout.type.caption, fontWeight: '800' },
-  weekStrip: { flexDirection: 'row', justifyContent: 'space-between' },
-  weekDay: {
-    alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4,
-    borderRadius: layout.radius.control, borderWidth: 1.5, minWidth: 40, gap: 4,
-  },
-  weekDayLabel: { fontSize: 11, fontWeight: '600' },
-  weekDayNumber: { fontSize: layout.type.body, fontWeight: '700' },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  dayHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dayStatusIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  dayStatus: { fontSize: layout.type.body, fontWeight: '700' },
-  infoBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  statRow: { flexDirection: 'row', gap: layout.space.md },
-});

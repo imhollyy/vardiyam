@@ -7,7 +7,7 @@ import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getDayEntry, upsertDayEntry, deleteDayEntry, type DayEntryPatch } from '@/src/data/dayEntryRepository';
 import type { LeaveType } from '@/src/domain/payroll/types';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { Stepper } from '@/src/components/ui/Stepper';
@@ -104,7 +104,7 @@ export default function DayEditScreen() {
         <View style={[styles.handleBar, { backgroundColor: theme.border }]} />
       </View>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.foreground }]}>{formatDisplayDate(localDate)}</Text>
+        <Text style={[styles.title, { color: theme.ink }]}>{formatDisplayDate(localDate)}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Kapat" onPress={() => router.back()} style={styles.closeButton}>
           <Ionicons name="close" size={22} color={theme.muted} />
         </Pressable>
@@ -146,10 +146,10 @@ export default function DayEditScreen() {
               onPress={() => setLeaveHalfDay((v) => !v)}
               style={styles.checkRow}
             >
-              <View style={[styles.checkBox, { borderColor: leaveHalfDay ? theme.accent : theme.border, backgroundColor: leaveHalfDay ? theme.accent : 'transparent' }]}>
-                {leaveHalfDay && <Ionicons name="checkmark" size={14} color={theme.onPrimaryAction} />}
+              <View style={[styles.checkBox, { borderColor: leaveHalfDay ? theme.ink : theme.border, backgroundColor: leaveHalfDay ? theme.ink : 'transparent' }]}>
+                {leaveHalfDay && <Ionicons name="checkmark" size={14} color={theme.onInk} />}
               </View>
-              <Text style={{ color: theme.foreground, fontSize: layout.type.body, fontWeight: '600' }}>Yarım gün</Text>
+              <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>Yarım gün</Text>
             </Pressable>
           </Card>
         )}
@@ -157,7 +157,7 @@ export default function DayEditScreen() {
         <Card>
           <CardHeader icon="chatbubble-outline" title="Not" />
           <TextInput
-            style={[styles.noteInput, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.surface }]}
+            style={[styles.noteInput, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface, fontFamily: fonts.regular }]}
             value={note}
             onChangeText={setNote}
             placeholder="İsteğe bağlı not"
@@ -188,9 +188,9 @@ export default function DayEditScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   handle: { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
-  handleBar: { width: 36, height: 4, borderRadius: 2 },
+  handleBar: { width: 36, height: 4, borderRadius: layout.radius.handle },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: layout.screen.horizontal, paddingVertical: 8 },
-  title: { fontSize: layout.type.section, fontWeight: '800' },
+  title: { fontFamily: fonts.extraBold, fontSize: layout.type.section },
   closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   form: { paddingHorizontal: layout.screen.horizontal, paddingBottom: 16, gap: layout.space.md },
   leaveGrid: { gap: layout.space.sm },
