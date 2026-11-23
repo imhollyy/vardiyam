@@ -52,18 +52,22 @@ export type DerivedDay = {
   isHoliday: boolean;
   isWeekend: boolean;
   shiftTemplateId: string | null;
+  shiftNominalMinutes: number;
   note: string | null;
 };
 
 export type MonthlyStatement = {
   periodStart: string;
   periodEnd: string;
+  salaryType: SalaryType;
   baseSalaryMinor: number;
   workedDays: number;
   totalDays: number;
+  scheduledOvertimeMinutes: number;
+  manualOvertimeMinutes: number;
+  overtimeMinutes: number;
   overtimeMinor: number;
   holidayBonusMinor: number;
-  weekendBonusMinor: number;
   deductionMinor: number;
   extraIncomeMinor: number;
   besDeductionMinor: number;
@@ -73,4 +77,10 @@ export type MonthlyStatement = {
   stampTaxMinor: number;
   incomeTaxMinor: number;
   netMinor: number;
+};
+
+export type AnnualLeaveResult = {
+  earnedDays: number;
+  usedDays: number;
+  remainingDays: number;
 };

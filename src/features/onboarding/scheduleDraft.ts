@@ -23,9 +23,9 @@ export type SavedScheduleDraft = {
 };
 
 const FALLBACK_TEMPLATES = [
-  { name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00' },
-  { name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00' },
-  { name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00' },
+  { name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
+  { name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00', breakMinutes: 30 },
+  { name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
 ];
 
 export function ensureScheduleTemplates(draft: SavedScheduleDraft, stored: readonly ShiftTemplate[]): SavedScheduleDraft {

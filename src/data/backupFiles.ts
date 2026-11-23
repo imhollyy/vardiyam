@@ -2,11 +2,11 @@ import { getRandomBytesAsync } from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { sha256 } from '@noble/hashes/sha2.js';
 import { executeSafeDatabaseSwap } from '@/src/features/backup/safeDatabaseSwap';
 import { parseRecoveryMarker, recoverDatabaseState, type RecoveryMarker } from '@/src/features/backup/recoveryEngine';
 import { validateBackupDatabase } from './backupValidation.ts';
 import { CURRENT_SCHEMA_VERSION } from './migrations.ts';
+import { computeLogicalDigest } from './logicalDigest.ts';
 
 const DATABASE_NAME = 'vardiyam.db';
 const MARKER_NAME = 'vardiyam-database-maintenance.json';
@@ -41,39 +41,35 @@ export async function replaceLiveDatabase(
   let rollbackDigest: string | undefined;
   let rollbackRecordCount: number | undefined;
   await executeSafeDatabaseSwap({
-    markStaging: () => writeMarker({ version: 2, state: 'staging', stageName, rollbackName }),
+    markStaging: () => writeMarker({ version: 3, state: 'staging', stageName, rollbackName }),
     prepareStage: async () => {
       stageOpen = await SQLite.openDatabaseAsync(stageName);
       await SQLite.backupDatabaseAsync({ sourceDatabase: staged, destDatabase: stageOpen });
       await stageOpen.execAsync('PRAGMA wal_checkpoint(TRUNCATE);');
       candidateRecordCount = await validateCurrent(stageOpen);
-      const candidateImage = await stageOpen.serializeAsync();
-      candidateDigest = toHex(sha256(candidateImage));
-      candidateImage.fill(0);
+      candidateDigest = await computeLogicalDigest(stageOpen);
       await stageOpen.closeAsync(); stageOpen = null;
     },
     prepareRollback: async () => {
       const sourceCount = await validateCurrent(current);
-      const sourceImage = await current.serializeAsync();
+      const sourceDigest = await computeLogicalDigest(current);
       rollbackOpen = await SQLite.openDatabaseAsync(rollbackName);
       await SQLite.backupDatabaseAsync({ sourceDatabase: current, destDatabase: rollbackOpen });
       await rollbackOpen.execAsync('PRAGMA wal_checkpoint(TRUNCATE);');
       const copyCount = await validateCurrent(rollbackOpen);
-      const rollbackImage = await rollbackOpen.serializeAsync();
-      if (copyCount !== sourceCount || !equalBytes(sourceImage, rollbackImage)) {
-        sourceImage.fill(0); rollbackImage.fill(0);
+      const rollbackCopyDigest = await computeLogicalDigest(rollbackOpen);
+      if (copyCount !== sourceCount || rollbackCopyDigest !== sourceDigest) {
         throw new Error('Geri dönüş kopyası özgün verilerle eşleşmiyor.');
       }
       rollbackRecordCount = copyCount;
-      rollbackDigest = toHex(sha256(rollbackImage));
-      sourceImage.fill(0); rollbackImage.fill(0);
+      rollbackDigest = rollbackCopyDigest;
       await rollbackOpen.closeAsync(); rollbackOpen = null;
     },
     markPrepared: () => {
       if (!candidateDigest || candidateRecordCount === undefined || !rollbackDigest || rollbackRecordCount === undefined) {
         throw new Error('Doğrulanmış yeni ve eski veritabanı kopyaları bulunamadı.');
       }
-      return writeMarker({ version: 2, state: 'prepared', stageName, rollbackName, candidateDigest, candidateRecordCount, rollbackDigest, rollbackRecordCount });
+      return writeMarker({ version: 3, state: 'prepared', stageName, rollbackName, candidateDigest, candidateRecordCount, rollbackDigest, rollbackRecordCount });
     },
     closeLive: controls.closeCurrent,
     replaceLive: async () => {
@@ -83,15 +79,13 @@ export async function replaceLiveDatabase(
     reopenAndValidate: async () => {
       const reopened = await controls.reopenCurrent();
       const recordCount = await validateCurrent(reopened);
-      const image = await reopened.serializeAsync();
-      const digest = toHex(sha256(image));
-      image.fill(0);
+      const digest = await computeLogicalDigest(reopened);
       if (recordCount !== candidateRecordCount || digest !== candidateDigest) {
         throw new Error('Yeni veritabanı doğrulanmış aday kopyayla eşleşmiyor.');
       }
     },
     markCommitted: () => writeMarker({
-      version: 2, state: 'committed', stageName, rollbackName, candidateDigest: candidateDigest!, candidateRecordCount: candidateRecordCount!,
+      version: 3, state: 'committed', stageName, rollbackName, candidateDigest: candidateDigest!, candidateRecordCount: candidateRecordCount!,
       rollbackDigest: rollbackDigest!, rollbackRecordCount: rollbackRecordCount!,
     }),
     restoreRollback: async () => {
@@ -118,8 +112,9 @@ export async function replaceLiveDatabase(
       await cleanupCommittedMarker({ stageName, rollbackName });
       await deleteMarker();
     },
-  }).catch(() => {
-    throw new Error('Geri yükleme tamamlanamadı; önceki veritabanı geri yüklendi veya güvenlik kopyası korunuyor.');
+  }).catch((err: unknown) => {
+    const detail = err instanceof Error ? ` [${err.message}]` : '';
+    throw new Error(`Geri yükleme tamamlanamadı${detail}; önceki veritabanı geri yüklendi veya güvenlik kopyası korunuyor.`);
   });
 }
 
@@ -198,9 +193,7 @@ async function verifyRecoveryDatabase(name: string, expectedDigest: string, expe
       },
       expectedSchemaVersion: CURRENT_SCHEMA_VERSION,
     });
-    const image = await database.serializeAsync();
-    const digest = toHex(sha256(image));
-    image.fill(0);
+    const digest = await computeLogicalDigest(database);
     if (validation.recordCount !== expectedRecordCount || digest !== expectedDigest) {
       throw new Error('Veritabanı beklenen doğrulanmış görüntüyle eşleşmiyor.');
     }
@@ -212,17 +205,6 @@ async function verifyRecoveryDatabase(name: string, expectedDigest: string, expe
 async function cleanupCommittedMarker(marker: Pick<MaintenanceMarker, 'stageName' | 'rollbackName'>): Promise<void> {
   await deleteDatabaseIfPresent(marker.stageName);
   await deleteDatabaseIfPresent(marker.rollbackName);
-}
-
-function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.length !== right.length) return false;
-  let difference = 0;
-  for (let index = 0; index < left.length; index += 1) difference |= left[index]! ^ right[index]!;
-  return difference === 0;
-}
-
-function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function writeMarker(marker: MaintenanceMarker): Promise<void> {

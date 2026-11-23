@@ -5,7 +5,7 @@ import { parseRecoveryMarker, recoverDatabaseState } from '../../src/features/ba
 
 const digest = 'a'.repeat(64);
 const marker = (state) => ({
-  version: 2, state, stageName: 'vdy-stage-0123456789abcdef.db', rollbackName: 'vdy-rollback-0123456789abcdef.db',
+  version: 3, state, stageName: 'vdy-stage-0123456789abcdef.db', rollbackName: 'vdy-rollback-0123456789abcdef.db',
   candidateDigest: digest, candidateRecordCount: 1, rollbackDigest: 'b'.repeat(64), rollbackRecordCount: 1,
 });
 

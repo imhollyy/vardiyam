@@ -6,6 +6,8 @@ export type ShiftTemplate = {
   name: string;
   startLocalTime: string;
   endLocalTime: string;
+  breakMinutes: number;
+  standardMinutes?: number;
   colorToken?: string;
   iconKey?: string;
 };
@@ -19,6 +21,7 @@ export type ShiftCycle = {
   anchorLocalDate: LocalDate;
   startIndex: number;
   entries: readonly CycleEntry[];
+  effectiveFrom?: LocalDate;
 };
 
 export type PlanOverride =

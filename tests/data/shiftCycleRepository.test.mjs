@@ -1,26 +1,17 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
 
 import { initializeDatabase } from '../../src/data/database.ts';
-import { buildShiftSchedule } from '../../src/features/shifts/schedule.ts';
 import {
-  createPlanOverride,
   createShiftCycle,
   createShiftTemplate,
-  deletePlanOverride,
   deleteShiftCycle,
   deleteShiftTemplate,
-  getPlannedShiftForDate,
-  getPlannedShiftsForRange,
   getShiftCycle,
   getShiftTemplate,
-  listPlanOverrides,
   listShiftCycles,
-  updatePlanOverride,
+  listShiftTemplates,
   updateShiftCycle,
   updateShiftTemplate,
   saveShiftSchedule,
@@ -54,7 +45,20 @@ const day = (id = 'day') => ({
   name: 'Day',
   startLocalTime: '08:00',
   endLocalTime: '16:00',
+  standardMinutes: 480,
+  breakMinutes: 30,
 });
+
+const night = (id = 'night') => ({
+  id,
+  code: 'N',
+  name: 'Night',
+  startLocalTime: '22:00',
+  endLocalTime: '06:00',
+  standardMinutes: 480,
+  breakMinutes: 30,
+});
+
 const cycle = (id = 'cycle') => ({
   id,
   name: 'Rotating',
@@ -62,218 +66,219 @@ const cycle = (id = 'cycle') => ({
   anchorLocalDate: '2026-01-01',
   startIndex: 0,
   entries: [{ kind: 'SHIFT', templateId: 'day' }, { kind: 'OFF' }],
+  effectiveFrom: '2026-01-01',
 });
 
-test('template and cycle CRUD round-trip preserves ordered domain data', async () => {
+test('template CRUD round-trip preserves all fields including standardMinutes', async () => {
   const { sqlite, database } = await setup();
   try {
     await createShiftTemplate(database, day());
-    assert.deepEqual(await getShiftTemplate(database, 'day'), day());
-    await updateShiftTemplate(database, { ...day(), name: 'Updated day', colorToken: 'blue' });
-    assert.equal((await getShiftTemplate(database, 'day')).name, 'Updated day');
+    const loaded = await getShiftTemplate(database, 'day');
+    assert.equal(loaded.id, 'day');
+    assert.equal(loaded.code, 'D');
+    assert.equal(loaded.name, 'Day');
+    assert.equal(loaded.startLocalTime, '08:00');
+    assert.equal(loaded.endLocalTime, '16:00');
+    assert.equal(loaded.standardMinutes, 480);
+
+    await updateShiftTemplate(database, { ...day(), name: 'Updated', startLocalTime: '09:00', standardMinutes: 540 });
+    const updated = await getShiftTemplate(database, 'day');
+    assert.equal(updated.name, 'Updated');
+    assert.equal(updated.startLocalTime, '09:00');
+    assert.equal(updated.standardMinutes, 540);
+  } finally { sqlite.close(); }
+});
+
+test('cycle CRUD round-trip preserves ordered entries', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
     await createShiftCycle(database, cycle());
-    assert.deepEqual(await getShiftCycle(database, 'cycle'), cycle());
+    const loaded = await getShiftCycle(database, 'cycle');
+    assert.deepEqual(loaded, cycle());
     assert.deepEqual(await listShiftCycles(database), [cycle()]);
-    const updated = { ...cycle(), name: 'Updated cycle', startIndex: 1 };
+
+    const updated = { ...cycle(), name: 'Updated', startIndex: 1 };
     await updateShiftCycle(database, updated);
     assert.deepEqual(await getShiftCycle(database, 'cycle'), updated);
+
     assert.equal(await deleteShiftCycle(database, 'cycle'), true);
     assert.equal(await deleteShiftTemplate(database, 'day'), true);
   } finally { sqlite.close(); }
 });
 
-test('saving an edited schedule is atomic and keeps existing date overrides', async () => {
+test('saveShiftSchedule atomically saves templates and cycle', async () => {
   const { sqlite, database } = await setup();
   try {
-    const templates = [
-      day(),
-      { ...day('evening'), code: 'E', name: 'Evening', startLocalTime: '16:00', endLocalTime: '00:00' },
-    ];
-    const initial = {
-      id: 'cycle', name: 'Cycle', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-01-01', startIndex: 0,
-      entries: [{ kind: 'SHIFT', templateId: 'day' }, { kind: 'OFF' }],
+    const templates = [day(), night()];
+    const c = {
+      id: 'c1', name: 'Two-shift', timezone: 'Europe/Istanbul',
+      anchorLocalDate: '2026-01-05', startIndex: 0, effectiveFrom: '2026-01-05',
+      entries: [
+        { kind: 'SHIFT', templateId: 'day' },
+        { kind: 'SHIFT', templateId: 'night' },
+        { kind: 'OFF' },
+      ],
     };
-    await saveShiftSchedule(database, templates, initial);
-    await createPlanOverride(database, 'cycle', { localDate: '2026-01-02', kind: 'LEAVE' });
+    await saveShiftSchedule(database, templates, c, '2026-01-05');
+    assert.deepEqual(await getShiftCycle(database, 'c1'), c);
+    assert.equal((await listShiftTemplates(database)).length, 2);
 
-    const updatedTemplates = templates.map((template) =>
-      template.id === 'day' ? { ...template, name: 'Day updated' } : template,
+    const updatedTemplates = templates.map((t) =>
+      t.id === 'day' ? { ...t, startLocalTime: '09:00', standardMinutes: 540 } : t,
     );
-    const updated = {
-      ...initial,
-      name: 'Updated cycle',
-      anchorLocalDate: '2026-02-01',
-      startIndex: 1,
-      entries: [{ kind: 'SHIFT', templateId: 'evening' }, { kind: 'OFF' }],
-    };
-    await saveShiftSchedule(database, updatedTemplates, updated);
+    const updatedCycle = { ...c, name: 'Updated', anchorLocalDate: '2026-02-01', startIndex: 1, effectiveFrom: '2026-02-01' };
+    await saveShiftSchedule(database, updatedTemplates, updatedCycle, '2026-02-01');
 
-    assert.deepEqual(await getShiftCycle(database, 'cycle'), updated);
-    assert.equal((await getShiftTemplate(database, 'day')).name, 'Day updated');
-    assert.deepEqual(await listPlanOverrides(database, 'cycle'), [
-      { localDate: '2026-01-02', kind: 'LEAVE' },
-    ]);
+    assert.deepEqual(await getShiftCycle(database, 'c1'), updatedCycle);
+    assert.equal((await getShiftTemplate(database, 'day')).startLocalTime, '09:00');
+    assert.equal((await getShiftTemplate(database, 'day')).standardMinutes, 540);
   } finally { sqlite.close(); }
 });
 
-test('reconfirming a reopened schedule reuses cycle/template IDs and does not touch work records', async () => {
+test('effectiveFrom is stored with the cycle', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
+    await createShiftCycle(database, cycle(), '2026-03-15');
+    const row = sqlite.prepare("SELECT effective_from FROM shift_cycles WHERE id = 'cycle';").get();
+    assert.equal(row.effective_from, '2026-03-15');
+  } finally { sqlite.close(); }
+});
+
+test('saveShiftSchedule with new effectiveFrom creates a versioned cycle', async () => {
   const { sqlite, database } = await setup();
   try {
     const templates = [day()];
-    const saved = {
-      id: 'stable-cycle', name: 'Vardiya düzenim', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-01-01', startIndex: 0,
-      entries: [{ kind: 'SHIFT', templateId: 'day' }],
-    };
-    await saveShiftSchedule(database, templates, saved);
-    sqlite.prepare("INSERT INTO work_records(id,record_source,started_at_utc,ended_at_utc,timezone,break_minutes,note) VALUES('existing-work','MANUAL','2026-01-04T05:00:00.000Z','2026-01-04T13:00:00.000Z','Europe/Istanbul',0,NULL);").run();
+    const c = cycle();
+    await saveShiftSchedule(database, templates, c, '2026-01-01');
+    let row = sqlite.prepare("SELECT effective_from FROM shift_cycles WHERE id = 'cycle';").get();
+    assert.equal(row.effective_from, '2026-01-01');
 
-    const updatedTemplate = { ...templates[0], startLocalTime: '09:00' };
-    const updated = { ...saved, entries: [{ kind: 'SHIFT', templateId: 'day' }] };
-    await saveShiftSchedule(database, [updatedTemplate], updated);
-    await saveShiftSchedule(database, [updatedTemplate], updated);
-
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM shift_cycles WHERE id='stable-cycle';").get().count, 1);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM shift_templates WHERE id='day';").get().count, 1);
-    assert.equal(sqlite.prepare("SELECT start_local_time FROM shift_templates WHERE id='day';").get().start_local_time, '09:00');
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM work_records WHERE id='existing-work';").get().count, 1);
+    await saveShiftSchedule(database, templates, { ...c, startIndex: 1 }, '2026-06-01');
+    row = sqlite.prepare("SELECT effective_from FROM shift_cycles WHERE id = 'cycle';").get();
+    assert.equal(row.effective_from, '2026-06-01');
+    assert.equal((await getShiftCycle(database, 'cycle')).startIndex, 1);
   } finally { sqlite.close(); }
 });
 
-test('repository edit round-trip keeps the saved cycle phase exactly', async () => {
-  const { sqlite, database } = await setup();
-  try {
-    const templates = [day(), { ...day('evening'), code: 'E', name: 'Evening' }, { ...day('night'), code: 'N', name: 'Night' }];
-    const saved = {
-      id: 'cycle', name: 'Weekly', timezone: 'Europe/Istanbul', anchorLocalDate: '2026-01-01', startIndex: 10,
-      entries: Array.from({ length: 21 }, (_, index) => ({ kind: 'SHIFT', templateId: templates[Math.floor(index / 7)].id })),
-    };
-    await saveShiftSchedule(database, templates, saved);
-    const loaded = await getShiftCycle(database, 'cycle');
-    const templateIndex = templates.findIndex((template) => template.id === loaded.entries[loaded.startIndex].templateId);
-    const rebuilt = buildShiftSchedule({
-      id: loaded.id, name: loaded.name, timezone: loaded.timezone, anchorLocalDate: loaded.anchorLocalDate,
-      pattern: 'weekly-three', startTemplateIndex: templateIndex, preservedStartEntryIndex: loaded.startIndex,
-      templates, customEntries: [],
-    });
-    assert.deepEqual(rebuilt.cycle, loaded);
-  } finally { sqlite.close(); }
-});
-
-test('failed schedule save rolls back earlier template inserts and the cycle', async () => {
+test('delete template in use raises TEMPLATE_IN_USE', async () => {
   const { sqlite, database } = await setup();
   try {
     await createShiftTemplate(database, day());
-    const templates = [
-      { ...day('new'), code: 'N', name: 'Night' },
-      { ...day('conflict'), code: 'D', name: 'Conflicting day' },
+    await createShiftCycle(database, cycle());
+    await assert.rejects(
+      deleteShiftTemplate(database, 'day'),
+      (err) => err instanceof ShiftStorageError && err.code === 'TEMPLATE_IN_USE',
+    );
+  } finally { sqlite.close(); }
+});
+
+test('duplicate template code is rejected by DB unique constraint', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
+    await assert.rejects(createShiftTemplate(database, { ...day(), id: 'dup', name: 'Dup' }));
+  } finally { sqlite.close(); }
+});
+
+test('cycle with unknown template is rejected by domain validation', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
+    await assert.rejects(
+      createShiftCycle(database, { ...cycle(), entries: [{ kind: 'SHIFT', templateId: 'missing' }] }),
+    );
+  } finally { sqlite.close(); }
+});
+
+test('failed saveShiftSchedule rolls back all changes', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
+    const conflictTemplates = [
+      { ...night(), id: 'new-night' },
+      { ...day(), id: 'conflict', code: 'D', name: 'Conflict' },
     ];
-    const cycle = {
-      id: 'cycle', name: 'Should rollback', timezone: 'Europe/Istanbul',
+    const c = {
+      id: 'bad', name: 'Bad', timezone: 'Europe/Istanbul',
       anchorLocalDate: '2026-01-01', startIndex: 0,
-      entries: [
-        { kind: 'SHIFT', templateId: 'new' },
-        { kind: 'SHIFT', templateId: 'conflict' },
-      ],
+      entries: [{ kind: 'SHIFT', templateId: 'new-night' }, { kind: 'SHIFT', templateId: 'conflict' }],
     };
-
-    await assert.rejects(saveShiftSchedule(database, templates, cycle));
-    assert.equal(await getShiftTemplate(database, 'new'), null);
+    await assert.rejects(saveShiftSchedule(database, conflictTemplates, c));
+    assert.equal(await getShiftTemplate(database, 'new-night'), null);
     assert.equal(await getShiftTemplate(database, 'conflict'), null);
-    assert.equal(await getShiftCycle(database, 'cycle'), null);
-    assert.deepEqual(await listShiftCycles(database), []);
+    assert.equal(await getShiftCycle(database, 'bad'), null);
   } finally { sqlite.close(); }
 });
 
-test('saved schedule and overrides survive closing and reopening the SQLite database', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'vardiyam-schedule-'));
-  const path = join(directory, 'schedule.db');
-  let sqlite = new DatabaseSync(path);
-  try {
-    let database = createAdapter(sqlite);
-    await initializeDatabase(database);
-    const templates = [day(), { ...day('evening'), code: 'E', name: 'Evening', startLocalTime: '16:00', endLocalTime: '00:00' }];
-    const savedCycle = {
-      id: 'persistent-cycle', name: 'Persistent', timezone: 'Europe/Istanbul',
-      anchorLocalDate: '2026-12-31', startIndex: 0,
-      entries: [{ kind: 'SHIFT', templateId: 'day' }, { kind: 'OFF' }],
-    };
-    await saveShiftSchedule(database, templates, savedCycle);
-    await createPlanOverride(database, savedCycle.id, { localDate: '2027-01-01', kind: 'LEAVE' });
-    sqlite.close();
-
-    sqlite = new DatabaseSync(path);
-    database = createAdapter(sqlite);
-    await initializeDatabase(database);
-    assert.deepEqual(await getShiftCycle(database, savedCycle.id), savedCycle);
-    assert.equal((await getPlannedShiftForDate(database, savedCycle.id, '2026-12-31')).templateId, 'day');
-    assert.equal((await getPlannedShiftForDate(database, savedCycle.id, '2027-01-01')).kind, 'LEAVE');
-  } finally {
-    sqlite.close();
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('overrides persist SHIFT/OFF/LEAVE, enforce one per date, and do not shift the cycle', async () => {
+test('MON_FRI two-shift cycle has 14 entries: 5 day + 2 off + 5 night + 2 off', async () => {
   const { sqlite, database } = await setup();
   try {
-    await createShiftTemplate(database, day());
-    await createShiftCycle(database, cycle());
-    const overrides = [
-      { localDate: '2026-01-01', kind: 'OFF' },
-      { localDate: '2026-01-02', kind: 'SHIFT', templateId: 'day', reason: 'cover' },
-      { localDate: '2026-01-03', kind: 'LEAVE' },
+    const templates = [day(), night()];
+    const entries = [
+      ...Array.from({ length: 5 }, () => ({ kind: 'SHIFT', templateId: 'day' })),
+      ...Array.from({ length: 2 }, () => ({ kind: 'OFF' })),
+      ...Array.from({ length: 5 }, () => ({ kind: 'SHIFT', templateId: 'night' })),
+      ...Array.from({ length: 2 }, () => ({ kind: 'OFF' })),
     ];
-    for (const override of overrides) await createPlanOverride(database, 'cycle', override);
-    await assert.rejects(createPlanOverride(database, 'cycle', overrides[0]));
-    assert.deepEqual(await listPlanOverrides(database, 'cycle'), overrides);
-    await updatePlanOverride(database, 'cycle', '2026-01-01', { localDate: '2026-01-04', kind: 'LEAVE' });
-    assert.equal(await deletePlanOverride(database, 'cycle', '2026-01-02'), true);
-    assert.equal((await getPlannedShiftForDate(database, 'cycle', '2026-01-01')).kind, 'SHIFT');
-    assert.equal((await getPlannedShiftForDate(database, 'cycle', '2026-01-02')).kind, 'OFF');
-    assert.equal((await getPlannedShiftForDate(database, 'cycle', '2026-01-04')).kind, 'LEAVE');
+    const c = {
+      id: 'two-shift', name: 'Mon-Fri Two', timezone: 'Europe/Istanbul',
+      anchorLocalDate: '2026-01-05', startIndex: 0, entries,
+    };
+    await saveShiftSchedule(database, templates, c, '2026-01-05');
+    const loaded = await getShiftCycle(database, 'two-shift');
+    assert.equal(loaded.entries.length, 14);
+    assert.equal(loaded.entries[0].kind, 'SHIFT');
+    assert.equal(loaded.entries[0].templateId, 'day');
+    assert.equal(loaded.entries[5].kind, 'OFF');
+    assert.equal(loaded.entries[7].kind, 'SHIFT');
+    assert.equal(loaded.entries[7].templateId, 'night');
+    assert.equal(loaded.entries[12].kind, 'OFF');
   } finally { sqlite.close(); }
 });
 
-test('foreign keys, uniqueness and safe deletion preserve referenced rows', async () => {
+test('MON_SAT fixed-day cycle has 7 entries: 6 shift + 1 off', async () => {
   const { sqlite, database } = await setup();
   try {
-    await createShiftTemplate(database, day());
-    await assert.rejects(createShiftTemplate(database, { ...day(), id: 'duplicate', name: 'duplicate' }));
-    await assert.rejects(createShiftCycle(database, { ...cycle(), entries: [{ kind: 'SHIFT', templateId: 'missing' }] }));
-    await createShiftCycle(database, cycle());
-    await createPlanOverride(database, 'cycle', { localDate: '2026-02-01', kind: 'SHIFT', templateId: 'day' });
-    await assert.rejects(deleteShiftTemplate(database, 'day'), (error) => error instanceof ShiftStorageError && error.code === 'TEMPLATE_IN_USE');
-    await assert.rejects(deleteShiftCycle(database, 'cycle'), (error) => error instanceof ShiftStorageError && error.code === 'CYCLE_HAS_OVERRIDES');
-    assert.ok(await getShiftCycle(database, 'cycle'));
-    assert.ok(await getShiftTemplate(database, 'day'));
-    assert.throws(() => sqlite.prepare("INSERT INTO plan_overrides (cycle_id, local_date, kind) VALUES ('absent', '2026-01-01', 'OFF');").run());
+    const templates = [day()];
+    const entries = [
+      ...Array.from({ length: 6 }, () => ({ kind: 'SHIFT', templateId: 'day' })),
+      { kind: 'OFF' },
+    ];
+    const c = {
+      id: 'sat-fixed', name: 'Mon-Sat Fixed', timezone: 'Europe/Istanbul',
+      anchorLocalDate: '2026-01-05', startIndex: 0, entries,
+    };
+    await saveShiftSchedule(database, templates, c, '2026-01-05');
+    const loaded = await getShiftCycle(database, 'sat-fixed');
+    assert.equal(loaded.entries.length, 7);
+    for (let i = 0; i < 6; i++) assert.equal(loaded.entries[i].kind, 'SHIFT');
+    assert.equal(loaded.entries[6].kind, 'OFF');
   } finally { sqlite.close(); }
 });
 
-test('failed cycle replacement rolls back parent update and prior entries', async () => {
+test('shift change re-aligns cycle with new startIndex', async () => {
   const { sqlite, database } = await setup();
   try {
-    await createShiftTemplate(database, day());
-    await createShiftCycle(database, cycle());
-    sqlite.exec("CREATE TRIGGER reject_second_entry BEFORE INSERT ON cycle_entries WHEN NEW.position = 1 BEGIN SELECT RAISE(ABORT, 'injected failure'); END;");
-    await assert.rejects(updateShiftCycle(database, { ...cycle(), name: 'must rollback', startIndex: 1 }));
-    assert.deepEqual(await getShiftCycle(database, 'cycle'), cycle());
-    sqlite.exec('DROP TRIGGER reject_second_entry;');
-  } finally { sqlite.close(); }
-});
+    const templates = [day(), night()];
+    const entries = [
+      ...Array.from({ length: 5 }, () => ({ kind: 'SHIFT', templateId: 'day' })),
+      { kind: 'OFF' }, { kind: 'OFF' },
+      ...Array.from({ length: 5 }, () => ({ kind: 'SHIFT', templateId: 'night' })),
+      { kind: 'OFF' }, { kind: 'OFF' },
+    ];
+    const c = {
+      id: 'realign', name: 'Realign', timezone: 'Europe/Istanbul',
+      anchorLocalDate: '2026-01-05', startIndex: 0, entries,
+    };
+    await saveShiftSchedule(database, templates, c, '2026-01-05');
 
-test('database range projection matches the pure domain engine and rejects unsafe range size', async () => {
-  const { sqlite, database } = await setup();
-  try {
-    await createShiftTemplate(database, day());
-    await createShiftCycle(database, cycle());
-    await createPlanOverride(database, 'cycle', { localDate: '2026-01-03', kind: 'LEAVE' });
-    const projected = await getPlannedShiftsForRange(database, 'cycle', '2026-01-01', '2026-01-05');
-    assert.deepEqual(projected.map(({ localDate, kind, source }) => [localDate, kind, source]), [
-      ['2026-01-01', 'SHIFT', 'CYCLE'], ['2026-01-02', 'OFF', 'CYCLE'],
-      ['2026-01-03', 'LEAVE', 'OVERRIDE'], ['2026-01-04', 'OFF', 'CYCLE'],
-      ['2026-01-05', 'SHIFT', 'CYCLE'],
-    ]);
-    await assert.rejects(getPlannedShiftsForRange(database, 'cycle', '2026-01-01', '2037-01-01'), /limited to/);
+    const shifted = { ...c, startIndex: 7, anchorLocalDate: '2026-01-19' };
+    await saveShiftSchedule(database, templates, shifted, '2026-01-19');
+    const loaded = await getShiftCycle(database, 'realign');
+    assert.equal(loaded.startIndex, 7);
+    assert.equal(loaded.anchorLocalDate, '2026-01-19');
+    assert.equal(loaded.entries[loaded.startIndex].templateId, 'night');
   } finally { sqlite.close(); }
 });

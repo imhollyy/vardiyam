@@ -1,54 +1,85 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { APP_NAME } from '@/src/config/app';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
+import { Screen } from '@/src/components/ui/Screen';
+import { ActionButton } from '@/src/components/ui/ActionButton';
+
+const STEPS: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }[] = [
+  { icon: 'calendar-outline', text: 'Vardiya düzenini gir' },
+  { icon: 'calculator-outline', text: 'Maaş ve kesintilerini hesapla' },
+  { icon: 'bar-chart-outline', text: 'Aylık kazancını takip et' },
+];
+
+const TRUST: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }[] = [
+  { icon: 'phone-portrait-outline', text: 'Veriler cihazında' },
+  { icon: 'cloud-offline-outline', text: 'İnternet gerektirmez' },
+  { icon: 'lock-closed-outline', text: 'Sunucuya veri gitmez' },
+];
 
 export default function WelcomeScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <Screen scroll={false}>
       <View style={styles.hero}>
-        <Text style={[styles.title, { color: theme.foreground }]}>{APP_NAME}</Text>
+        <View style={[styles.logoCircle, { backgroundColor: theme.surfaceMuted }]}>
+          <Ionicons name="briefcase" size={48} color={theme.ink} />
+        </View>
+        <Text style={[styles.title, { color: theme.ink }]}>{APP_NAME}</Text>
         <Text style={[styles.subtitle, { color: theme.muted }]}>
           Vardiyalarını takip et, kazancını hesapla.
         </Text>
+
+        <View style={styles.steps}>
+          {STEPS.map((step, i) => (
+            <View key={i} style={styles.stepRow} accessibilityLabel={`${i + 1}. ${step.text}`}>
+              <View style={[styles.stepIcon, { backgroundColor: theme.surfaceMuted }]}>
+                <Ionicons accessible={false} name={step.icon} size={20} color={theme.ink} />
+              </View>
+              <Text style={[styles.stepText, { color: theme.ink }]}>{step.text}</Text>
+            </View>
+          ))}
+        </View>
       </View>
+
       <View style={styles.bottom}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.replace('/setup')}
-          style={({ pressed }) => [
-            styles.button,
-            { backgroundColor: theme.primaryAction, opacity: pressed ? 0.85 : 1 },
-          ]}
-        >
-          <Text style={[styles.buttonText, { color: theme.onPrimaryAction }]}>Başla</Text>
-        </Pressable>
+        <View style={styles.trustRow}>
+          {TRUST.map((item, i) => (
+            <View key={i} style={styles.trustItem} accessibilityLabel={item.text}>
+              <Ionicons accessible={false} name={item.icon} size={18} color={theme.muted} />
+              <Text style={[styles.trustText, { color: theme.muted }]}>{item.text}</Text>
+            </View>
+          ))}
+        </View>
+        <ActionButton label="Hızlı Kurulum" onPress={() => router.replace('/setup')} icon="arrow-forward" />
       </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: layout.screen.horizontal,
-    paddingTop: 80,
-    paddingBottom: layout.screen.bottom,
-  },
   hero: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
+  },
+  logoCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   title: {
+    fontFamily: fonts.extraBold,
     fontSize: 34,
-    fontWeight: '800',
     textAlign: 'center',
   },
   subtitle: {
@@ -56,17 +87,44 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 26,
   },
-  bottom: {
-    paddingBottom: 16,
+  steps: {
+    marginTop: 24,
+    gap: 14,
+    alignSelf: 'stretch',
   },
-  button: {
-    borderRadius: layout.radius.control,
-    paddingVertical: 16,
+  stepRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minHeight: layout.control.minHeight,
+    gap: 14,
   },
-  buttonText: {
+  stepIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepText: {
+    fontFamily: fonts.semiBold,
     fontSize: layout.type.body,
-    fontWeight: '700',
+    flex: 1,
+  },
+  bottom: {
+    gap: 20,
+    paddingBottom: 8,
+  },
+  trustRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  trustItem: {
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: 100,
+  },
+  trustText: {
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+    textAlign: 'center',
   },
 });

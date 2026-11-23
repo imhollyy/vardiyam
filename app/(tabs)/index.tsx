@@ -1,14 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
-import { deriveDays, enumerateDays, type DerivedDay, type Settings } from '@/src/domain/payroll/index';
+import { deriveDays, type DerivedDay, type MonthlyStatement, type Settings } from '@/src/domain/payroll/index';
 import { formatTryMinor } from '@/src/domain/money';
+import { loadCurrentPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
+import { Screen } from '@/src/components/ui/Screen';
+import { Card } from '@/src/components/ui/Card';
+import { PageHeading } from '@/src/components/ui/PageHeading';
+import { InkCard, InkCardRow, InkCardStat } from '@/src/components/ui/InkCard';
+import { DayBlock, type DayBlockStatus } from '@/src/components/ui/DayBlock';
+import { ActionButton } from '@/src/components/ui/ActionButton';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { SkeletonCard } from '@/src/components/ui/Skeleton';
 
 const DAY_LABELS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
@@ -38,187 +48,152 @@ function weekDates(center: string): string[] {
   return dates;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  WORKED: 'Çalışma günü',
-  OFF: 'İzinli',
-  LEAVE: 'İzin',
-  HOLIDAY: 'Resmî tatil',
-};
+function formatGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 6) return 'İyi geceler';
+  if (hour < 12) return 'Günaydın';
+  if (hour < 18) return 'İyi günler';
+  return 'İyi akşamlar';
+}
+
+function formatDate(localDate: string): string {
+  const [y, m, d] = localDate.split('-');
+  const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  return `${Number(d)} ${months[Number(m) - 1]} ${y}`;
+}
+
+function toDayBlockStatus(day: DerivedDay | undefined): DayBlockStatus {
+  if (!day) return 'off';
+  if (day.status === 'WORKED') return day.overtimeMinutes > 0 ? 'overtime' : 'shift';
+  if (day.status === 'LEAVE') return 'leave';
+  if (day.status === 'HOLIDAY') return 'holiday';
+  return 'off';
+}
+
+function toDayCode(day: DerivedDay | undefined): string {
+  if (!day) return '—';
+  if (day.status === 'WORKED') return 'G';
+  if (day.status === 'LEAVE') return day.leaveType === 'ANNUAL' ? 'İZN' : 'İZ';
+  if (day.status === 'HOLIDAY') return 'T';
+  return '—';
+}
 
 export default function HomeScreen() {
   const { theme } = useAppTheme();
   const database = useAppDatabase();
   const router = useRouter();
-  const today = useMemo(todayLocal, []);
+  const today = useMemo(() => todayLocal(), []);
   const week = useMemo(() => weekDates(today), [today]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [days, setDays] = useState<DerivedDay[]>([]);
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [periodStatement, setPeriodStatement] = useState<MonthlyStatement | null>(null);
+  const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setLoading(true);
       void (async () => {
-        const s = await getSettings(database);
-        const entries = await getDayEntriesInRange(database, week[0]!, week[6]!);
-        const derived = deriveDays(week, entries, s);
-        if (active) {
-          setSettings(s);
-          setDays(derived);
+        try {
+          const s = await getSettings(database);
+          const entries = await getDayEntriesInRange(database, week[0]!, week[6]!);
+          const derived = deriveDays(week, entries, s);
+          const { statement, period } = await loadCurrentPeriodStatement(database, today);
+          if (active) {
+            setSettings(s);
+            setDays(derived);
+            setPeriodStatement(statement);
+            setPeriodInfo(period);
+          }
+        } finally {
+          if (active) setLoading(false);
         }
       })();
       return () => { active = false; };
-    }, [database, week]),
+    }, [database, week, today]),
   );
 
-  const selectedDay = days.find((d) => d.localDate === selectedDate);
+  if (loading) {
+    return (
+      <Screen>
+        <PageHeading eyebrow={formatGreeting()} title={formatDate(today)} />
+        <SkeletonCard rows={2} />
+        <SkeletonCard rows={4} />
+      </Screen>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.greeting, { color: theme.foreground }]}>
-          {settings ? formatTryMinor(settings.salaryMinor) + ' / ay' : ''}
-        </Text>
+    <Screen>
+      {/* Heading: greeting + date, salary pill */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <PageHeading eyebrow={formatGreeting()} title={formatDate(today)} />
+        {settings && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.surfaceMuted, paddingHorizontal: 10, paddingVertical: 6, borderRadius: layout.radius.pill, marginTop: 6 }}>
+            <Ionicons accessible={false} name="wallet" size={14} color={theme.muted} />
+            <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.caption, color: theme.muted }}>
+              {formatTryMinor(settings.salaryMinor)}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.weekStrip}>
+      {/* Period summary ink card */}
+      <InkCard
+        eyebrow={periodInfo?.label ?? 'Bu dönem'}
+        amount={periodStatement ? formatTryMinor(periodStatement.netMinor) : '—'}
+        daysLabel={periodStatement ? `${periodStatement.workedDays} gün` : undefined}
+      >
+        <InkCardRow>
+          <InkCardStat label="Çalışılan" value={periodStatement ? String(periodStatement.workedDays) : '—'} />
+          <InkCardStat label="Fazla mesai" value={periodStatement && periodStatement.overtimeMinutes > 0 ? `${Math.floor(periodStatement.overtimeMinutes / 60)} sa` : '0 sa'} />
+          <InkCardStat label="İzin/Tatil" value={periodStatement ? String(periodStatement.totalDays - periodStatement.workedDays) : '—'} />
+        </InkCardRow>
+      </InkCard>
+
+      {/* Week strip */}
+      <SectionHeader title="Bu Hafta" />
+      <View style={{ flexDirection: 'row', gap: 6 }}>
         {week.map((date) => {
           const dow = new Date(date.replace(/-/g, '/')).getDay();
           const day = days.find((d) => d.localDate === date);
-          const isToday = date === today;
-          const isSelected = date === selectedDate;
+          const dateNum = date.split('-')[2] ?? '';
+          const otMin = day?.overtimeMinutes ?? 0;
+          const otLabel = otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined;
           return (
-            <Pressable
-              key={date}
-              accessibilityRole="button"
-              accessibilityLabel={`${DAY_LABELS[dow]} ${date.split('-')[2]}`}
-              onPress={() => setSelectedDate(date)}
-              style={[
-                styles.weekDay,
-                {
-                  backgroundColor: isSelected ? theme.accentSurface : 'transparent',
-                  borderColor: isToday ? theme.accent : 'transparent',
-                },
-              ]}
-            >
-              <Text style={[styles.weekDayLabel, { color: isSelected ? theme.accent : theme.muted }]}>
-                {DAY_LABELS[dow]}
-              </Text>
-              <Text style={[styles.weekDayNumber, { color: isSelected ? theme.accent : theme.foreground }]}>
-                {date.split('-')[2]}
-              </Text>
-              <View
-                style={[
-                  styles.statusDot,
-                  {
-                    backgroundColor:
-                      day?.status === 'WORKED' ? theme.success :
-                      day?.status === 'HOLIDAY' ? theme.warning :
-                      day?.status === 'LEAVE' ? theme.danger :
-                      theme.border,
-                  },
-                ]}
+            <View key={date} style={{ flex: 1 }}>
+              <DayBlock
+                dayLabel={DAY_LABELS[dow] ?? ''}
+                dateNumber={dateNum}
+                code={toDayCode(day)}
+                status={toDayBlockStatus(day)}
+                isToday={date === today}
+                hasOvertime={otMin > 0}
+                overtimeLabel={otLabel}
+                onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
               />
-            </Pressable>
+            </View>
           );
         })}
       </View>
 
-      <ScrollView contentContainerStyle={styles.detail}>
-        {selectedDay && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.cardTitle, { color: theme.foreground }]}>
-              {STATUS_LABELS[selectedDay.status] ?? selectedDay.status}
-            </Text>
-            {selectedDay.leaveType && selectedDay.leaveType !== 'HOLIDAY' && (
-              <Text style={{ color: theme.muted, fontSize: layout.type.body }}>
-                İzin: {selectedDay.leaveType}{selectedDay.leaveHalfDay ? ' (yarım gün)' : ''}
-              </Text>
-            )}
-            {selectedDay.overtimeMinutes > 0 && (
-              <Text style={{ color: theme.warning, fontSize: layout.type.body }}>
-                Fazla mesai: {Math.floor(selectedDay.overtimeMinutes / 60)} sa {selectedDay.overtimeMinutes % 60} dk
-              </Text>
-            )}
-            {selectedDay.note && (
-              <Text style={{ color: theme.muted, fontSize: layout.type.caption, marginTop: 4 }}>
-                {selectedDay.note}
-              </Text>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push({ pathname: '/day-edit' as never, params: { date: selectedDate } })}
-              style={[styles.editButton, { borderColor: theme.border }]}
-            >
-              <Text style={{ color: theme.accent, fontWeight: '600', fontSize: layout.type.body }}>Düzenle</Text>
-            </Pressable>
-          </View>
-        )}
-      </ScrollView>
-    </View>
+      {/* Quick actions */}
+      <SectionHeader title="Hızlı Erişim" />
+      <Card>
+        <ActionButton
+          label="Ek gelir ekle"
+          variant="secondary"
+          icon="cash-outline"
+          onPress={() => router.push('/additional-income' as never)}
+        />
+        <ActionButton
+          label="Vardiya değişikliği"
+          variant="secondary"
+          icon="swap-horizontal-outline"
+          onPress={() => router.push('/shift-change' as never)}
+        />
+      </Card>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 60,
-  },
-  header: {
-    paddingHorizontal: layout.screen.horizontal,
-    marginBottom: 16,
-  },
-  greeting: {
-    fontSize: layout.type.title,
-    fontWeight: '800',
-  },
-  weekStrip: {
-    flexDirection: 'row',
-    paddingHorizontal: layout.screen.horizontal,
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  weekDay: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: layout.radius.control,
-    borderWidth: 1.5,
-    minWidth: 42,
-    gap: 4,
-  },
-  weekDayLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  weekDayNumber: {
-    fontSize: layout.type.body,
-    fontWeight: '700',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  detail: {
-    paddingHorizontal: layout.screen.horizontal,
-    paddingBottom: layout.screen.bottom,
-  },
-  card: {
-    borderRadius: layout.radius.card,
-    borderWidth: 1,
-    padding: 20,
-    gap: 8,
-  },
-  cardTitle: {
-    fontSize: layout.type.section,
-    fontWeight: '700',
-  },
-  editButton: {
-    borderWidth: 1,
-    borderRadius: layout.radius.control,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-});

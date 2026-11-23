@@ -30,9 +30,18 @@ function canonicalLocalDateCheck(column: string): string {
   `;
 }
 
+/**
+ * Yeni şema 100'den başlar. Eski "Vardiyam" sürümleri 1–9 arasını kullanıyordu;
+ * bu aralıkta bir veritabanı bulunursa uyumsuz sayılır ve sıfırlanır.
+ * Yeni migration eklerken 101, 102… şeklinde devam et.
+ */
+export const FIRST_SCHEMA_VERSION = 100;
+
+export const DEFAULT_SETTINGS_INSERT_SQL = 'INSERT OR IGNORE INTO settings (id) VALUES (1);';
+
 export const migrations: readonly Migration[] = [
   {
-    version: 1,
+    version: 100,
     sql: `
       CREATE TABLE IF NOT EXISTS app_metadata (
         key TEXT PRIMARY KEY NOT NULL,
@@ -141,7 +150,21 @@ export const migrations: readonly Migration[] = [
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S.000Z', 'now'))
       );
 
-      INSERT OR IGNORE INTO settings (id) VALUES (1);
+      ${DEFAULT_SETTINGS_INSERT_SQL}
+    `,
+  },
+  {
+    version: 101,
+    sql: `
+      ALTER TABLE shift_templates ADD COLUMN break_minutes INTEGER NOT NULL DEFAULT 0;
+
+      -- Fill existing rows with the legal minimum break based on shift duration.
+      -- duration <= 240 min → 15 dk, <= 450 → 30 dk, > 450 → 60 dk (İş K. md. 68)
+      UPDATE shift_templates SET break_minutes = CASE
+        WHEN standard_minutes <= 240 THEN 15
+        WHEN standard_minutes <= 450 THEN 30
+        ELSE 60
+      END;
     `,
   },
 ];
@@ -165,7 +188,8 @@ export async function runMigrations(database: MigrationDatabase): Promise<Migrat
       );
     }
 
-    if (initialVersion > 0 && initialVersion < CURRENT_SCHEMA_VERSION) {
+    // Eski Vardiyam şeması (1–9) veya yeni şemadan önceki herhangi bir sürüm: güvenle sıfırla.
+    if (initialVersion > 0 && initialVersion < FIRST_SCHEMA_VERSION) {
       return { previousVersion: initialVersion, currentVersion: initialVersion, needsReset: true };
     }
 

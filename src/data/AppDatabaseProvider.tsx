@@ -20,6 +20,7 @@ type AppDatabaseContextValue = {
   busy: boolean;
   error: string | null;
   runDatabaseMaintenance: <T>(operation: (database: SQLiteDatabase, maintenance: DatabaseMaintenance) => Promise<T>) => Promise<T>;
+  notifyDataReset: () => void;
 };
 
 const AppDatabaseContext = createContext<AppDatabaseContextValue | null>(null);
@@ -52,6 +53,7 @@ export function AppDatabaseProvider({ children }: PropsWithChildren) {
   const [database, setDatabase] = useState<SQLiteDatabase | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataEpoch, setDataEpoch] = useState(0);
   const databaseRef = useRef<SQLiteDatabase | null>(null);
 
   useEffect(() => {
@@ -69,7 +71,8 @@ export function AppDatabaseProvider({ children }: PropsWithChildren) {
       setDatabase(opened);
       setError(null);
       setBusy(false);
-    }).catch(() => {
+    }).catch((openError: unknown) => {
+      console.error('[db] açılış hatası', openError);
       if (active) {
         setError('Yerel veritabanı açılamadı. Veriler değiştirilmedi. Uygulamayı yeniden başlatıp tekrar deneyin.');
         setBusy(false);
@@ -130,19 +133,23 @@ export function AppDatabaseProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const value = useMemo(() => ({ database, busy, error, runDatabaseMaintenance }), [database, busy, error, runDatabaseMaintenance]);
+  const notifyDataReset = useCallback(() => { setDataEpoch((e) => e + 1); }, []);
+
+  const value = useMemo(() => ({ database, busy, error, runDatabaseMaintenance, notifyDataReset }), [database, busy, error, runDatabaseMaintenance, notifyDataReset]);
 
   return (
     <AppDatabaseContext.Provider value={value}>
       {!database ? (
-        <View accessibilityRole="progressbar" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          {busy && <ActivityIndicator />}
-          <Text accessibilityLiveRegion="polite" style={{ marginTop: 12, textAlign: 'center' }}>
+        // Tema henüz yüklenmediği için renkler sabit verilir; aksi halde koyu modda
+        // siyah zemin üstünde siyah yazı oluşur ve ekran tamamen siyah görünür.
+        <View accessibilityRole="progressbar" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFFFFF' }}>
+          {busy && <ActivityIndicator color="#1F2937" />}
+          <Text accessibilityLiveRegion="polite" style={{ marginTop: 12, textAlign: 'center', color: '#1F2937' }}>
             {error ?? (busy ? 'Yerel veritabanı hazırlanıyor…' : 'Veritabanı kullanılamıyor.')}
           </Text>
         </View>
       ) : (
-        <View style={{ flex: 1 }}>
+        <View key={dataEpoch} style={{ flex: 1 }}>
           <View style={{ flex: 1 }} pointerEvents={busy ? 'none' : 'auto'} accessibilityElementsHidden={busy} importantForAccessibility={busy ? 'no-hide-descendants' : 'auto'}>
             {children}
           </View>
@@ -170,4 +177,10 @@ export function useDatabaseMaintenance() {
   const value = useContext(AppDatabaseContext);
   if (!value) throw new Error('useDatabaseMaintenance must be used inside AppDatabaseProvider.');
   return { busy: value.busy, error: value.error, runDatabaseMaintenance: value.runDatabaseMaintenance };
+}
+
+export function useNotifyDataReset() {
+  const value = useContext(AppDatabaseContext);
+  if (!value) throw new Error('useNotifyDataReset must be used inside AppDatabaseProvider.');
+  return value.notifyDataReset;
 }

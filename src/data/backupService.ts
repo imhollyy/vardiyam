@@ -89,30 +89,3 @@ export async function applyPreparedRestore(
   });
 }
 
-export async function createEmptyDatabaseForWipe(): Promise<SQLiteDatabase> {
-  const empty = await SQLite.openDatabaseAsync(':memory:');
-  try {
-    await empty.execAsync('PRAGMA foreign_keys = ON;');
-    const { initializeDatabase } = await import('./database.ts');
-    const initResult = await initializeDatabase(empty);
-    if (initResult.needsReset) throw new Error('Boş veritabanı şeması beklenmeyen durumda.');
-    const validation = await validateBackupDatabase(empty, { createReferenceDatabase, expectedSchemaVersion: CURRENT_SCHEMA_VERSION });
-    if (validation.recordCount !== 0) throw new Error('Boş veritabanı hazırlanamadı.');
-    return empty;
-  } catch (error) {
-    await empty.closeAsync();
-    throw error;
-  }
-}
-
-export async function applyDataWipe(
-  current: SQLiteDatabase,
-  emptyDatabase: SQLiteDatabase,
-  controls: DatabaseMaintenanceControls,
-): Promise<void> {
-  await replaceLiveDatabase(current, emptyDatabase, controls, async (restored) => {
-    const count = await validateCurrentSchema(restored);
-    if (count !== 0) throw new Error('Silme sonrası bazı yerel kayıtlar kaldı.');
-    return count;
-  });
-}

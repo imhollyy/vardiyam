@@ -40,14 +40,8 @@ export async function getOnboardingState(database: SQLiteDatabase): Promise<Onbo
     }
     if (completionRow?.value === 'false') return { step: parsed?.step ?? 0, completed: false };
 
-    // Legacy recovery: before completion was stored separately, configured users
-    // could have had their completed flag overwritten by a wizard progress save.
-    const existing = await database.getFirstAsync<{ configured: number }>(
-      `SELECT EXISTS(SELECT 1 FROM shift_cycles) OR EXISTS(SELECT 1 FROM earnings_profiles)
-        OR EXISTS(SELECT 1 FROM work_records) OR EXISTS(SELECT 1 FROM net_payments)
-        OR EXISTS(SELECT 1 FROM earnings_snapshots) AS configured;`,
-    );
-    return { step: parsed?.step ?? 0, completed: existing?.configured === 1 };
+    const settings = await database.getFirstAsync<{ setup_completed: number }>('SELECT setup_completed FROM settings WHERE id = 1;');
+    return { step: parsed?.step ?? 0, completed: settings?.setup_completed === 1 };
   });
 }
 
@@ -63,12 +57,8 @@ export async function saveOnboardingState(database: SQLiteDatabase, state: Onboa
     }
     let completed = state.completed || previousCompleted || completionRow?.value === 'true';
     if (!completed && completionRow?.value !== 'false') {
-      const existing = await database.getFirstAsync<{ configured: number }>(
-        `SELECT EXISTS(SELECT 1 FROM shift_cycles) OR EXISTS(SELECT 1 FROM earnings_profiles)
-          OR EXISTS(SELECT 1 FROM work_records) OR EXISTS(SELECT 1 FROM net_payments)
-          OR EXISTS(SELECT 1 FROM earnings_snapshots) AS configured;`,
-      );
-      completed = existing?.configured === 1;
+      const settings = await database.getFirstAsync<{ setup_completed: number }>('SELECT setup_completed FROM settings WHERE id = 1;');
+      completed = settings?.setup_completed === 1;
     }
     const next = JSON.stringify({ step: state.step, completed });
     await database.runAsync(`INSERT INTO app_metadata (key, value) VALUES ('onboarding_state', ?)
