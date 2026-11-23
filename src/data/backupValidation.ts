@@ -12,6 +12,7 @@ export type ReferenceDatabaseFactory = () => Promise<ReferenceDatabase>;
 
 export const TABLES_BY_VERSION: Record<number, readonly string[]> = {
   100: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes'],
+  101: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes'],
 };
 
 const CRITICAL_TRIGGERS = [

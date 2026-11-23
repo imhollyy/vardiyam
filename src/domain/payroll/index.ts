@@ -12,7 +12,8 @@ import {
   NET_TO_GROSS_RATIO_BP,
   getIncomeTaxBrackets,
 } from '../../config/payroll.ts';
-import { DAILY_STANDARD_BY_SCHEDULE, shiftNominalMinutes } from '../../config/shifts.ts';
+import { shiftNominalMinutes } from '../../config/shifts.ts';
+import { calculateScheduledOvertime } from './overtime.ts';
 import { isOfficialHoliday } from '../../config/holidays.ts';
 import type { ShiftTemplate } from '../shift-cycle/index.ts';
 import type {
@@ -77,6 +78,50 @@ export function getPayPeriod(year: number, month: number, payday: string): { sta
   const startDate = `${startYear}-${pad(startMonth)}-${pad(actualStartDay)}`;
 
   return { start: startDate, end: endDate };
+}
+
+const SHORT_MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+/**
+ * Returns the pay period that contains the given localDate.
+ * The period is labelled by the month in which it ends (the month the salary lands).
+ */
+export function getPayPeriodForDate(localDate: string, payday: string): { start: string; end: string; label: string } {
+  const [dy, dm, dd] = localDate.split('-').map(Number) as [number, number, number];
+
+  // Try the period ending in the same month as localDate
+  let { start, end } = getPayPeriod(dy, dm, payday);
+  if (localDate >= start && localDate <= end) {
+    const [ey, em] = end.split('-').map(Number) as [number, number];
+    const [sy, sm, sd2] = start.split('-').map(Number) as [number, number, number];
+    const label = buildLabel(sy, sm, sd2, ey, em, end);
+    return { start, end, label };
+  }
+
+  // localDate is after end of that period → try next month
+  let nextMonth = dm + 1;
+  let nextYear = dy;
+  if (nextMonth > 12) { nextMonth = 1; nextYear++; }
+  ({ start, end } = getPayPeriod(nextYear, nextMonth, payday));
+  if (localDate >= start && localDate <= end) {
+    const [ey, em] = end.split('-').map(Number) as [number, number];
+    const [sy, sm, sd2] = start.split('-').map(Number) as [number, number, number];
+    const label = buildLabel(sy, sm, sd2, ey, em, end);
+    return { start, end, label };
+  }
+
+  // Fallback: same-month period
+  ({ start, end } = getPayPeriod(dy, dm, payday));
+  const [ey, em] = end.split('-').map(Number) as [number, number];
+  const [sy, sm, sd2] = start.split('-').map(Number) as [number, number, number];
+  void dd;
+  return { start, end, label: buildLabel(sy, sm, sd2, ey, em, end) };
+}
+
+function buildLabel(sy: number, sm: number, sd: number, ey: number, em: number, end: string): string {
+  const endDay = Number(end.split('-')[2]);
+  if (sy === ey && sm === em) return `${SHORT_MONTHS[sm - 1]} ${sy}`;
+  return `${sd} ${SHORT_MONTHS[sm - 1]} – ${endDay} ${SHORT_MONTHS[em - 1]}`;
 }
 
 export function enumerateDays(start: string, end: string): string[] {
@@ -328,24 +373,14 @@ export function generateMonthlyStatement(
   const workedDays = days.filter((d) => d.status === 'WORKED').length;
   const dailySalaryMinor = Math.round(settings.salaryMinor / 30);
 
-  const dailyStandard = DAILY_STANDARD_BY_SCHEDULE[settings.workSchedule];
-  let totalOvertimeMinutes = days.reduce((s, d) => s + d.overtimeMinutes, 0);
+  const scheduledOvertimeByDay = calculateScheduledOvertime(days, templates);
+  const scheduledOvertimeMap = new Map(scheduledOvertimeByDay.map((o) => [o.localDate, o.scheduledOvertimeMinutes]));
 
-  for (const day of days) {
-    if (day.status !== 'WORKED') continue;
-    if (day.shiftNominalMinutes > 0) {
-      const delta = day.shiftNominalMinutes - dailyStandard;
-      if (delta > 0) totalOvertimeMinutes += delta;
-    }
-  }
+  const manualOvertimeMinutes = days.reduce((s, d) => s + d.overtimeMinutes, 0);
+  const scheduledOvertimeMinutes = scheduledOvertimeByDay.reduce((s, o) => s + o.scheduledOvertimeMinutes, 0);
+  const totalOvertimeMinutes = scheduledOvertimeMinutes + manualOvertimeMinutes;
 
-  if (settings.workSchedule === 'EVERY_DAY') {
-    for (const day of days) {
-      if (dayOfWeek(day.localDate) === 0 && day.status === 'WORKED') {
-        totalOvertimeMinutes += DAILY_STANDARD_MINUTES;
-      }
-    }
-  }
+  void scheduledOvertimeMap; // used for future per-day breakdown
 
   const overtimeMinor = calculateOvertime(totalOvertimeMinutes, settings.salaryMinor);
 
@@ -385,6 +420,8 @@ export function generateMonthlyStatement(
     baseSalaryMinor: settings.salaryMinor,
     workedDays,
     totalDays,
+    scheduledOvertimeMinutes,
+    manualOvertimeMinutes,
     overtimeMinutes: totalOvertimeMinutes,
     overtimeMinor,
     holidayBonusMinor,

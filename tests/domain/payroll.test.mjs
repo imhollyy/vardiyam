@@ -355,19 +355,15 @@ test('generateMonthlyStatement: GROSS mode applies tax and SGK', () => {
   assert.ok(stmt.netMinor < stmt.grossMinor);
 });
 
-// --- EVERY_DAY 7th day overtime ---
+// --- EVERY_DAY scheduled overtime (haftalık limit bazlı) ---
 
-test('EVERY_DAY: Sundays add standard minutes as overtime', () => {
+test('EVERY_DAY: giriş ve şablon olmadan otomatik mesai YOK (haftalık limit bazlı)', () => {
+  // Yeni davranış: şablon/giriş olmadan scheduled overtime hesaplanamaz.
+  // calculateScheduledOvertime şablona ihtiyaç duyar; günlük standart tabanlı eski mantık kaldırıldı.
   const settings = { ...BASE_SETTINGS, workSchedule: 'EVERY_DAY', payday: 'LAST' };
   const stmt = generateMonthlyStatement(settings, new Map(), [], 2025, 8);
-  const dates = enumerateDays(stmt.periodStart, stmt.periodEnd);
-  const sundaysInPeriod = dates.filter((d) => {
-    const [y, m, day] = d.split('-').map(Number);
-    return new Date(y, m - 1, day).getDay() === 0;
-  }).length;
-  assert.ok(sundaysInPeriod > 0);
-  assert.equal(stmt.overtimeMinutes, sundaysInPeriod * 450);
-  assert.ok(stmt.overtimeMinor > 0);
+  assert.equal(stmt.scheduledOvertimeMinutes, 0);
+  assert.equal(stmt.overtimeMinutes, 0);
 });
 
 test('MON_FRI: no automatic Sunday overtime', () => {
@@ -473,16 +469,15 @@ test('generateMonthlyStatement: basic month with no entries', () => {
 
 // --- Overtime single-counting ---
 
-test('overtime from user entry and EVERY_DAY Sunday are summed, each counted once', () => {
+test('EVERY_DAY: elle girilen mesai (60 dk) doğru yansır, günlük standart mesai eklenmez', () => {
+  // Yeni davranış: sadece manuel overtimeMinutes ve calculateScheduledOvertime sonucu toplanır.
+  // Şablon verilmediğinden scheduledOvertimeMinutes=0; sadece manualOvertimeMinutes=60.
   const settings = { ...BASE_SETTINGS, workSchedule: 'EVERY_DAY', payday: 'LAST' };
   const sunday = '2025-08-03';
   assert.equal(new Date(2025, 7, 3).getDay(), 0);
   const entries = new Map([[sunday, makeDayEntry(sunday, { overtimeMinutes: 60 })]]);
   const stmt = generateMonthlyStatement(settings, entries, [], 2025, 8);
-  const { start, end } = getPayPeriod(2025, 8, 'LAST');
-  const sundayCount = enumerateDays(start, end).filter((d) => {
-    const [y, m, day] = d.split('-').map(Number);
-    return new Date(y, m - 1, day).getDay() === 0;
-  }).length;
-  assert.equal(stmt.overtimeMinutes, 60 + sundayCount * 450);
+  assert.equal(stmt.manualOvertimeMinutes, 60);
+  assert.equal(stmt.scheduledOvertimeMinutes, 0);
+  assert.equal(stmt.overtimeMinutes, 60);
 });

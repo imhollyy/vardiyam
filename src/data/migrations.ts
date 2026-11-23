@@ -153,6 +153,20 @@ export const migrations: readonly Migration[] = [
       ${DEFAULT_SETTINGS_INSERT_SQL}
     `,
   },
+  {
+    version: 101,
+    sql: `
+      ALTER TABLE shift_templates ADD COLUMN break_minutes INTEGER NOT NULL DEFAULT 0;
+
+      -- Fill existing rows with the legal minimum break based on shift duration.
+      -- duration <= 240 min → 15 dk, <= 450 → 30 dk, > 450 → 60 dk (İş K. md. 68)
+      UPDATE shift_templates SET break_minutes = CASE
+        WHEN standard_minutes <= 240 THEN 15
+        WHEN standard_minutes <= 450 THEN 30
+        ELSE 60
+      END;
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;

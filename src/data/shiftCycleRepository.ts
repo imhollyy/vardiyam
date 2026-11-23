@@ -36,6 +36,7 @@ type TemplateRow = {
   name: string;
   start_local_time: string;
   end_local_time: string;
+  break_minutes: number;
   standard_minutes: number;
   color_token: string | null;
   icon_key: string | null;
@@ -58,7 +59,7 @@ type EntryRow = {
 };
 
 const TEMPLATE_SELECT =
-  'SELECT id, code, name, start_local_time, end_local_time, standard_minutes, color_token, icon_key FROM shift_templates';
+  'SELECT id, code, name, start_local_time, end_local_time, break_minutes, standard_minutes, color_token, icon_key FROM shift_templates';
 
 async function assertForeignKeysEnabled(database: ShiftCycleDatabase): Promise<void> {
   const row = await database.getFirstAsync<{ foreign_keys: number }>('PRAGMA foreign_keys;');
@@ -77,6 +78,7 @@ function fromTemplateRow(row: TemplateRow): ShiftTemplate {
     name: row.name,
     startLocalTime: row.start_local_time,
     endLocalTime: row.end_local_time,
+    breakMinutes: row.break_minutes,
     standardMinutes: row.standard_minutes,
     ...(row.color_token === null ? {} : { colorToken: row.color_token }),
     ...(row.icon_key === null ? {} : { iconKey: row.icon_key }),
@@ -182,13 +184,14 @@ export async function createShiftTemplate(
     await assertForeignKeysEnabled(database);
     await database.runAsync(
       'INSERT INTO shift_templates ' +
-        '(id, code, name, start_local_time, end_local_time, standard_minutes, color_token, icon_key) ' +
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
+        '(id, code, name, start_local_time, end_local_time, break_minutes, standard_minutes, color_token, icon_key) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
       template.id,
       template.code,
       template.name,
       template.startLocalTime,
       template.endLocalTime,
+      template.breakMinutes,
       template.standardMinutes ?? 480,
       template.colorToken ?? null,
       template.iconKey ?? null,
@@ -301,17 +304,18 @@ export async function saveShiftSchedule(
       validateShiftTemplate(template);
       await database.runAsync(
         'INSERT INTO shift_templates ' +
-          '(id, code, name, start_local_time, end_local_time, standard_minutes, color_token, icon_key) ' +
-          'VALUES (?, ?, ?, ?, ?, ?, ?, ?) ' +
+          '(id, code, name, start_local_time, end_local_time, break_minutes, standard_minutes, color_token, icon_key) ' +
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
           'ON CONFLICT(id) DO UPDATE SET code = excluded.code, name = excluded.name, ' +
           'start_local_time = excluded.start_local_time, end_local_time = excluded.end_local_time, ' +
-          'standard_minutes = excluded.standard_minutes, ' +
+          'break_minutes = excluded.break_minutes, standard_minutes = excluded.standard_minutes, ' +
           'color_token = excluded.color_token, icon_key = excluded.icon_key;',
         template.id,
         template.code,
         template.name,
         template.startLocalTime,
         template.endLocalTime,
+        template.breakMinutes,
         template.standardMinutes ?? 480,
         template.colorToken ?? null,
         template.iconKey ?? null,

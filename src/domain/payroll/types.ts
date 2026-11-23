@@ -63,6 +63,8 @@ export type MonthlyStatement = {
   baseSalaryMinor: number;
   workedDays: number;
   totalDays: number;
+  scheduledOvertimeMinutes: number;
+  manualOvertimeMinutes: number;
   overtimeMinutes: number;
   overtimeMinor: number;
   holidayBonusMinor: number;

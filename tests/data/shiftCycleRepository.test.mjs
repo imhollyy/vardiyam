@@ -46,6 +46,7 @@ const day = (id = 'day') => ({
   startLocalTime: '08:00',
   endLocalTime: '16:00',
   standardMinutes: 480,
+  breakMinutes: 30,
 });
 
 const night = (id = 'night') => ({
@@ -55,6 +56,7 @@ const night = (id = 'night') => ({
   startLocalTime: '22:00',
   endLocalTime: '06:00',
   standardMinutes: 480,
+  breakMinutes: 30,
 });
 
 const cycle = (id = 'cycle') => ({

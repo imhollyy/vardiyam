@@ -5,66 +5,68 @@ export type DefaultShiftHours = {
   name: string;
   startLocalTime: string;
   endLocalTime: string;
+  breakMinutes: number;
 };
+
+/** Legal minimum break per shift duration (İş Kanunu md. 68). */
+export function legalMinBreakMinutes(nominalMinutes: number): number {
+  if (nominalMinutes <= 240) return 15;
+  if (nominalMinutes <= 450) return 30;
+  return 60;
+}
 
 export const DEFAULT_SHIFT_HOURS: Record<WorkSchedule, Record<ShiftPattern, DefaultShiftHours[]>> = {
   MON_FRI: {
     FIXED_DAY: [
-      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '17:00' },
+      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '18:00', breakMinutes: 60 },
     ],
     FIXED_NIGHT: [
-      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '07:00' },
+      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '08:00', breakMinutes: 60 },
     ],
     TWO_SHIFT: [
-      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '18:00' },
-      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '08:00' },
+      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '18:00', breakMinutes: 60 },
+      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '08:00', breakMinutes: 60 },
     ],
     THREE_SHIFT: [
-      { code: 'S', name: 'Sabah', startLocalTime: '08:00', endLocalTime: '16:00' },
-      { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00' },
-      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00' },
+      { code: 'S', name: 'Sabah', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
+      { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00', breakMinutes: 30 },
+      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
     ],
   },
   MON_SAT: {
     FIXED_DAY: [
-      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00' },
+      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
     ],
     FIXED_NIGHT: [
-      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '06:00' },
+      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
     ],
     TWO_SHIFT: [
-      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '18:00' },
-      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '08:00' },
+      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
+      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
     ],
     THREE_SHIFT: [
-      { code: 'S', name: 'Sabah', startLocalTime: '08:00', endLocalTime: '16:00' },
-      { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00' },
-      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00' },
+      { code: 'S', name: 'Sabah', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
+      { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00', breakMinutes: 30 },
+      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
     ],
   },
   EVERY_DAY: {
     FIXED_DAY: [
-      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00' },
+      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
     ],
     FIXED_NIGHT: [
-      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '06:00' },
+      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
     ],
     TWO_SHIFT: [
-      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '20:00' },
-      { code: 'GC', name: 'Gece', startLocalTime: '20:00', endLocalTime: '08:00' },
+      { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
+      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
     ],
     THREE_SHIFT: [
-      { code: 'S', name: 'Sabah', startLocalTime: '06:00', endLocalTime: '14:00' },
-      { code: 'A', name: 'Akşam', startLocalTime: '14:00', endLocalTime: '22:00' },
-      { code: 'GC', name: 'Gece', startLocalTime: '22:00', endLocalTime: '06:00' },
+      { code: 'S', name: 'Sabah', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
+      { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00', breakMinutes: 30 },
+      { code: 'GC', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
     ],
   },
-};
-
-export const DAILY_STANDARD_BY_SCHEDULE: Record<WorkSchedule, number> = {
-  MON_FRI: 540,
-  MON_SAT: 450,
-  EVERY_DAY: 450,
 };
 
 export function shiftNominalMinutes(startLocalTime: string, endLocalTime: string): number {
@@ -73,12 +75,4 @@ export function shiftNominalMinutes(startLocalTime: string, endLocalTime: string
   const startMin = sh * 60 + sm;
   const endMin = eh * 60 + em;
   return endMin > startMin ? endMin - startMin : 1440 - startMin + endMin;
-}
-
-export function shiftOvertimeDelta(
-  startLocalTime: string,
-  endLocalTime: string,
-  workSchedule: WorkSchedule,
-): number {
-  return shiftNominalMinutes(startLocalTime, endLocalTime) - DAILY_STANDARD_BY_SCHEDULE[workSchedule];
 }
