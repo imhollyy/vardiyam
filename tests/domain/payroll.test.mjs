@@ -214,11 +214,11 @@ test('SOCIAL leave: not deducted', () => {
   assert.equal(calculateDeductions(days, entries, MONTHLY), 0);
 });
 
-test('HOURLY leave: deducted by hours', () => {
+test('HOURLY leave: calculateDeductions returns 0 (deduction handled at statement level)', () => {
+  // HOURLY deduction is now applied via applyHourlyLeavePolicy in generateMonthlyStatement
   const days = makeLeaveDay('2025-01-06', 'HOURLY', { leaveHours: 3 });
   const entries = new Map([['2025-01-06', makeDayEntry('2025-01-06', { leaveType: 'HOURLY', leaveHours: 3 })]]);
-  const expected = Math.round(HOURLY * 3);
-  assert.equal(calculateDeductions(days, entries, MONTHLY), expected);
+  assert.equal(calculateDeductions(days, entries, MONTHLY), 0);
 });
 
 test('HOLIDAY: not deducted', () => {

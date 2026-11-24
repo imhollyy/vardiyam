@@ -284,11 +284,11 @@ test('weekly overtime: full-day leave <= half-day leave <= no leave', () => {
   assert.equal(noTotal, 600);    // 5 days x 120
 });
 
-test('HOURLY leave: overtime distribution uses reduced net (660-240=420)', () => {
-  // Week Nov 23-27: 4 normal WORKED (660 min) + 1 HOURLY leave WORKED (660-4×60=420 min)
-  // No LEAVE days -> scheduledWorkDays = 5, standardDayMin = 540 (not used for WORKED)
-  // weekTotal = 4×660 + 420 = 3060
-  // excess = 3060-2700 = 360, perDay = 360/5 = 72
+test('HOURLY leave: overtime distribution uses full net (not reduced)', () => {
+  // Week Nov 23-27: 4 normal WORKED (660 min) + 1 HOURLY leave WORKED (660 min full)
+  // HOURLY days now count FULL net; deduction is period-level only
+  // weekTotal = 5×660 = 3300
+  // excess = 3300-2700 = 600, perDay = 600/5 = 120
   const days = [
     workedDay('2026-11-23'),
     day('2026-11-24', 'WORKED', { leaveType: 'HOURLY', leaveHours: 4 }),
@@ -300,7 +300,7 @@ test('HOURLY leave: overtime distribution uses reduced net (660-240=420)', () =>
   // All 5 WORKED days (including HOURLY) get overtime
   assert.equal(result.length, 5);
   for (const o of result) {
-    assert.equal(o.scheduledOvertimeMinutes, 72);
+    assert.equal(o.scheduledOvertimeMinutes, 120);
   }
   // Nov 24 (HOURLY) is in result
   assert.ok(result.find((o) => o.localDate === '2026-11-24'));
