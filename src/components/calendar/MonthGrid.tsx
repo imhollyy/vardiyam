@@ -103,19 +103,21 @@ export function MonthGrid({ year, month, today, dayMap, templateMap, theme, mode
           const leMin = day?.lateEarlyMinutes ?? 0;
           const dateNum = date.split('-')[2] ?? '';
 
+          const isFuture = date > today;
+
           return (
             <Pressable
               key={date}
               accessibilityRole="button"
               accessibilityLabel={`${dateNum}${day?.status ? ', ' + day.status : ''}${otMin > 0 ? ', fazla mesai ' + fmtMin(otMin) : ''}`}
               onPress={() => onDayPress?.(date)}
-              style={({ pressed }) => ({ width: '14.28%', minHeight: 50, padding: 2, opacity: pressed ? 0.75 : 1 })}
+              style={({ pressed }) => ({ width: '14.28%', minHeight: 50, padding: 2, opacity: pressed ? 0.75 : (isFuture ? 0.6 : 1) })}
             >
               <View style={{
                 flex: 1,
                 borderRadius: layout.radius.day,
                 backgroundColor: bg,
-                borderWidth: isToday ? 2 : 0,
+                borderWidth: isToday ? 2.5 : 0,
                 borderColor: isToday ? theme.ink : 'transparent',
                 padding: 3,
                 alignItems: 'center',

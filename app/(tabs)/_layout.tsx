@@ -8,6 +8,7 @@ const destinations = [
   { name: 'index', title: 'Bugün', glyph: 'home-outline', label: 'Bugün sekmesi' },
   { name: 'calendar', title: 'Takvim', glyph: 'calendar-outline', label: 'Takvim sekmesi' },
   { name: 'earnings', title: 'Kazanç', glyph: 'wallet-outline', label: 'Kazanç sekmesi' },
+  { name: 'analysis', title: 'Analiz', glyph: 'bar-chart-outline', label: 'Analiz sekmesi' },
   { name: 'settings', title: 'Ayarlar', glyph: 'settings-outline', label: 'Ayarlar sekmesi' },
 ] as const;
 

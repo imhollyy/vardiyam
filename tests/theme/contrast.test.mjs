@@ -78,7 +78,8 @@ const dark = {
 // ─── Shift palette ────────────────────────────────────────────────────────────
 const shifts = {
   day:     { background: '#FFD166', text: '#1B1A17', textSecondary: '#5A4300' },
-  evening: { background: '#F4A261', text: '#1B1A17', textSecondary: '#3D2000' },
+  eveningL: { background: '#7DB7F0', text: '#0B2540', textSecondary: '#1A3D6E' },
+  eveningD: { background: '#5A9BE0', text: '#0B2540', textSecondary: '#1A3D6E' },
   nightL:  { background: '#23305E', text: '#FFFFFF', textSecondary: '#B4C4FF' },
   nightD:  { background: '#3A4A8C', text: '#FFFFFF', textSecondary: '#B4C4FF' },
   leaveL:  { background: '#9BE1C4', text: '#0F3B2A', textSecondary: '#1E6B4D' },
@@ -114,11 +115,21 @@ test('dark: onPrimaryAction on primaryAction', () => assertContrast('dark onPA/p
 // ─── Shift palette pairs (large text minimum 3:1) ────────────────────────────
 test('shift day: text on bg', () => assertContrast('day text/bg', shifts.day.text, shifts.day.background, LARGE_TEXT_MIN));
 test('shift day: textSecondary on bg', () => assertContrast('day secondary/bg', shifts.day.textSecondary, shifts.day.background, LARGE_TEXT_MIN));
-test('shift evening: text on bg', () => assertContrast('evening text/bg', shifts.evening.text, shifts.evening.background, LARGE_TEXT_MIN));
-test('shift evening: textSecondary on bg', () => assertContrast('evening secondary/bg', shifts.evening.textSecondary, shifts.evening.background, LARGE_TEXT_MIN));
+test('shift evening light: text on bg', () => assertContrast('eveningL text/bg', shifts.eveningL.text, shifts.eveningL.background, NORMAL_TEXT_MIN));
+test('shift evening dark: text on bg', () => assertContrast('eveningD text/bg', shifts.eveningD.text, shifts.eveningD.background, NORMAL_TEXT_MIN));
 test('shift night light: text on bg', () => assertContrast('nightL text/bg', shifts.nightL.text, shifts.nightL.background, LARGE_TEXT_MIN));
 test('shift night dark: text on bg', () => assertContrast('nightD text/bg', shifts.nightD.text, shifts.nightD.background, LARGE_TEXT_MIN));
 test('shift leave light: text on bg', () => assertContrast('leaveL text/bg', shifts.leaveL.text, shifts.leaveL.background, LARGE_TEXT_MIN));
 test('shift leave dark: text on bg', () => assertContrast('leaveD text/bg', shifts.leaveD.text, shifts.leaveD.background, LARGE_TEXT_MIN));
 test('shift holiday light: text on bg', () => assertContrast('holidayL text/bg', shifts.holidayL.text, shifts.holidayL.background, LARGE_TEXT_MIN));
 test('shift holiday dark: text on bg', () => assertContrast('holidayD text/bg', shifts.holidayD.text, shifts.holidayD.background, LARGE_TEXT_MIN));
+
+// Evening vs Night luminance distinction (color-blindness accessibility)
+test('shift evening light vs night light: luminance difference > 0.2', () => {
+  const diff = Math.abs(luminance(shifts.eveningL.background) - luminance(shifts.nightL.background));
+  assert.ok(diff > 0.2, `Evening/Night luminance too close: diff=${diff.toFixed(3)}`);
+});
+test('shift evening dark vs night dark: luminance difference > 0.2', () => {
+  const diff = Math.abs(luminance(shifts.eveningD.background) - luminance(shifts.nightD.background));
+  assert.ok(diff > 0.2, `Evening/Night dark luminance too close: diff=${diff.toFixed(3)}`);
+});
