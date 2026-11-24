@@ -1,3 +1,11 @@
+export const PAYDAY_LAST = 'LAST' as const;
+
+export const HOURLY_LEAVE_POLICY = {
+  OVERTIME_FIRST: 'OVERTIME_FIRST',
+  BASE_PAY: 'BASE_PAY',
+} as const;
+export type HourlyLeavePolicy = typeof HOURLY_LEAVE_POLICY[keyof typeof HOURLY_LEAVE_POLICY];
+
 export type SalaryType = 'GROSS' | 'NET';
 export type WorkSchedule = 'MON_FRI' | 'MON_SAT' | 'EVERY_DAY';
 export type ShiftPattern = 'TWO_SHIFT' | 'THREE_SHIFT' | 'FIXED_DAY' | 'FIXED_NIGHT';
@@ -15,6 +23,7 @@ export type Settings = {
   shiftPattern: ShiftPattern;
   startDate: string | null;
   setupCompleted: boolean;
+  hourlyLeavePolicy: HourlyLeavePolicy;
 };
 
 export type DayEntry = {
@@ -77,6 +86,8 @@ export type MonthlyStatement = {
   stampTaxMinor: number;
   incomeTaxMinor: number;
   netMinor: number;
+  hourlyLeaveOffsetMinutes: number;
+  hourlyLeaveDeductionMinor: number;
 };
 
 export type AnnualLeaveResult = {

@@ -174,11 +174,12 @@ test('delete template in use raises TEMPLATE_IN_USE', async () => {
   } finally { sqlite.close(); }
 });
 
-test('duplicate template code is rejected by DB unique constraint', async () => {
+test('duplicate template code is allowed after migration 102 removed the UNIQUE constraint', async () => {
   const { sqlite, database } = await setup();
   try {
     await createShiftTemplate(database, day());
-    await assert.rejects(createShiftTemplate(database, { ...day(), id: 'dup', name: 'Dup' }));
+    // Same code 'G', different id — must succeed after migration 102
+    await assert.doesNotReject(createShiftTemplate(database, { ...day(), id: 'dup', name: 'Dup' }));
   } finally { sqlite.close(); }
 });
 

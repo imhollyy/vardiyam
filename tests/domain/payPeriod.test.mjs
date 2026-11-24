@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getPayPeriodForDate, getPayPeriod } from '../../src/domain/payroll/index.ts';
+import { getPayPeriodForDate, getPayPeriod, daysUntilPayday } from '../../src/domain/payroll/index.ts';
 
 // ---------------------------------------------------------------------------
 // getPayPeriod (temel)
@@ -80,4 +80,32 @@ test('label: aynı ay ise "Kas 2026" formatında', () => {
 test('payday=LAST, Şubat → dönem sonu 28 Şubat (artık yıl değil)', () => {
   const { end } = getPayPeriodForDate('2026-02-15', 'LAST');
   assert.equal(end, '2026-02-28');
+});
+
+// ---------------------------------------------------------------------------
+// daysUntilPayday
+// ---------------------------------------------------------------------------
+
+test('daysUntilPayday: LAST + 2026-11-24 → 6', () => {
+  assert.equal(daysUntilPayday('2026-11-24', 'LAST'), 6);
+});
+
+test('daysUntilPayday: LAST + 2026-11-30 → 0 (maaş günü)', () => {
+  assert.equal(daysUntilPayday('2026-11-30', 'LAST'), 0);
+});
+
+test('daysUntilPayday: LAST + 2026-02-10 → 18 (şubat sonu)', () => {
+  assert.equal(daysUntilPayday('2026-02-10', 'LAST'), 18);
+});
+
+test('daysUntilPayday: payday=15 + 2026-11-24 → 21', () => {
+  assert.equal(daysUntilPayday('2026-11-24', '15'), 21);
+});
+
+test('daysUntilPayday: payday=31 + 2026-02-10 → 18 (31 şubatta 28\'e kısıtlanır)', () => {
+  assert.equal(daysUntilPayday('2026-02-10', '31'), 18);
+});
+
+test('daysUntilPayday: payday=15 + 2026-11-15 → 0 (maaş günü)', () => {
+  assert.equal(daysUntilPayday('2026-11-15', '15'), 0);
 });

@@ -4,19 +4,18 @@
 
 ## CURRENT STATE
 
-- **Tarih:** 2026-11-20
+- **Tarih:** 2026-11-24
 - **Proje:** Mesai Pusulası (eski: Vardiyam)
-- **Aktif aşama:** Hibrit Yeniden Yapılanma — `feat/yeni-akis` branch
-- **Durum:** C1–C6 tamamlandı. Eski fiilî kayıt modülleri kaldırıldı; schema v1 single migration + needsReset guard; config + saf payroll engine + 23 unit test; welcome + 6-step setup; home week strip + calendar + day-edit modal + shift-change; earnings breakdown + reports + additional-income CRUD + settings rewrite (SIFIRLA, ücret bilgileri, yasal linkler) + KVKK/privacy draft sayfaları.
-- **Aktif branch:** feat/yeni-akis
-- **Commits:** aeac994 (C1) → 6fe9da2 (C2) → 93f5920 (C3) → 065f4dd (C4) → 9dfd975 (C5) → 640f8d7 (C6)
-- **Doğrulama:** `npm test` PASS 23/23 (payroll engine); `tsc --noEmit` yalnız pre-existing @expo/vector-icons ve datetimepicker tip eksikliği. Expo Doctor, gerçek cihaz, lint NOT RUN.
-- **Kurucu onayı:** Hibrit yeniden yapılanma planı "onaylıyorum" ile onaylandı. main merge/release izni verilmiş değil.
-- **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez.
+- **Aktif aşama:** Sadeleştirme — `feat/yeni-tasarim` branch — 4 AŞAMA TAMAMLANDI
+- **Durum:** Aşama 1–4 bitti. Kurulum sihirbazı 3 soruya indirildi, ScheduleEditor paylaşımlı bileşen, 4 sekme (Raporlar kaldırıldı), MonthGrid paylaşımlı takvim, ana ekran yeniden tasarımı (InkCard+FAB), gün düzenleme 3-satır chip + undo tostu, Kazanç/Raporlar birleşmesi (SegmentedControl), ilk kullanım koçmarkları, boş durum ekranları, 44pt dokunma hedefleri, dead code temizliği.
+- **Aktif branch:** feat/yeni-tasarim
+- **Son commitler:** 9d3828e (Aş.1) → db0c6ca (Aş.2) → 373f52e,01a6ffa,cdef279 (Aş.3) → 91217a4,a539784,90257c5 (Aş.4)
+- **Doğrulama:** `npm test` PASS 370/370; `tsc --noEmit` PASS; lint PASS. Gerçek cihaz NOT TESTED.
+- **Önemli uyarı:** GitHub deposu public; gerçek ücret ve kişisel veri commit edilmez. main merge için kurucu onayı gerekli.
 
 ## NEXT ACTION
 
-1. C7: Draft PR açma. main merge için kurucu onayı gerekli.
+Aşama 1-4 telefonda test et; onaylanırsa PR aç
 
 ### 2026-11-07 — VDY-014 — IMPLEMENTATION / VERIFICATION CHECKPOINT
 

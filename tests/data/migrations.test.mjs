@@ -87,3 +87,22 @@ test('tema tercihi kaydedilir ve okunur', async () => {
     assert.equal(await getThemePreference(db), 'dark');
   } finally { sqlite.close(); }
 });
+
+test('migration 102: shift_templates.code artık UNIQUE değil — aynı kod iki ayrı id ile kaydedilebilir', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    await initializeDatabase(adapter(sqlite));
+    sqlite.exec(
+      "INSERT INTO shift_templates (id, code, name, start_local_time, end_local_time, break_minutes, standard_minutes)" +
+      " VALUES ('t1', 'G', 'Gündüz 1', '08:00', '16:00', 30, 480);"
+    );
+    assert.doesNotThrow(() => {
+      sqlite.exec(
+        "INSERT INTO shift_templates (id, code, name, start_local_time, end_local_time, break_minutes, standard_minutes)" +
+        " VALUES ('t2', 'G', 'Gündüz 2', '09:00', '17:00', 30, 480);"
+      );
+    });
+    const rows = sqlite.prepare("SELECT code FROM shift_templates WHERE code = 'G';").all();
+    assert.equal(rows.length, 2);
+  } finally { sqlite.close(); }
+});

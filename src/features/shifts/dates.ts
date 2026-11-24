@@ -173,3 +173,9 @@ export function monthForLocalDate(value: LocalDate): string {
   }
   return `${match[1]}-${match[2]}`;
 }
+
+/** Returns the Monday of the ISO week that contains `value`. */
+export function mondayOfLocalDate(value: LocalDate): LocalDate {
+  const offset = mondayFirstWeekdayOffset(value);
+  return addLocalDays(value, -offset);
+}

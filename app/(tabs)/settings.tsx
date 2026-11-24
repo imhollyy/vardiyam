@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -15,141 +15,38 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { randomUUID } from 'expo-crypto';
 import { useAppDatabase, useNotifyDataReset } from '@/src/data/AppDatabaseProvider';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 
-import { ShiftKindBadge } from '@/src/components/shifts/ShiftKindBadge';
-import {
-  getNominalShiftWindow,
-  type ShiftCycle,
-  type ShiftTemplate,
-} from '@/src/domain/shift-cycle/index';
 import {
   listShiftCycles,
   listShiftTemplates,
   saveShiftSchedule,
 } from '@/src/data/shiftCycleRepository';
-import { getLocalToday } from '@/src/features/shifts/dates';
-import {
-  buildShiftSchedule,
-  previewShiftSchedule,
-  type CustomEntryDraft,
-  type ScheduleDraft,
-  type ShiftPattern,
-} from '@/src/features/shifts/schedule';
+import type { ShiftCycle, ShiftTemplate } from '@/src/domain/shift-cycle/index';
+import { getLocalToday, mondayOfLocalDate } from '@/src/features/shifts/dates';
 import { getSettings, updateSettings } from '@/src/data/settingsRepository';
-import type { Settings } from '@/src/domain/payroll/types';
-import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
+import type { Settings, HourlyLeavePolicy } from '@/src/domain/payroll/types';
+import { HOURLY_LEAVE_POLICY } from '@/src/domain/payroll/types';
+import { formatMoneyInput, formatTryMinor, parseTryMinor } from '@/src/domain/money';
+import { MoneyField } from '@/src/components/ui/MoneyField';
 import { fonts, layout } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
 import { ActionButton } from '@/src/components/ui/ActionButton';
-
-const PATTERNS: { id: ShiftPattern; title: string; hint: string }[] = [
-  { id: 'fixed', title: 'Sabit', hint: 'Her gün seçilen vardiya' },
-  { id: 'weekly-three', title: 'Haftalık 3 vardiya', hint: 'Vardiya başına 7 gün' },
-  { id: 'two-two-two', title: '2+2+2', hint: 'İkişer gün dönüşüm' },
-  { id: 'four-two', title: '4+2', hint: 'Dört vardiya, iki OFF' },
-  { id: 'six-one', title: '6+1', hint: 'Altı vardiya, bir OFF' },
-  { id: 'custom', title: 'Özel', hint: 'Gün gün düzenle' },
-];
-
-const DEFAULT_TEMPLATE_VALUES = [
-  { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
-  { code: 'A', name: 'Akşam', startLocalTime: '16:00', endLocalTime: '00:00', breakMinutes: 30 },
-  { code: 'N', name: 'Gece', startLocalTime: '00:00', endLocalTime: '08:00', breakMinutes: 30 },
-];
+import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes } from '@/src/config/shifts';
+import {
+  ScheduleEditor,
+  type ScheduleEditorValue,
+  type ScheduleEditorTemplateDraft,
+  isScheduleValueValid,
+} from '@/src/components/schedule/ScheduleEditor';
+import { planTemplateChanges, resolveTemplateIds } from '@/src/features/schedule/planTemplateChanges';
+import { buildCycleEntries, needsCurrentShiftStep } from '@/src/features/setup/buildSetupPayload';
 
 type Theme = ReturnType<typeof useAppTheme>['theme'];
-
-function createDefaults(id = `cycle-${Date.now()}`): ScheduleDraft {
-  const templates = DEFAULT_TEMPLATE_VALUES.map((template, index) => ({
-    id: `${id}-template-${index}`,
-    ...template,
-  }));
-  return {
-    id,
-    name: 'Vardiya düzenim',
-    timezone: 'Europe/Istanbul',
-    anchorLocalDate: getLocalToday('Europe/Istanbul'),
-    pattern: 'two-two-two',
-    startTemplateIndex: 0,
-    templates,
-    customEntries: [
-      { kind: 'SHIFT', templateIndex: 0 },
-      { kind: 'SHIFT', templateIndex: 0 },
-      { kind: 'SHIFT', templateIndex: 1 },
-      { kind: 'SHIFT', templateIndex: 1 },
-      { kind: 'SHIFT', templateIndex: 2 },
-      { kind: 'SHIFT', templateIndex: 2 },
-    ],
-  };
-}
-
-function sameTemplateRun(entries: ShiftCycle['entries'], start: number, end: number): boolean {
-  const first = entries[start];
-  return first?.kind === 'SHIFT' && entries.slice(start, end).every(
-    (entry) => entry.kind === 'SHIFT' && entry.templateId === first.templateId,
-  );
-}
-
-function detectPattern(cycle: ShiftCycle): ShiftPattern {
-  const entries = cycle.entries;
-  if (entries.length === 1) return 'fixed';
-  if (
-    entries.length === 21 && sameTemplateRun(entries, 0, 7) &&
-    sameTemplateRun(entries, 7, 14) && sameTemplateRun(entries, 14, 21)
-  ) return 'weekly-three';
-  if (entries.length === 6 && [0, 2, 4].every((index) => sameTemplateRun(entries, index, index + 2))) {
-    return 'two-two-two';
-  }
-  if (
-    entries.length === 6 && sameTemplateRun(entries, 0, 4) &&
-    entries.slice(4).every((entry) => entry.kind === 'OFF')
-  ) return 'four-two';
-  if (
-    entries.length === 7 && sameTemplateRun(entries, 0, 6) && entries[6].kind === 'OFF'
-  ) return 'six-one';
-  return 'custom';
-}
-
-function draftFromSaved(cycle: ShiftCycle, storedTemplates: ShiftTemplate[]): ScheduleDraft {
-  const defaults = createDefaults(cycle.id);
-  const cycleTemplateIds = [...new Set(cycle.entries.flatMap((entry) => entry.kind === 'SHIFT' ? [entry.templateId] : []))];
-  const cycleTemplates = cycleTemplateIds
-    .map((id) => storedTemplates.find((template) => template.id === id))
-    .filter((template): template is ShiftTemplate => Boolean(template));
-  const templates = [...cycleTemplates];
-  for (const template of storedTemplates) {
-    if (templates.length >= 3) break;
-    if (!templates.some((candidate) => candidate.id === template.id)) templates.push(template);
-  }
-  for (const template of defaults.templates) {
-    if (templates.length >= 3) break;
-    templates.push(template);
-  }
-  const anchorEntry = cycle.entries[cycle.startIndex];
-  const anchorTemplateId = anchorEntry?.kind === 'SHIFT'
-    ? anchorEntry.templateId
-    : cycle.entries.find((entry) => entry.kind === 'SHIFT')?.templateId;
-  const startTemplateIndex = Math.max(0, templates.findIndex((template) => template.id === anchorTemplateId));
-  return {
-    id: cycle.id,
-    name: cycle.name,
-    timezone: cycle.timezone,
-    anchorLocalDate: cycle.anchorLocalDate,
-    pattern: detectPattern(cycle),
-    startTemplateIndex,
-    preservedStartEntryIndex: cycle.startIndex,
-    templates,
-    customEntries: cycle.entries.map((entry): CustomEntryDraft =>
-      entry.kind === 'OFF'
-        ? { kind: 'OFF' }
-        : { kind: 'SHIFT', templateIndex: Math.max(0, templates.findIndex((template) => template.id === entry.templateId)) },
-    ),
-  };
-}
 
 function Field({
   label, value, onChangeText, theme, placeholder, keyboardType = 'default', maxLength,
@@ -169,17 +66,63 @@ function Field({
   );
 }
 
-function Action({ label, onPress, theme, secondary = false, disabled = false, accessibilityLabel }: {
-  label: string; onPress: () => void; theme: Theme; secondary?: boolean; disabled?: boolean; accessibilityLabel?: string;
-}) {
-  void theme;
-  return <ActionButton label={label} accessibilityLabel={accessibilityLabel} onPress={onPress} variant={secondary ? 'secondary' : 'primary'} disabled={disabled} />;
-}
-
-
 function SectionHeading({ icon, title, theme }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; theme: Theme }) {
-  return <View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: theme.surfaceMuted }]}><Ionicons name={icon} size={18} color={theme.ink} /></View><Text style={[styles.sectionTitle, { color: theme.ink }]}>{title}</Text></View>;
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={[styles.sectionIcon, { backgroundColor: theme.surfaceMuted }]}>
+        <Ionicons name={icon} size={18} color={theme.ink} />
+      </View>
+      <Text style={[styles.sectionTitle, { color: theme.ink }]}>{title}</Text>
+    </View>
+  );
 }
+
+function scheduleValueFromSettings(
+  settings: Settings,
+  storedTemplates: ShiftTemplate[],
+  cycle: ShiftCycle | null,
+): ScheduleEditorValue {
+  const defaults = DEFAULT_SHIFT_HOURS[settings.workSchedule][settings.shiftPattern];
+  let templateDrafts: ScheduleEditorTemplateDraft[];
+  if (cycle && storedTemplates.length > 0) {
+    const seen = new Set<string>();
+    const orderedIds: string[] = [];
+    for (const entry of cycle.entries) {
+      if (entry.kind === 'SHIFT' && !seen.has(entry.templateId)) {
+        seen.add(entry.templateId);
+        orderedIds.push(entry.templateId);
+      }
+    }
+    const ordered = orderedIds
+      .map((id) => storedTemplates.find((t) => t.id === id))
+      .filter((t): t is ShiftTemplate => t !== undefined);
+    templateDrafts = ordered.map((t) => ({
+      code: t.code, name: t.name, startLocalTime: t.startLocalTime,
+      endLocalTime: t.endLocalTime, breakMinutes: t.breakMinutes,
+    }));
+    while (templateDrafts.length < defaults.length) {
+      templateDrafts.push({ ...defaults[templateDrafts.length]! });
+    }
+  } else {
+    templateDrafts = defaults.map((d) => ({ ...d }));
+  }
+  return {
+    workSchedule: settings.workSchedule,
+    shiftPattern: settings.shiftPattern,
+    templateDrafts,
+    currentShiftIndex: 0,
+  };
+}
+
+const WORK_SCHEDULE_LABEL: Record<string, string> = {
+  MON_FRI: 'Pazartesi – Cuma',
+  MON_SAT: 'Pazartesi – Cumartesi',
+  EVERY_DAY: 'Her gün',
+};
+const SHIFT_PATTERN_LABEL: Record<string, string> = {
+  FIXED_DAY: 'Sabit gündüz', FIXED_NIGHT: 'Sabit gece',
+  TWO_SHIFT: '2 vardiya', THREE_SHIFT: '3 vardiya',
+};
 
 export default function SettingsScreen() {
   const database = useAppDatabase();
@@ -188,12 +131,12 @@ export default function SettingsScreen() {
   const { theme, mode, toggleMode } = useAppTheme();
   const [cycle, setCycle] = useState<ShiftCycle | null>(null);
   const [storedTemplates, setStoredTemplates] = useState<ShiftTemplate[]>([]);
-  const [draft, setDraft] = useState<ScheduleDraft>(() => createDefaults());
-  const [editing, setEditing] = useState(false);
+  const [scheduleValue, setScheduleValue] = useState<ScheduleEditorValue | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleSuccess, setScheduleSuccess] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<Settings | null>(null);
   const [editingSalary, setEditingSalary] = useState(false);
   const [salaryRaw, setSalaryRaw] = useState('');
@@ -202,16 +145,18 @@ export default function SettingsScreen() {
   const [besEnabledEdit, setBesEnabledEdit] = useState(false);
   const [besRateBpRaw, setBesRateBpRaw] = useState('3');
   const [savingSalary, setSavingSalary] = useState(false);
+  const [salaryError, setSalaryError] = useState<string | null>(null);
+  const [salarySuccess, setSalarySuccess] = useState<string | null>(null);
+  const [startDateEdit, setStartDateEdit] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
   const loadedOnce = useRef(false);
-  const startEntry = cycle?.entries[cycle.startIndex];
 
   useEffect(() => { loadedOnce.current = false; }, [database]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setScheduleError(null);
     try {
       const [cycles, templates, settings] = await Promise.all([
         listShiftCycles(database),
@@ -222,10 +167,9 @@ export default function SettingsScreen() {
       setCycle(active);
       setStoredTemplates(templates);
       setAppSettings(settings);
-      if (active) { setDraft(draftFromSaved(active, templates)); setEditing(false); }
-      else { setDraft(createDefaults()); setEditing(true); }
+      setScheduleValue(scheduleValueFromSettings(settings, templates, active));
     } catch {
-      setError('Ayarlar yüklenemedi. Tekrar deneyin.');
+      setScheduleError('Ayarlar yüklenemedi. Tekrar deneyin.');
     } finally {
       setLoading(false);
     }
@@ -237,100 +181,107 @@ export default function SettingsScreen() {
     void load();
   }, [load]));
 
-  const preview = useMemo(() => {
-    try { return previewShiftSchedule(draft, draft.anchorLocalDate, 14); }
-    catch { return []; }
-  }, [draft]);
-
-  const startTemplateOptions = draft.templates
-    .map((template, index) => ({ template, index }))
-    .filter(({ index }) => draft.pattern !== 'custom' || draft.customEntries.some(
-      (entry) => entry.kind === 'SHIFT' && entry.templateIndex === index,
-    ));
-
-  const updateTemplate = (index: number, update: Partial<ShiftTemplate>) => {
-    setDraft((current) => ({
-      ...current,
-      templates: current.templates.map((template, candidate) =>
-        candidate === index ? { ...template, ...update } : template,
-      ),
-    }));
-  };
-
-  const save = async () => {
-    setSuccess(null); setError(null);
-    let built;
-    try { built = buildShiftSchedule(draft); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'Bilgileri kontrol edin.'); return; }
-    setSaving(true);
-    try {
-      await saveShiftSchedule(database, built.templates, built.cycle);
-      setCycle(built.cycle); setStoredTemplates(built.templates);
-      setDraft({ ...draft, templates: built.templates }); setEditing(false);
-      setSuccess('Vardiya düzeni kaydedildi.');
-    } catch { setError('Kaydedilemedi.'); }
-    finally { setSaving(false); }
-  };
-
-  const cancelEdit = () => {
-    if (cycle) setDraft(draftFromSaved(cycle, storedTemplates));
-    else setDraft(createDefaults());
-    setEditing(false); setError(null);
-  };
-
-  const confirmCancelEdit = () => {
-    Alert.alert('Düzenlemeyi bırak?', 'Kaydedilmemiş değişiklikler kaybolacak.',
-      [{ text: 'Düzenlemeye dön', style: 'cancel' }, { text: 'Vazgeç', style: 'destructive', onPress: cancelEdit }]);
-  };
-
-  const choosePattern = (pattern: ShiftPattern) => {
-    setDraft((current) => ({
-      ...current, pattern, preservedStartEntryIndex: undefined,
-      customEntries: pattern === 'custom' && current.customEntries.length === 0
-        ? [{ kind: 'SHIFT', templateIndex: 0 }, { kind: 'OFF' }] : current.customEntries,
-    }));
-  };
-
-  const updateCustomEntry = (entryIndex: number, value: CustomEntryDraft) => {
-    setDraft((current) => ({
-      ...current, customEntries: current.customEntries.map((entry, index) => index === entryIndex ? value : entry),
-    }));
-  };
-
   const startSalaryEdit = () => {
     if (!appSettings) return;
-    setSalaryRaw((appSettings.salaryMinor / 100).toFixed(2));
+    setSalaryRaw(formatMoneyInput(String(Math.round(appSettings.salaryMinor / 100))));
     setSalaryTypeEdit(appSettings.salaryType);
     setPaydayRaw(appSettings.payday === 'LAST' ? '' : String(appSettings.payday));
     setBesEnabledEdit(appSettings.besEnabled);
     setBesRateBpRaw(String(appSettings.besRateBp / 100));
+    setStartDateEdit(appSettings.startDate ?? '');
     setEditingSalary(true);
-    setError(null);
+    setSalaryError(null);
   };
 
-  const cancelSalaryEdit = () => { setEditingSalary(false); setError(null); };
+  const cancelSalaryEdit = () => { setEditingSalary(false); setSalaryError(null); };
 
   const saveSalaryEdit = async () => {
     let salaryMinor: number;
-    try { salaryMinor = parseTryMinor(salaryRaw); } catch { setError('Maaş tutarı geçersiz.'); return; }
+    try { salaryMinor = parseTryMinor(salaryRaw); } catch { setSalaryError('Maaş tutarı geçersiz.'); return; }
     const paydayNum = paydayRaw.trim() === '' ? undefined : Number(paydayRaw.trim());
     if (paydayRaw.trim() !== '' && (isNaN(paydayNum!) || paydayNum! < 1 || paydayNum! > 31)) {
-      setError('Maaş günü 1–31 arasında olmalı veya boş bırakın (ayın sonu).'); return;
+      setSalaryError('Maaş günü 1–31 arasında olmalı veya boş bırakın (ayın sonu).'); return;
     }
     const payday = (paydayRaw.trim() === '' ? 'LAST' : String(paydayNum!)) as Settings['payday'];
     const besRateBp = Math.round(Number(besRateBpRaw) * 100);
     if (besEnabledEdit && (isNaN(besRateBp) || besRateBp < 100 || besRateBp > 2500)) {
-      setError('BES oranı %1–%25 arasında olmalı.'); return;
+      setSalaryError('BES oranı %1–%25 arasında olmalı.'); return;
     }
-    setSavingSalary(true); setError(null);
+    setSavingSalary(true); setSalaryError(null);
     try {
-      await updateSettings(database, { salaryMinor, salaryType: salaryTypeEdit, payday, besEnabled: besEnabledEdit, besRateBp: besEnabledEdit ? besRateBp : appSettings?.besRateBp ?? 300 });
+      await updateSettings(database, {
+        salaryMinor, salaryType: salaryTypeEdit, payday,
+        besEnabled: besEnabledEdit,
+        besRateBp: besEnabledEdit ? besRateBp : appSettings?.besRateBp ?? 300,
+        startDate: startDateEdit || null,
+      });
       const updated = await getSettings(database);
       setAppSettings(updated);
       setEditingSalary(false);
-      setSuccess('Ücret bilgileri güncellendi.');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Kaydedilemedi.'); }
+      setSalarySuccess('Ücret bilgileri güncellendi.');
+    } catch (err) { setSalaryError(err instanceof Error ? err.message : 'Kaydedilemedi.'); }
     finally { setSavingSalary(false); }
+  };
+
+  const startScheduleEdit = () => {
+    setScheduleError(null);
+    setScheduleSuccess(null);
+    setEditingSchedule(true);
+  };
+
+  const cancelScheduleEdit = () => {
+    if (appSettings && scheduleValue) {
+      setScheduleValue(scheduleValueFromSettings(appSettings, storedTemplates, cycle));
+    }
+    setEditingSchedule(false);
+    setScheduleError(null);
+  };
+
+  const confirmCancelScheduleEdit = () => {
+    Alert.alert('Düzenlemeyi bırak?', 'Kaydedilmemiş değişiklikler kaybolacak.',
+      [{ text: 'Düzenlemeye dön', style: 'cancel' }, { text: 'Vazgeç', style: 'destructive', onPress: cancelScheduleEdit }]);
+  };
+
+  const saveSchedule = async () => {
+    if (!scheduleValue) return;
+    if (!isScheduleValueValid(scheduleValue)) { setScheduleError('Vardiya saatlerini kontrol edin.'); return; }
+    setSavingSchedule(true); setScheduleError(null);
+    try {
+      const today = getLocalToday('Europe/Istanbul');
+      const effectiveFrom = mondayOfLocalDate(today);
+      const result = planTemplateChanges(scheduleValue.templateDrafts, storedTemplates);
+      const newTemplates = result.create.map((d) => ({
+        id: randomUUID(), code: d.code, name: d.name,
+        startLocalTime: d.startLocalTime, endLocalTime: d.endLocalTime,
+        breakMinutes: d.breakMinutes,
+        standardMinutes: shiftNominalMinutes(d.startLocalTime, d.endLocalTime),
+      }));
+      const allTemplates = [...result.reuse, ...newTemplates];
+      const templateIds = resolveTemplateIds(scheduleValue.templateDrafts, result, newTemplates);
+      const entries = buildCycleEntries(scheduleValue.workSchedule, scheduleValue.shiftPattern, templateIds);
+      const phaseCount = scheduleValue.shiftPattern === 'THREE_SHIFT' ? 3 : 2;
+      const startIndex = needsCurrentShiftStep(scheduleValue.shiftPattern)
+        ? Math.round((scheduleValue.currentShiftIndex * entries.length) / phaseCount) % entries.length
+        : 0;
+      const newCycle = {
+        id: cycle?.id ?? randomUUID(),
+        name: 'Vardiya düzenim',
+        timezone: 'Europe/Istanbul',
+        anchorLocalDate: effectiveFrom,
+        startIndex,
+        entries,
+      };
+      await saveShiftSchedule(database, allTemplates, newCycle, effectiveFrom);
+      await updateSettings(database, {
+        workSchedule: scheduleValue.workSchedule,
+        shiftPattern: scheduleValue.shiftPattern,
+      });
+      setCycle(newCycle);
+      setStoredTemplates(allTemplates);
+      setEditingSchedule(false);
+      setScheduleSuccess('Vardiya düzeni kaydedildi.');
+    } catch (err) { setScheduleError(err instanceof Error ? err.message : 'Kaydedilemedi.'); }
+    finally { setSavingSchedule(false); }
   };
 
   const handleReset = () => { setResetConfirmText(''); setShowResetModal(true); };
@@ -348,231 +299,237 @@ export default function SettingsScreen() {
     }
   };
 
-  const renderCyclePreview = (items: typeof preview) => (
-    <View style={styles.previewWrap}>
-      {items.map((item) => {
-        const template = item.kind === 'SHIFT' ? draft.templates.find((c) => c.id === item.templateId) : undefined;
-        const window = template ? getNominalShiftWindow(item.localDate, template.startLocalTime, template.endLocalTime) : null;
-        return (
-          <View key={item.localDate} style={[styles.previewDay, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-            <Text style={[styles.previewDate, { color: theme.muted }]}>{item.localDate.slice(5)}</Text>
-            <ShiftKindBadge compact kind={item.kind} template={template} />
-            {window ? <Text style={[styles.previewTime, { color: theme.muted }]}>{window.startLocalTime}–{window.endLocalTime}{window.crossesMidnight ? ' +1' : ''}</Text> : null}
-          </View>
-        );
-      })}
-    </View>
-  );
-
   return (
     <>
-    <ScrollView contentContainerStyle={[styles.screen, { backgroundColor: theme.background }]} keyboardShouldPersistTaps="handled">
-      <PageHeading eyebrow="TERCİHLER" title="Ayarlar" subtitle="Vardiya düzenin ve ücret ayarların cihazında saklanır." />
+      <ScrollView
+        contentContainerStyle={[styles.screen, { backgroundColor: theme.background }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <PageHeading eyebrow="TERCİHLER" title="Ayarlar" subtitle="Vardiya düzenin ve ücret ayarların cihazında saklanır." />
 
-      {/* Quick actions */}
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <SectionHeading icon="color-palette-outline" title="Görünüm ve hızlı erişim" theme={theme} />
-        <Action label={mode === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} onPress={() => void toggleMode()} theme={theme} secondary />
-        <Action label="Vardiya değişikliği" onPress={() => router.push('/shift-change' as never)} theme={theme} secondary />
-        <Action label="Ek gelirler" onPress={() => router.push('/additional-income' as never)} theme={theme} secondary />
-      </View>
-
-      {/* Payroll summary / edit */}
-      {appSettings && (
+        {/* Quick actions */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <SectionHeading icon="wallet-outline" title="Ücret bilgileri" theme={theme} />
-          {editingSalary ? (
-            <>
-              <Field label="Maaş (TL)" value={salaryRaw} onChangeText={setSalaryRaw} theme={theme} placeholder="Örn. 25000.00" keyboardType="numbers-and-punctuation" />
-              <Text style={[styles.fieldLabel, { color: theme.muted }]}>Maaş türü</Text>
-              <View style={styles.chipWrap}>
-                {(['GROSS', 'NET'] as const).map((type) => (
-                  <ChoiceChip key={type} label={type === 'GROSS' ? 'Brüt' : 'Net'} selected={salaryTypeEdit === type} onPress={() => setSalaryTypeEdit(type)} />
-                ))}
-              </View>
-              <Field label="Maaş günü (1–31, boş = ayın sonu)" value={paydayRaw} onChangeText={setPaydayRaw} theme={theme} placeholder="Boş = ayın sonu" keyboardType="numbers-and-punctuation" maxLength={2} />
-              <View style={styles.infoRow}>
-                <Text style={[styles.fieldLabel, { color: theme.muted }]}>BES aktif</Text>
-                <Switch value={besEnabledEdit} onValueChange={setBesEnabledEdit} trackColor={{ true: theme.accent }} />
-              </View>
-              {besEnabledEdit && (
-                <Field label="BES oranı (%)" value={besRateBpRaw} onChangeText={setBesRateBpRaw} theme={theme} placeholder="Örn. 3" keyboardType="numbers-and-punctuation" maxLength={4} />
-              )}
-              {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
-              <View style={styles.actionRow}>
-                <Action label={savingSalary ? 'Kaydediliyor…' : 'Kaydet'} onPress={() => void saveSalaryEdit()} theme={theme} disabled={savingSalary} />
-                <Action label="Vazgeç" onPress={cancelSalaryEdit} theme={theme} secondary disabled={savingSalary} />
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.infoRow}>
-                <Text style={{ color: theme.muted }}>Maaş</Text>
-                <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{formatTryMinor(appSettings.salaryMinor)} ({appSettings.salaryType === 'GROSS' ? 'Brüt' : 'Net'})</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={{ color: theme.muted }}>Maaş günü</Text>
-                <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.payday === 'LAST' ? 'Ayın sonu' : `Ayın ${appSettings.payday}`}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={{ color: theme.muted }}>BES</Text>
-                <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.besEnabled ? `%${(appSettings.besRateBp / 100).toFixed(0)}` : 'Kapalı'}</Text>
-              </View>
-              {success ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{success}</Text> : null}
-              <Action label="Ücret bilgilerini düzenle" onPress={startSalaryEdit} theme={theme} secondary />
-            </>
-          )}
+          <SectionHeading icon="color-palette-outline" title="Görünüm ve hızlı erişim" theme={theme} />
+          <ActionButton label={mode === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} onPress={() => void toggleMode()} variant="secondary" />
+          <ActionButton label="Ek gelirler" onPress={() => router.push('/additional-income' as never)} variant="secondary" />
         </View>
-      )}
 
-      {/* Data */}
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <SectionHeading icon="shield-checkmark-outline" title="Veri güvenliği" theme={theme} />
-        <Action label="Yedekleme ve geri yükleme" onPress={() => router.push('/backup' as never)} theme={theme} />
-      </View>
-
-      {/* Legal */}
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <SectionHeading icon="document-text-outline" title="Yasal" theme={theme} />
-        <Action label="KVKK Aydınlatma Metni" onPress={() => router.push('/legal/kvkk' as never)} theme={theme} secondary />
-        <Action label="Gizlilik Politikası" onPress={() => router.push('/legal/privacy' as never)} theme={theme} secondary />
-      </View>
-
-      {/* Shift cycle editor */}
-      {loading ? (
-        <View accessibilityLiveRegion="polite" style={styles.statusRow}>
-          <ActivityIndicator color={theme.ink} />
-          <Text style={{ color: theme.muted }}>Vardiya düzeni yükleniyor…</Text>
-        </View>
-      ) : error && !editing ? (
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text accessibilityRole="alert" style={[styles.body, { color: theme.ink }]}>{error}</Text>
-          <Action label="Tekrar dene" onPress={() => void load()} theme={theme} />
-        </View>
-      ) : !editing && cycle ? (
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.rowBetween}>
-            <View style={styles.flex}>
-              <Text style={[styles.cardTitle, { color: theme.ink }]}>{cycle.name}</Text>
-              <Text style={[styles.body, { color: theme.muted }]}>{PATTERNS.find((item) => item.id === detectPattern(cycle))?.title} · {cycle.timezone}</Text>
-            </View>
-            {startEntry?.kind === 'SHIFT' ? <ShiftKindBadge kind="SHIFT" template={storedTemplates.find((item) => item.id === startEntry.templateId)} /> : null}
-          </View>
-          <Action label="Düzeni düzenle" onPress={() => setEditing(true)} theme={theme} />
-          {success ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{success}</Text> : null}
-        </View>
-      ) : (
-        <>
+        {/* Payroll summary / edit */}
+        {appSettings && (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <SectionHeading icon="repeat-outline" title="Döngü bilgileri" theme={theme} />
-            <Field label="Düzen adı" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} theme={theme} placeholder="Örn. Üretim vardiyam" />
-            <Field label="Zaman dilimi (IANA)" value={draft.timezone} onChangeText={(timezone) => setDraft({ ...draft, timezone })} theme={theme} placeholder="Europe/Istanbul" />
-            <DateTimePickerField mode="date" label="Döngü başlangıç tarihi" value={draft.anchorLocalDate} timezone={draft.timezone} onChange={(anchorLocalDate) => setDraft({ ...draft, anchorLocalDate })} onError={setError} />
-            <Text style={[styles.fieldLabel, { color: theme.muted }]}>Düzen türü</Text>
-            <View style={styles.chipWrap}>
-              {PATTERNS.map((item) => <ChoiceChip key={item.id} label={item.title} description={item.hint} selected={draft.pattern === item.id} onPress={() => choosePattern(item.id)} />)}
-            </View>
-          </View>
-
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <SectionHeading icon="time-outline" title="Vardiya şablonları" theme={theme} />
-            {draft.templates.map((template, index) => (
-              <View key={template.id} style={[styles.templateBox, { borderColor: theme.border }]}>
-                <View style={styles.twoColumns}>
-                  <View style={styles.flex}><Field label={`Ad ${index + 1}`} value={template.name} onChangeText={(name) => updateTemplate(index, { name })} theme={theme} /></View>
-                  <View style={styles.codeField}><Field label={`Kod ${index + 1}`} value={template.code} onChangeText={(code) => updateTemplate(index, { code: code.toLocaleUpperCase('tr-TR') })} theme={theme} maxLength={5} /></View>
+            <SectionHeading icon="wallet-outline" title="Ücret bilgileri" theme={theme} />
+            {editingSalary ? (
+              <>
+                <MoneyField label="Maaş" value={salaryRaw} onChangeText={setSalaryRaw} placeholder="Örn. 25.000" />
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>Maaş türü</Text>
+                <View style={styles.chipWrap}>
+                  {(['GROSS', 'NET'] as const).map((type) => (
+                    <ChoiceChip key={type} label={type === 'GROSS' ? 'Brüt' : 'Net'} selected={salaryTypeEdit === type} onPress={() => setSalaryTypeEdit(type)} />
+                  ))}
                 </View>
-                <View style={styles.twoColumns}>
-                  <View style={styles.flex}><DateTimePickerField mode="time" label={`Başlangıç ${index + 1}`} value={template.startLocalTime} localDate={draft.anchorLocalDate} timezone={draft.timezone} onChange={(startLocalTime) => updateTemplate(index, { startLocalTime })} onError={setError} /></View>
-                  <View style={styles.flex}><DateTimePickerField mode="time" label={`Bitiş ${index + 1}`} value={template.endLocalTime} localDate={draft.anchorLocalDate} timezone={draft.timezone} onChange={(endLocalTime) => updateTemplate(index, { endLocalTime })} onError={setError} /></View>
+                <Field label="Maaş günü (1–31, boş = ayın sonu)" value={paydayRaw} onChangeText={setPaydayRaw} theme={theme} placeholder="Boş = ayın sonu" keyboardType="numbers-and-punctuation" maxLength={2} />
+                <View style={styles.infoRow}>
+                  <Text style={[styles.fieldLabel, { color: theme.muted }]}>BES aktif</Text>
+                  <Switch value={besEnabledEdit} onValueChange={setBesEnabledEdit} trackColor={{ true: theme.accent }} />
                 </View>
-              </View>
-            ))}
-            <Text style={[styles.fieldLabel, { color: theme.muted }]}>Başlangıç vardiyası</Text>
-            <View style={styles.chipWrap}>
-              {startTemplateOptions.map(({ template, index }) => (
-                <ChoiceChip key={template.id} label={`${template.code || `V${index + 1}`} · ${template.name || `V${index + 1}`}`} selected={draft.startTemplateIndex === index} onPress={() => setDraft({ ...draft, startTemplateIndex: index, preservedStartEntryIndex: undefined })} />
-              ))}
-            </View>
-            {draft.pattern === 'custom' ? (
-              <View>
-                {draft.customEntries.map((entry, index) => (
-                  <View key={`custom-${index}`} style={[styles.customRow, { borderColor: theme.border }]}>
-                    <Text style={[styles.customDay, { color: theme.muted }]}>{index + 1}. gün</Text>
-                    <View style={styles.customControls}>
-                      <ChoiceChip label="Vardiya" selected={entry.kind === 'SHIFT'} onPress={() => updateCustomEntry(index, { kind: 'SHIFT', templateIndex: entry.kind === 'SHIFT' ? entry.templateIndex : draft.startTemplateIndex })} />
-                      <ChoiceChip label="OFF" selected={entry.kind === 'OFF'} onPress={() => updateCustomEntry(index, { kind: 'OFF' })} />
-                      {entry.kind === 'SHIFT' ? draft.templates.map((t, ti) => <ChoiceChip key={t.id} label={t.code || `V${ti + 1}`} selected={entry.templateIndex === ti} onPress={() => updateCustomEntry(index, { kind: 'SHIFT', templateIndex: ti })} />) : null}
-                    </View>
-                    <Pressable accessibilityLabel={`${index + 1}. günü kaldır`} accessibilityRole="button" hitSlop={8} onPress={() => setDraft({ ...draft, customEntries: draft.customEntries.filter((_, c) => c !== index) })} style={styles.removeEntry}>
-                      <Text style={{ color: theme.muted, fontSize: 14 }}>Kaldır</Text>
-                    </Pressable>
+                {besEnabledEdit && (
+                  <Field label="BES oranı (%)" value={besRateBpRaw} onChangeText={setBesRateBpRaw} theme={theme} placeholder="Örn. 3" keyboardType="numbers-and-punctuation" maxLength={4} />
+                )}
+                <DateTimePickerField
+                  mode="date"
+                  label="İşe başlama tarihi"
+                  value={startDateEdit}
+                  timezone="Europe/Istanbul"
+                  maximumDate={new Date()}
+                  onChange={setStartDateEdit}
+                  onError={setSalaryError}
+                />
+                {salaryError ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{salaryError}</Text> : null}
+                <View style={styles.actionRow}>
+                  <ActionButton label={savingSalary ? 'Kaydediliyor…' : 'Kaydet'} onPress={() => void saveSalaryEdit()} disabled={savingSalary} />
+                  <ActionButton label="Vazgeç" onPress={cancelSalaryEdit} variant="secondary" disabled={savingSalary} />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.infoRow}>
+                  <Text style={{ color: theme.muted }}>Maaş</Text>
+                  <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{formatTryMinor(appSettings.salaryMinor)} ({appSettings.salaryType === 'GROSS' ? 'Brüt' : 'Net'})</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={{ color: theme.muted }}>Maaş günü</Text>
+                  <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.payday === 'LAST' ? 'Ayın sonu' : `Ayın ${appSettings.payday}`}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={{ color: theme.muted }}>BES</Text>
+                  <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.besEnabled ? `%${(appSettings.besRateBp / 100).toFixed(0)}` : 'Kapalı'}</Text>
+                </View>
+                {appSettings.startDate ? (
+                  <View style={styles.infoRow}>
+                    <Text style={{ color: theme.muted }}>İşe başlama</Text>
+                    <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.startDate.split('-').reverse().join('.')}</Text>
                   </View>
-                ))}
-                <Action label="Gün ekle" onPress={() => setDraft({ ...draft, customEntries: [...draft.customEntries, { kind: 'OFF' }] })} theme={theme} secondary disabled={draft.customEntries.length >= 14} />
-              </View>
+                ) : null}
+                {salarySuccess ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{salarySuccess}</Text> : null}
+                <ActionButton label="Ücret bilgilerini düzenle" onPress={startSalaryEdit} variant="secondary" />
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Hourly leave policy */}
+        {appSettings && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <SectionHeading icon="time-outline" title="Saatlik izin kuralı" theme={theme} />
+            {[
+              {
+                value: HOURLY_LEAVE_POLICY.BASE_PAY as HourlyLeavePolicy,
+                title: 'Maaşımdan kesilsin',
+                description: 'Mesain etkilenmez, izin saatin maaşından kesilir.',
+              },
+              {
+                value: HOURLY_LEAVE_POLICY.OVERTIME_FIRST as HourlyLeavePolicy,
+                title: 'Önce mesaimden düşülsün',
+                description: 'Mesain varsa izin saatin oradan düşülür, yetmezse maaşından kesilir.',
+              },
+            ].map((opt) => {
+              const selected = appSettings.hourlyLeavePolicy === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={opt.title}
+                  onPress={() => {
+                    void updateSettings(database, { hourlyLeavePolicy: opt.value }).then(() =>
+                      getSettings(database).then(setAppSettings),
+                    );
+                  }}
+                  style={[
+                    styles.hlpOption,
+                    {
+                      borderColor: selected ? theme.ink : theme.border,
+                      borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+                      backgroundColor: selected ? theme.surfaceMuted : theme.surface,
+                    },
+                  ]}
+                >
+                  <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={20} color={selected ? theme.ink : theme.muted} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>{opt.title}</Text>
+                    <Text style={{ color: theme.muted, fontSize: layout.type.caption, marginTop: 2 }}>{opt.description}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Shift schedule */}
+        {loading ? (
+          <View accessibilityLiveRegion="polite" style={styles.statusRow}>
+            <ActivityIndicator color={theme.ink} />
+            <Text style={{ color: theme.muted }}>Vardiya düzeni yükleniyor…</Text>
+          </View>
+        ) : (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <SectionHeading icon="repeat-outline" title="Vardiya düzeni" theme={theme} />
+            {!editingSchedule ? (
+              <>
+                {appSettings && (
+                  <>
+                    <View style={styles.infoRow}>
+                      <Text style={{ color: theme.muted }}>Çalışma düzeni</Text>
+                      <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{WORK_SCHEDULE_LABEL[appSettings.workSchedule] ?? appSettings.workSchedule}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={{ color: theme.muted }}>Vardiya</Text>
+                      <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{SHIFT_PATTERN_LABEL[appSettings.shiftPattern] ?? appSettings.shiftPattern}</Text>
+                    </View>
+                    {scheduleValue?.templateDrafts.map((td, i) => (
+                      <View key={i} style={styles.infoRow}>
+                        <Text style={{ color: theme.muted }}>{td.name}</Text>
+                        <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{td.startLocalTime} – {td.endLocalTime}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+                {scheduleSuccess ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{scheduleSuccess}</Text> : null}
+                <ActionButton label="Vardiya düzenini düzenle" onPress={startScheduleEdit} variant="secondary" />
+                <ActionButton label="Vardiya değişikliği" onPress={() => router.push('/shift-change' as never)} variant="secondary" />
+              </>
+            ) : scheduleValue ? (
+              <>
+                <ScheduleEditor value={scheduleValue} onChange={setScheduleValue} />
+                {scheduleError ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{scheduleError}</Text> : null}
+                <View style={styles.actionRow}>
+                  <ActionButton label={savingSchedule ? 'Kaydediliyor…' : 'Kaydet'} onPress={() => void saveSchedule()} disabled={savingSchedule} />
+                  <ActionButton label="Vazgeç" onPress={confirmCancelScheduleEdit} variant="secondary" disabled={savingSchedule} />
+                </View>
+              </>
             ) : null}
           </View>
+        )}
 
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <SectionHeading icon="calendar-outline" title="14 günlük önizleme" theme={theme} />
-            {preview.length ? renderCyclePreview(preview) : <Text style={{ color: theme.muted }}>Bilgileri kontrol et.</Text>}
-          </View>
+        {/* Data */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <SectionHeading icon="shield-checkmark-outline" title="Veri güvenliği" theme={theme} />
+          <ActionButton label="Yedekleme ve geri yükleme" onPress={() => router.push('/backup' as never)} />
+        </View>
 
-          {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
-          <View style={styles.actionRow}>
-            <Action label={saving ? 'Kaydediliyor…' : 'Kaydet'} onPress={() => void save()} theme={theme} disabled={saving} />
-            {cycle ? <Action label="Vazgeç" onPress={confirmCancelEdit} theme={theme} secondary disabled={saving} /> : null}
-          </View>
-        </>
-      )}
+        {/* Legal */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <SectionHeading icon="document-text-outline" title="Yasal" theme={theme} />
+          <ActionButton label="KVKK Aydınlatma Metni" onPress={() => router.push('/legal/kvkk' as never)} variant="secondary" />
+          <ActionButton label="Gizlilik Politikası" onPress={() => router.push('/legal/privacy' as never)} variant="secondary" />
+        </View>
 
-      {/* Reset */}
-      <View style={[styles.card, { backgroundColor: theme.dangerSurface, borderColor: theme.danger }]}>
-        <SectionHeading icon="trash-outline" title="Sıfırla" theme={theme} />
-        <Text style={[styles.body, { color: theme.ink }]}>Tüm verilerini sil ve uygulamayı baştan kur.</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleReset}
-          style={[styles.dangerButton, { borderColor: theme.danger }]}
-        >
-          <Text style={{ color: theme.danger, fontWeight: '700', fontSize: layout.type.body }}>SIFIRLA</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
-
-    <Modal animationType="fade" transparent visible={showResetModal} onRequestClose={() => setShowResetModal(false)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackdrop}>
-        <View style={[styles.modalSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.modalTitle, { color: theme.ink }]}>Tüm verileri sil</Text>
-          <Text style={[styles.body, { color: theme.muted }]}>Bu işlem geri alınamaz. Onaylamak için aşağıya{' '}
-            <Text style={{ fontWeight: '900', color: theme.danger }}>SIFIRLA</Text>
-            {' '}yazın.</Text>
-          <TextInput
-            accessibilityLabel="Onay metni"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            onChangeText={setResetConfirmText}
-            placeholder="SIFIRLA"
-            placeholderTextColor={theme.muted}
-            style={[styles.input, { backgroundColor: theme.background, borderColor: resetConfirmText === 'SIFIRLA' ? theme.danger : theme.border, color: theme.ink }]}
-            value={resetConfirmText}
-          />
+        {/* Reset */}
+        <View style={[styles.card, { backgroundColor: theme.dangerSurface, borderColor: theme.danger }]}>
+          <SectionHeading icon="trash-outline" title="Sıfırla" theme={theme} />
+          <Text style={[styles.body, { color: theme.ink }]}>Tüm verilerini sil ve uygulamayı baştan kur.</Text>
           <Pressable
-            accessibilityLabel="Sıfırlamayı onayla"
             accessibilityRole="button"
-            disabled={resetConfirmText !== 'SIFIRLA'}
-            onPress={() => void confirmReset()}
-            style={[styles.dangerButton, { borderColor: theme.danger, opacity: resetConfirmText === 'SIFIRLA' ? 1 : 0.35 }]}
+            onPress={handleReset}
+            style={[styles.dangerButton, { borderColor: theme.danger }]}
           >
-            <Text style={{ color: theme.danger, fontWeight: '700', fontSize: layout.type.body }}>Onayla ve sıfırla</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => setShowResetModal(false)} style={styles.modalCancel}>
-            <Text style={{ color: theme.muted, fontSize: layout.type.body }}>İptal</Text>
+            <Text style={{ color: theme.danger, fontFamily: fonts.bold, fontSize: layout.type.body }}>SIFIRLA</Text>
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </ScrollView>
+
+      <Modal animationType="fade" transparent visible={showResetModal} onRequestClose={() => setShowResetModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.ink }]}>Tüm verileri sil</Text>
+            <Text style={[styles.body, { color: theme.muted }]}>Bu işlem geri alınamaz. Onaylamak için aşağıya{' '}
+              <Text style={{ fontFamily: fonts.extraBold, color: theme.danger }}>SIFIRLA</Text>
+              {' '}yazın.</Text>
+            <TextInput
+              accessibilityLabel="Onay metni"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              onChangeText={setResetConfirmText}
+              placeholder="SIFIRLA"
+              placeholderTextColor={theme.muted}
+              style={[styles.input, { backgroundColor: theme.background, borderColor: resetConfirmText === 'SIFIRLA' ? theme.danger : theme.border, color: theme.ink }]}
+              value={resetConfirmText}
+            />
+            <Pressable
+              accessibilityLabel="Sıfırlamayı onayla"
+              accessibilityRole="button"
+              disabled={resetConfirmText !== 'SIFIRLA'}
+              onPress={() => void confirmReset()}
+              style={[styles.dangerButton, { borderColor: theme.danger, opacity: resetConfirmText === 'SIFIRLA' ? 1 : 0.35 }]}
+            >
+              <Text style={{ color: theme.danger, fontFamily: fonts.bold, fontSize: layout.type.body }}>Onayla ve sıfırla</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => setShowResetModal(false)} style={styles.modalCancel}>
+              <Text style={{ color: theme.muted, fontSize: layout.type.body }}>İptal</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </>
   );
 }
@@ -583,27 +540,13 @@ const styles = StyleSheet.create({
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   sectionIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.section, flexShrink: 1 },
-  cardTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.heading },
   body: { fontFamily: fonts.regular, fontSize: layout.type.body, lineHeight: 22 },
   field: { gap: 6 },
   fieldLabel: { fontFamily: fonts.bold, marginTop: 2, fontSize: layout.type.caption },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: layout.type.body },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  templateBox: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
-  twoColumns: { flexDirection: 'row', gap: 10 },
-  flex: { flex: 1, minWidth: 0 },
-  codeField: { width: 92 },
-  customRow: { borderTopWidth: 1, paddingVertical: 10, gap: 8 },
-  customDay: { fontSize: 13, fontWeight: '700' },
-  customControls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  removeEntry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  previewWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  previewDay: { minWidth: 125, flexGrow: 1, flexBasis: '45%', borderWidth: 1, borderRadius: 12, padding: 8, gap: 5 },
-  previewDate: { fontSize: 12, fontWeight: '700' },
-  previewTime: { fontSize: 12 },
   actionRow: { gap: 10 },
   statusRow: { minHeight: 100, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   error: { fontFamily: fonts.bold, fontSize: layout.type.caption, lineHeight: 20 },
   success: { fontFamily: fonts.bold, fontSize: layout.type.caption, lineHeight: 20 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
@@ -612,4 +555,5 @@ const styles = StyleSheet.create({
   modalSheet: { borderWidth: 1, borderRadius: 24, padding: 24, gap: 16 },
   modalTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.heading },
   modalCancel: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
+  hlpOption: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, padding: 12, minHeight: 44 },
 });

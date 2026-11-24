@@ -228,11 +228,12 @@ export async function updateShiftTemplate(
     await assertForeignKeysEnabled(database);
     const result = await database.runAsync(
       'UPDATE shift_templates SET code = ?, name = ?, start_local_time = ?, end_local_time = ?, ' +
-        'standard_minutes = ?, color_token = ?, icon_key = ? WHERE id = ?;',
+        'break_minutes = ?, standard_minutes = ?, color_token = ?, icon_key = ? WHERE id = ?;',
       template.code,
       template.name,
       template.startLocalTime,
       template.endLocalTime,
+      template.breakMinutes,
       template.standardMinutes ?? 480,
       template.colorToken ?? null,
       template.iconKey ?? null,

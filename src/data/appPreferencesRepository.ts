@@ -124,3 +124,21 @@ export async function saveThemePreference(
     );
   });
 }
+
+export async function getStartDatePromptDismissed(database: SQLiteDatabase): Promise<boolean> {
+  const value = await getMetadata(database, 'start_date_prompt_dismissed');
+  return value === '1';
+}
+
+export async function saveStartDatePromptDismissed(database: SQLiteDatabase): Promise<void> {
+  await saveMetadata(database, 'start_date_prompt_dismissed', '1');
+}
+
+export async function getCoachmarkDismissed(database: SQLiteDatabase, key: string): Promise<boolean> {
+  const value = await getMetadata(database, key);
+  return value === '1';
+}
+
+export async function saveCoachmarkDismissed(database: SQLiteDatabase, key: string): Promise<void> {
+  await saveMetadata(database, key, '1');
+}

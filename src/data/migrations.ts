@@ -10,6 +10,7 @@ type MigrationDatabase = Pick<
 type Migration = {
   version: number;
   sql: string;
+  requiresFKOff?: boolean;
 };
 
 function canonicalLocalDateCheck(column: string): string {
@@ -167,6 +168,55 @@ export const migrations: readonly Migration[] = [
       END;
     `,
   },
+  {
+    version: 102,
+    requiresFKOff: true,
+    sql: `
+      CREATE TABLE shift_templates_v102 (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        code TEXT NOT NULL CHECK (length(trim(code)) > 0),
+        name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        start_local_time TEXT NOT NULL CHECK (
+          length(start_local_time) = 5
+          AND start_local_time GLOB '[0-2][0-9]:[0-5][0-9]'
+          AND CAST(substr(start_local_time, 1, 2) AS INTEGER) < 24
+        ),
+        end_local_time TEXT NOT NULL CHECK (
+          length(end_local_time) = 5
+          AND end_local_time GLOB '[0-2][0-9]:[0-5][0-9]'
+          AND CAST(substr(end_local_time, 1, 2) AS INTEGER) < 24
+        ),
+        standard_minutes INTEGER NOT NULL DEFAULT 480 CHECK (standard_minutes > 0 AND standard_minutes <= 1440),
+        break_minutes INTEGER NOT NULL DEFAULT 0,
+        color_token TEXT,
+        icon_key TEXT
+      );
+
+      INSERT INTO shift_templates_v102
+        SELECT id, code, name, start_local_time, end_local_time, standard_minutes, break_minutes, color_token, icon_key
+        FROM shift_templates;
+
+      DROP TABLE shift_templates;
+
+      ALTER TABLE shift_templates_v102 RENAME TO shift_templates;
+    `,
+  },
+  {
+    version: 103,
+    sql: `
+      -- Remove overtime/late-early from leave days (data consistency fix).
+      -- HOURLY leave is excluded because those days can legitimately have overtime.
+      UPDATE day_entries
+      SET overtime_minutes = 0, late_early_minutes = 0
+      WHERE leave_type IS NOT NULL AND leave_type <> 'HOURLY';
+    `,
+  },
+  {
+    version: 104,
+    sql: `
+      ALTER TABLE settings ADD COLUMN hourly_leave_policy TEXT NOT NULL DEFAULT 'BASE_PAY' CHECK (hourly_leave_policy IN ('OVERTIME_FIRST','BASE_PAY'));
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;
@@ -197,14 +247,30 @@ export async function runMigrations(database: MigrationDatabase): Promise<Migrat
       return { previousVersion: initialVersion, currentVersion: initialVersion, needsReset: false };
     }
 
-    await database.withTransactionAsync(async () => {
+    for (const migration of migrations) {
       const currentVersion = await getSchemaVersion(database);
-      for (const migration of migrations) {
-        if (migration.version <= currentVersion) continue;
-        await database.execAsync(migration.sql);
-        await database.execAsync('PRAGMA user_version = ' + migration.version + ';');
+      if (migration.version <= currentVersion) continue;
+
+      if (migration.requiresFKOff) {
+        // PRAGMA foreign_keys is a no-op inside a transaction; it must be set
+        // before the transaction begins so DDL (DROP TABLE + RENAME) can run
+        // without triggering FK constraint checks on referencing tables.
+        await database.execAsync('PRAGMA foreign_keys = OFF;');
+        try {
+          await database.withTransactionAsync(async () => {
+            await database.execAsync(migration.sql);
+            await database.execAsync('PRAGMA user_version = ' + migration.version + ';');
+          });
+        } finally {
+          await database.execAsync('PRAGMA foreign_keys = ON;');
+        }
+      } else {
+        await database.withTransactionAsync(async () => {
+          await database.execAsync(migration.sql);
+          await database.execAsync('PRAGMA user_version = ' + migration.version + ';');
+        });
       }
-    });
+    }
 
     return { previousVersion: initialVersion, currentVersion: CURRENT_SCHEMA_VERSION, needsReset: false };
   });

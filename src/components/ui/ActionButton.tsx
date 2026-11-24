@@ -17,11 +17,11 @@ export function ActionButton({ label, onPress, variant = 'primary', disabled = f
   compact?: boolean;
   neutralWhenDisabled?: boolean;
 }) {
-  const { theme, mode } = useAppTheme();
+  const { theme } = useAppTheme();
   const muted = variant === 'secondary' || variant === 'quiet';
   const inactive = disabled && neutralWhenDisabled;
-  const backgroundColor = inactive ? theme.surface : variant === 'primary' ? theme.ink : variant === 'success' ? theme.success : variant === 'destructive' ? theme.danger : theme.surface;
-  const foreground = inactive ? theme.muted : muted ? theme.ink : variant === 'primary' ? theme.onInk : mode === 'dark' ? theme.background : '#FFFFFF';
+  const backgroundColor = inactive ? theme.surface : variant === 'primary' ? theme.inverse : variant === 'success' ? theme.success : variant === 'destructive' ? theme.danger : theme.surface;
+  const foreground = inactive ? theme.muted : muted ? theme.ink : variant === 'primary' ? theme.onInverse : variant === 'success' ? theme.onSuccess : variant === 'destructive' ? theme.onDanger : theme.ink;
   return (
     <Pressable
       accessibilityRole="button"

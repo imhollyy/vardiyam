@@ -5,15 +5,21 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "mesai-pusulasi",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F6F2EA",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "backgroundColor": "#F6F2EA"
+    },
+    "android": {
+      "backgroundColor": "#F6F2EA"
     },
     "plugins": [
       "expo-router",
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "expo-font"
+      "expo-font",
+      "expo-system-ui"
     ],
     "experiments": {
       "typedRoutes": true

@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { fonts } from '@/src/theme/tokens';
 
 export default function EntryScreen() {
   const database = useAppDatabase();
@@ -20,6 +21,6 @@ export default function EntryScreen() {
   }, [database, attempt]);
   if (destination) return <Redirect href={destination} />;
   return <View style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
-    {failed ? <><Text accessibilityRole="alert" style={{ color: theme.danger, textAlign: 'center' }}>Başlangıç bilgileri açılamadı. Yerel verilerin korunuyor.</Text><Pressable accessibilityRole="button" onPress={() => { setFailed(false); setAttempt((value) => value + 1); }}><Text style={{ color: theme.accent, fontWeight: '800', padding: 12 }}>Yeniden dene</Text></Pressable></> : <><ActivityIndicator color={theme.accent} /><Text accessibilityLiveRegion="polite" style={{ color: theme.muted }}>Uygulama hazırlanıyor…</Text></>}
+    {failed ? <><Text accessibilityRole="alert" style={{ color: theme.danger, textAlign: 'center' }}>Başlangıç bilgileri açılamadı. Yerel verilerin korunuyor.</Text><Pressable accessibilityRole="button" onPress={() => { setFailed(false); setAttempt((value) => value + 1); }}><Text style={{ color: theme.ink, fontFamily: fonts.extraBold, padding: 12 }}>Yeniden dene</Text></Pressable></> : <><ActivityIndicator color={theme.ink} /><Text accessibilityLiveRegion="polite" style={{ color: theme.muted }}>Uygulama hazırlanıyor…</Text></>}
   </View>;
 }

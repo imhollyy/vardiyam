@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: layout.space.sm },
-  label: { fontFamily: fonts.bold, fontSize: layout.type.body, flex: 1 },
+  label: { fontFamily: fonts.bold, fontSize: layout.type.body, flexShrink: 1 },
   description: { fontSize: layout.type.caption, lineHeight: 18 },
   group: { gap: layout.space.sm },
 });

@@ -6,6 +6,7 @@ import {
   daysInMonth,
   getLocalToday,
   localDateForMonthDay,
+  mondayOfLocalDate,
   monthForLocalDate,
   monthRange,
   mondayFirstOffset,
@@ -63,4 +64,17 @@ test('WorkRecord instants map to the intended local calendar months', () => {
   assert.deepEqual(localDates, ['2026-12-31', '2027-01-01']);
   assert.deepEqual(localDates.map(monthForLocalDate), ['2026-12', '2027-01']);
   assert.deepEqual(localDates.map(mondayFirstWeekdayOffset), [3, 4]);
+});
+
+test('mondayOfLocalDate: Pazartesi → kendisi, diğer günler → o haftanın Pazartesisi', () => {
+  // 2026-11-23 Pazartesi
+  assert.equal(mondayOfLocalDate('2026-11-23'), '2026-11-23');
+  // 2026-11-24 Salı → 2026-11-23
+  assert.equal(mondayOfLocalDate('2026-11-24'), '2026-11-23');
+  // 2026-11-29 Pazar → 2026-11-23
+  assert.equal(mondayOfLocalDate('2026-11-29'), '2026-11-23');
+  // 2026-12-31 Perşembe → 2026-12-28
+  assert.equal(mondayOfLocalDate('2026-12-31'), '2026-12-28');
+  // 2027-01-01 Cuma → 2026-12-28 (hafta değişimi)
+  assert.equal(mondayOfLocalDate('2027-01-01'), '2026-12-28');
 });

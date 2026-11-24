@@ -2,12 +2,12 @@ import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
+import { fonts } from '@/src/theme/tokens';
 
 const destinations = [
   { name: 'index', title: 'Bugün', glyph: 'home-outline', label: 'Bugün sekmesi' },
   { name: 'calendar', title: 'Takvim', glyph: 'calendar-outline', label: 'Takvim sekmesi' },
   { name: 'earnings', title: 'Kazanç', glyph: 'wallet-outline', label: 'Kazanç sekmesi' },
-  { name: 'reports', title: 'Raporlar', glyph: 'stats-chart-outline', label: 'Raporlar sekmesi' },
   { name: 'settings', title: 'Ayarlar', glyph: 'settings-outline', label: 'Ayarlar sekmesi' },
 ] as const;
 
@@ -27,7 +27,7 @@ export default function TabLayout() {
           paddingTop: 6,
           paddingBottom: 6,
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 12, fontFamily: fonts.semiBold },
         tabBarItemStyle: { paddingHorizontal: 0 },
         tabBarIconStyle: { marginTop: 1 },
       }}

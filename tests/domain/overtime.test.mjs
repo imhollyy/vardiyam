@@ -101,17 +101,23 @@ test('Çarşamba OFF → 4 iş günü 660dk/gün = 2640 < 2700 → fazla mesai Y
   assert.equal(result.length, 0);
 });
 
-test('Çarşamba LEAVE → 4 iş günü, 660dk/gün × 4 = 2640 < 2700 → fazla mesai YOK', () => {
+test('Carsamba LEAVE: standardDayMin katkisiyla weekTotal=3180>2700, 4 calisma gunu 120dk mesai alir', () => {
+  // Yeni davranis: izin gunu standart pay (2700/5=540) ile toplama katki yapar.
+  // 4x660 + 540 = 3180, fazla=480, 4 gun x 120 = 480 -> result.length=4
   const tpl = makeTemplate('G', '08:00', '20:00', 60);
   const days = [
     makeDay('2025-11-17', 'G'),
     makeDay('2025-11-18', 'G'),
-    makeDay('2025-11-19', 'G', { status: 'LEAVE', shiftTemplateId: null }),
+    makeDay('2025-11-19', 'G', { status: 'LEAVE', leaveType: 'ANNUAL', shiftTemplateId: null }),
     makeDay('2025-11-20', 'G'),
     makeDay('2025-11-21', 'G'),
   ];
   const result = calculateScheduledOvertime(days, [tpl]);
-  assert.equal(result.length, 0);
+  assert.equal(result.length, 4);
+  assert.ok(!result.find((o) => o.localDate === '2025-11-19')); // LEAVE day gets no overtime
+  for (const o of result) {
+    assert.equal(o.scheduledOvertimeMinutes, 120);
+  }
 });
 
 test('shiftTemplateId null olan WORKED gün → 0 net dakika katkısı, limit aşılmaz', () => {

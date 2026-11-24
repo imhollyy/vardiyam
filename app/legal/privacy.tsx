@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { APP_NAME } from '@/src/config/app';
-import { layout } from '@/src/theme/tokens';
+import { fonts, layout } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card } from '@/src/components/ui/Card';
 import { PageHeading } from '@/src/components/ui/PageHeading';
@@ -56,8 +56,8 @@ export default function PrivacyScreen() {
 
       {SECTIONS.map((section) => (
         <Card key={section.title}>
-          <Text style={[styles.heading, { color: theme.foreground }]}>{section.title}</Text>
-          <Text style={[styles.body, { color: theme.foreground }]}>{section.body}</Text>
+          <Text style={[styles.heading, { color: theme.ink }]}>{section.title}</Text>
+          <Text style={[styles.body, { color: theme.ink }]}>{section.body}</Text>
         </Card>
       ))}
 
@@ -71,7 +71,7 @@ export default function PrivacyScreen() {
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
   closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  heading: { fontSize: layout.type.section, fontWeight: '700' },
+  heading: { fontSize: layout.type.section, fontFamily: fonts.bold },
   body: { fontSize: layout.type.body, lineHeight: 24 },
   draft: { fontSize: layout.type.caption, fontStyle: 'italic', textAlign: 'center' },
 });
