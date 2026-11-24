@@ -56,11 +56,11 @@ export function mondayOfLocalDate(localDate: string): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function needsCurrentShiftStep(pattern: ShiftPattern): boolean {
+export function needsCurrentShiftStep(pattern: ShiftPattern): boolean {
   return pattern === 'TWO_SHIFT' || pattern === 'THREE_SHIFT';
 }
 
-function buildCycleEntries(ws: WorkSchedule, sp: ShiftPattern, templateIds: string[]): CycleEntry[] {
+export function buildCycleEntries(ws: WorkSchedule, sp: ShiftPattern, templateIds: string[]): CycleEntry[] {
   const workDays = ws === 'MON_FRI' ? 5 : ws === 'MON_SAT' ? 6 : 7;
   const offDays = 7 - workDays;
   const shift = (id: string): CycleEntry => ({ kind: 'SHIFT', templateId: id });

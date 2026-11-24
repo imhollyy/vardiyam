@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
+import { getStartDatePromptDismissed, saveStartDatePromptDismissed } from '@/src/data/appPreferencesRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
 import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
 import {
@@ -102,6 +103,7 @@ export default function HomeScreen() {
   const [periodStatement, setPeriodStatement] = useState<MonthlyStatement | null>(null);
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [promptDismissed, setPromptDismissed] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -110,6 +112,7 @@ export default function HomeScreen() {
       void (async () => {
         try {
           const s = await getSettings(database);
+          const dismissed = await getStartDatePromptDismissed(database);
           const tmpl = await listShiftTemplates(database);
           const cycles = await listShiftCycles(database);
           const rangeStart = displayedMonday < week[0]! ? displayedMonday : week[0]!;
@@ -123,6 +126,7 @@ export default function HomeScreen() {
           const { statement, period } = await loadCurrentPeriodStatement(database, today);
           if (active) {
             setSettings(s);
+            setPromptDismissed(dismissed);
             setTemplates(tmpl);
             setDayMap(new Map(derived.map((d) => [d.localDate, d])));
             setPlannedMap(planned);
@@ -219,6 +223,35 @@ export default function HomeScreen() {
           {Number(todayNumStr)} {monthStr}
         </Text>
       </View>
+
+      {/* start-date prompt */}
+      {!settings?.startDate && !promptDismissed && (
+        <View style={{ backgroundColor: theme.surfaceMuted, borderRadius: layout.radius.card, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Ionicons accessible={false} name="briefcase-outline" size={18} color={theme.muted} />
+          <Text style={{ flex: 1, color: theme.muted, fontSize: layout.type.caption, lineHeight: 18 }}>
+            Yıllık izin hesabı için işe başlama tarihinizi girin.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ayarlar'dan girin"
+            onPress={() => router.push('/(tabs)/settings' as never)}
+            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: layout.radius.control, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}
+          >
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.ink }}>Ayarlar</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="İstemiyorum"
+            onPress={() => {
+              setPromptDismissed(true);
+              void saveStartDatePromptDismissed(database);
+            }}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="close" size={16} color={theme.muted} />
+          </Pressable>
+        </View>
+      )}
 
       {/* b) ShiftBlock: bugünün vardiyası veya izin/tatil */}
       {todayIsSpecial ? (
