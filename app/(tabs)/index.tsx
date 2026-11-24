@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { FlatList, type NativeSyntheticEvent, type NativeScrollEvent, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -28,6 +28,10 @@ import { DayBlock, type DayBlockStatus } from '@/src/components/ui/DayBlock';
 import { ShiftBlock, type ShiftBlockKind } from '@/src/components/ui/ShiftBlock';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { SkeletonCard } from '@/src/components/ui/Skeleton';
+
+const WEEK_RANGE = 26;
+const WEEK_CENTER = WEEK_RANGE;
+const WEEK_OFFSETS = Array.from({ length: WEEK_RANGE * 2 + 1 }, (_, i) => i - WEEK_RANGE);
 
 const WEEKDAY_NAMES = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 const MONTH_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
@@ -83,9 +87,12 @@ export default function HomeScreen() {
   const { theme, mode } = useAppTheme();
   const database = useAppDatabase();
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   const today = useMemo(() => todayLocal(), []);
   const week = useMemo(() => weekDates(today), [today]);
   const [weekOffset, setWeekOffset] = useState(0);
+  const flatListRef = useRef<FlatList<number>>(null);
+  const stripWidth = screenWidth - layout.screen.horizontal * 2;
   const displayedMonday = useMemo(() => addDays(week[0]!, weekOffset * 7), [week, weekOffset]);
   const displayedWeek = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(displayedMonday, i)), [displayedMonday]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -166,9 +173,6 @@ export default function HomeScreen() {
     : 0;
   const lateEarlyMinutes = weekDays.reduce((s, d) => s + d.lateEarlyMinutes, 0);
 
-  const displayedMonth = Number(displayedWeek[3]!.split('-')[1]);
-  const isOutOfMonth = (date: string) => Number(date.split('-')[1]) !== displayedMonth;
-
   const weekRangeLabel = useMemo(() => {
     const start = displayedWeek[0]!;
     const end = displayedWeek[6]!;
@@ -244,13 +248,17 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* c) Hafta şeridi: başlık + ok navigasyon + DayBlock */}
+      {/* c) Hafta şeridi: başlık + ok + FlatList yatay kaydırma */}
       <View style={{ gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Önceki hafta"
-            onPress={() => setWeekOffset((o) => o - 1)}
+            onPress={() => {
+              const next = weekOffset - 1;
+              setWeekOffset(next);
+              flatListRef.current?.scrollToIndex({ index: WEEK_CENTER + next, animated: true });
+            }}
             style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
           >
             <Ionicons name="chevron-back" size={20} color={theme.ink} />
@@ -261,7 +269,11 @@ export default function HomeScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Sonraki hafta"
-            onPress={() => setWeekOffset((o) => o + 1)}
+            onPress={() => {
+              const next = weekOffset + 1;
+              setWeekOffset(next);
+              flatListRef.current?.scrollToIndex({ index: WEEK_CENTER + next, animated: true });
+            }}
             style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
           >
             <Ionicons name="chevron-forward" size={20} color={theme.ink} />
@@ -270,7 +282,10 @@ export default function HomeScreen() {
         {weekOffset !== 0 ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => setWeekOffset(0)}
+            onPress={() => {
+              setWeekOffset(0);
+              flatListRef.current?.scrollToIndex({ index: WEEK_CENTER, animated: true });
+            }}
             style={{ alignSelf: 'center' }}
           >
             <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.accent }}>
@@ -278,29 +293,49 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         ) : null}
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          {displayedWeek.map((date) => {
-            const dow = new Date(date.replace(/-/g, '/')).getDay();
-            const day = dayMap.get(date);
-            const dateNum = date.split('-')[2] ?? '';
-            const otMin = day?.overtimeMinutes ?? 0;
-            const faded = isOutOfMonth(date);
+        <FlatList
+          ref={flatListRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          data={WEEK_OFFSETS}
+          keyExtractor={(item) => String(item)}
+          initialScrollIndex={WEEK_CENTER}
+          getItemLayout={(_, index) => ({ length: stripWidth, offset: stripWidth * index, index })}
+          onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / stripWidth);
+            setWeekOffset(idx - WEEK_CENTER);
+          }}
+          renderItem={({ item: itemOffset }) => {
+            const thisWeek = Array.from({ length: 7 }, (_, i) => addDays(week[0]!, itemOffset * 7 + i));
+            const thisMonth = Number(thisWeek[3]!.split('-')[1]);
             return (
-              <View key={date} style={{ flex: 1, opacity: faded ? 0.35 : 1 }}>
-                <DayBlock
-                  dayLabel={DAY_LABELS[dow] ?? ''}
-                  dateNumber={dateNum}
-                  code={toDayCode(day)}
-                  status={toDayBlockStatus(day)}
-                  isToday={date === today}
-                  hasOvertime={otMin > 0}
-                  overtimeLabel={otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined}
-                  onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
-                />
+              <View style={{ width: stripWidth, flexDirection: 'row', gap: 6 }}>
+                {thisWeek.map((date) => {
+                  const dow = new Date(date.replace(/-/g, '/')).getDay();
+                  const day = dayMap.get(date);
+                  const dateNum = date.split('-')[2] ?? '';
+                  const otMin = day?.overtimeMinutes ?? 0;
+                  const faded = Number(date.split('-')[1]) !== thisMonth;
+                  return (
+                    <View key={date} style={{ flex: 1, opacity: faded ? 0.35 : 1 }}>
+                      <DayBlock
+                        dayLabel={DAY_LABELS[dow] ?? ''}
+                        dateNumber={dateNum}
+                        code={toDayCode(day)}
+                        status={toDayBlockStatus(day)}
+                        isToday={date === today}
+                        hasOvertime={otMin > 0}
+                        overtimeLabel={otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined}
+                        onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             );
-          })}
-        </View>
+          }}
+        />
       </View>
 
       {/* d) InkCard: Bu dönem tahmini + maaş hapı + mesai/eksik/izin */}
