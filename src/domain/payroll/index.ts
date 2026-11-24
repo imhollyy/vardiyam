@@ -14,6 +14,8 @@ import {
 } from '../../config/payroll.ts';
 import { shiftNominalMinutes } from '../../config/shifts.ts';
 import { calculateScheduledOvertime } from './overtime.ts';
+import { applyHourlyLeavePolicy } from './hourlyLeavePolicy.ts';
+import type { HourlyLeaveInput } from './hourlyLeavePolicy.ts';
 import { isOfficialHoliday } from '../../config/holidays.ts';
 import { getProjectedDay, type ShiftCycle, type ShiftTemplate } from '../shift-cycle/index.ts';
 import type {
@@ -26,9 +28,12 @@ import type {
   LeaveType,
   ExtraIncomeFrequency,
   AnnualLeaveResult,
+  HourlyLeavePolicy,
 } from './types.ts';
+import { HOURLY_LEAVE_POLICY } from './types.ts';
 
-export type { Settings, DayEntry, ExtraIncome, DerivedDay, DayStatus, MonthlyStatement, LeaveType, ExtraIncomeFrequency, AnnualLeaveResult };
+export type { Settings, DayEntry, ExtraIncome, DerivedDay, DayStatus, MonthlyStatement, LeaveType, ExtraIncomeFrequency, AnnualLeaveResult, HourlyLeavePolicy };
+export { HOURLY_LEAVE_POLICY };
 
 function dayOfWeek(localDate: string): number {
   const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
@@ -287,21 +292,16 @@ export function calculateDeductions(
   monthlySalaryMinor: number,
 ): number {
   const dailySalaryMinor = Math.round(monthlySalaryMinor / 30);
-  const hourlyRate = Math.round(monthlySalaryMinor / HOURLY_RATE_DIVISOR);
   let totalMinor = 0;
 
   for (const day of days) {
-    const isLeaveDay = day.status === 'LEAVE';
-    const isHourlyWorkedDay = day.status === 'WORKED' && day.leaveType === 'HOURLY';
-    if (!isLeaveDay && !isHourlyWorkedDay) continue;
-    if (!day.leaveType) continue;
+    if (day.status !== 'LEAVE') continue;
+    if (!day.leaveType || day.leaveType === 'HOURLY') continue;
     const entry = dayEntries.get(day.localDate);
     const deduct = isLeaveDeducted(day.leaveType, entry?.deductOverride ?? null);
     if (!deduct) continue;
 
-    if (day.leaveType === 'HOURLY') {
-      totalMinor += Math.round(hourlyRate * day.leaveHours);
-    } else if (day.leaveHalfDay) {
+    if (day.leaveHalfDay) {
       totalMinor += Math.round(dailySalaryMinor / 2);
     } else {
       totalMinor += dailySalaryMinor;
@@ -457,16 +457,37 @@ export function generateMonthlyStatement(
 
   const manualOvertimeMinutes = days.reduce((s, d) => s + d.overtimeMinutes, 0);
   const scheduledOvertimeMinutes = scheduledOvertimeByDay.reduce((s, o) => s + o.scheduledOvertimeMinutes, 0);
-  const totalOvertimeMinutes = scheduledOvertimeMinutes + manualOvertimeMinutes;
+  const rawOvertimeMinutes = scheduledOvertimeMinutes + manualOvertimeMinutes;
 
   void scheduledOvertimeMap; // used for future per-day breakdown
+
+  // Collect hourly leave inputs for period-level policy application
+  const hourlyLeaveInputs: HourlyLeaveInput[] = [];
+  for (const day of days) {
+    if (day.leaveType === 'HOURLY' && day.leaveHours > 0) {
+      const entry = dayEntries.get(day.localDate);
+      hourlyLeaveInputs.push({ deductOverride: entry?.deductOverride ?? null, leaveHours: day.leaveHours });
+    }
+  }
+
+  const hourlyLeaveResult = applyHourlyLeavePolicy(
+    rawOvertimeMinutes,
+    hourlyLeaveInputs,
+    settings.hourlyLeavePolicy,
+  );
+
+  const totalOvertimeMinutes = hourlyLeaveResult.overtimeMinutes;
+  const hourlyLeaveOffsetMinutes = hourlyLeaveResult.offsetFromOvertimeMinutes;
+  const hourlyRate = Math.round(settings.salaryMinor / HOURLY_RATE_DIVISOR);
+  const hourlyLeaveDeductionMinor = Math.round(hourlyRate * hourlyLeaveResult.baseDeductionMinutes / 60);
 
   const overtimeMinor = calculateOvertime(totalOvertimeMinutes, settings.salaryMinor);
 
   const holidayWorkedDays = days.filter((d) => d.isHoliday && d.status === 'WORKED').length;
   const holidayBonusMinor = calculateHolidayBonus(holidayWorkedDays, dailySalaryMinor);
 
-  const deductionMinor = calculateDeductions(days, dayEntries, settings.salaryMinor);
+  const baseDeductionMinor = calculateDeductions(days, dayEntries, settings.salaryMinor);
+  const deductionMinor = baseDeductionMinor + hourlyLeaveDeductionMinor;
   const extraIncomeMinor = calculateExtraIncome(extraIncomes, start, end);
 
   const grossMinor = settings.salaryMinor + overtimeMinor + holidayBonusMinor
@@ -513,5 +534,7 @@ export function generateMonthlyStatement(
     stampTaxMinor,
     incomeTaxMinor,
     netMinor,
+    hourlyLeaveOffsetMinutes,
+    hourlyLeaveDeductionMinor,
   };
 }

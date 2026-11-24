@@ -61,10 +61,7 @@ export function calculateScheduledOvertime(
       const tpl = d.shiftTemplateId ? templateMap.get(d.shiftTemplateId) : null;
       if (!tpl) return sum;
       const net = netShiftMinutes(tpl);
-      // HOURLY leave is WORKED status; its net is reduced by leave hours
-      if (d.leaveType === 'HOURLY') {
-        return sum + Math.max(0, net - d.leaveHours * 60);
-      }
+      // HOURLY leave days count their full planned net; period-level deduction is applied separately
       return sum + net;
     }, 0)
       + fullLeaveDays.length * standardDayMin
