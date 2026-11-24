@@ -1,7 +1,7 @@
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { AmountText } from './AmountText';
-import { fonts, layout } from '@/src/theme/tokens';
+import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
 
 type InkCardProps = {
   eyebrow: string;
@@ -13,7 +13,8 @@ type InkCardProps = {
 };
 
 export function InkCard({ eyebrow, amount, daysLabel, children, onPress, style }: InkCardProps) {
-  const { theme } = useAppTheme();
+  const { theme, mode } = useAppTheme();
+  const dayPalette = shiftPalette.day[mode];
 
   const content = (
     <View style={[{ backgroundColor: theme.inkCard, borderRadius: layout.radius.block, padding: 20, gap: 10 }, style]}>
@@ -22,8 +23,8 @@ export function InkCard({ eyebrow, amount, daysLabel, children, onPress, style }
           {eyebrow.toUpperCase()}
         </Text>
         {daysLabel ? (
-          <View style={{ backgroundColor: '#FFD166', borderRadius: layout.radius.pill, paddingHorizontal: 10, paddingVertical: 3 }}>
-            <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: '#1B1A17' }}>{daysLabel}</Text>
+          <View style={{ backgroundColor: dayPalette.background, borderRadius: layout.radius.pill, paddingHorizontal: 10, paddingVertical: 3 }}>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: dayPalette.text }}>{daysLabel}</Text>
           </View>
         ) : null}
       </View>

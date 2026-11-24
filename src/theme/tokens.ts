@@ -66,6 +66,12 @@ export const colors = {
     accentSurface:  '#F1ECE2',
     primaryAction:  '#2449C9',
     onPrimaryAction:'#F6F2EA',
+
+    // Guaranteed contrast pairs (use these for filled interactive elements)
+    inverse:        '#1B1A17',
+    onInverse:      '#F6F2EA',
+    onDanger:       '#FFFFFF',
+    onSuccess:      '#FFFFFF',
   },
   dark: {
     background:     '#14130F',
@@ -75,7 +81,7 @@ export const colors = {
     inkCard:        '#2B2820',
 
     ink:            '#F3EEE3',
-    onInk:          '#F6F2EA',
+    onInk:          '#F6F2EA',  // cream text on inkCard dark surface
     muted:          '#B5AD9C',
     mutedSoft:      '#9C9585',
 
@@ -94,7 +100,13 @@ export const colors = {
     foreground:     '#F3EEE3',
     accentSurface:  '#2A2721',
     primaryAction:  '#8FA8FF',
-    onPrimaryAction:'#F6F2EA',
+    onPrimaryAction:'#14130F',
+
+    // Guaranteed contrast pairs (use these for filled interactive elements)
+    inverse:        '#F3EEE3',
+    onInverse:      '#1B1A17',
+    onDanger:       '#14130F',
+    onSuccess:      '#14130F',
   },
 } as const;
 

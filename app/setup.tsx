@@ -392,11 +392,11 @@ export default function SetupScreen() {
                         accessibilityLabel={`Mola ${opt.label}`}
                         onPress={() => updateTemplateBreak(i, opt.value)}
                         style={[styles.breakChip, {
-                          backgroundColor: td.breakMinutes === opt.value ? theme.ink : theme.surface,
-                          borderColor: td.breakMinutes === opt.value ? theme.ink : theme.border,
+                          backgroundColor: td.breakMinutes === opt.value ? theme.inverse : theme.surface,
+                          borderColor: td.breakMinutes === opt.value ? theme.inverse : theme.border,
                         }]}
                       >
-                        <Text style={{ fontFamily: fonts.semiBold, color: td.breakMinutes === opt.value ? theme.onInk : theme.ink, fontSize: 12 }}>
+                        <Text style={{ fontFamily: fonts.semiBold, color: td.breakMinutes === opt.value ? theme.onInverse : theme.ink, fontSize: 12 }}>
                           {opt.label}
                         </Text>
                       </Pressable>
