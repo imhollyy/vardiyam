@@ -1,3 +1,5 @@
+export const PAYDAY_LAST = 'LAST' as const;
+
 export type SalaryType = 'GROSS' | 'NET';
 export type WorkSchedule = 'MON_FRI' | 'MON_SAT' | 'EVERY_DAY';
 export type ShiftPattern = 'TWO_SHIFT' | 'THREE_SHIFT' | 'FIXED_DAY' | 'FIXED_NIGHT';

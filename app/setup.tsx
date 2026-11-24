@@ -8,9 +8,9 @@ import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { markSetupCompleted, updateSettings } from '@/src/data/settingsRepository';
 import { saveShiftSchedule } from '@/src/data/shiftCycleRepository';
 import type { SalaryType, WorkSchedule, ShiftPattern } from '@/src/domain/payroll/types';
-import { getPayPeriodForDate } from '@/src/domain/payroll/index';
-import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-cycle/index';
+import { PAYDAY_LAST } from '@/src/domain/payroll/types';
 import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
+import { buildSetupPayload } from '@/src/features/setup/buildSetupPayload';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
 import { parseTryMinor, formatTryMinor } from '@/src/domain/money';
@@ -98,55 +98,12 @@ const INITIAL_DRAFT: Draft = {
   startDateText: '',
 };
 
-function mondayOfDate(localDate: string): string {
-  const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
-  const date = new Date(y, m - 1, d);
-  const dow = date.getDay();
-  date.setDate(d + (dow === 0 ? -6 : 1 - dow));
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function mondayOfThisWeek(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  return mondayOfDate(today);
-}
-
 function isValidTime(t: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
 }
 
 function needsCurrentShiftStep(pattern: ShiftPattern): boolean {
   return pattern === 'TWO_SHIFT' || pattern === 'THREE_SHIFT';
-}
-
-function buildCycleEntries(ws: WorkSchedule, sp: ShiftPattern, templateIds: string[]): CycleEntry[] {
-  const workDays = ws === 'MON_FRI' ? 5 : ws === 'MON_SAT' ? 6 : 7;
-  const offDays = 7 - workDays;
-  const shift = (id: string): CycleEntry => ({ kind: 'SHIFT', templateId: id });
-  const off = (): CycleEntry => ({ kind: 'OFF' });
-
-  if (sp === 'FIXED_DAY' || sp === 'FIXED_NIGHT') {
-    if (offDays === 0) return [shift(templateIds[0]!)];
-    return [
-      ...Array.from({ length: workDays }, () => shift(templateIds[0]!)),
-      ...Array.from({ length: offDays }, () => off()),
-    ];
-  }
-
-  const count = sp === 'TWO_SHIFT' ? 2 : 3;
-  const entries: CycleEntry[] = [];
-  for (let i = 0; i < count; i++) {
-    if (offDays === 0) {
-      entries.push(...Array.from({ length: 7 }, () => shift(templateIds[i]!)));
-    } else {
-      entries.push(...Array.from({ length: workDays }, () => shift(templateIds[i]!)));
-      entries.push(...Array.from({ length: offDays }, () => off()));
-    }
-  }
-  return entries;
 }
 
 function getEffectiveSteps(draft: Draft): StepId[] {
@@ -177,7 +134,7 @@ export default function SetupScreen() {
           if (parseTryMinor(draft.salaryText) <= 0) return false;
         } catch { return false; }
         const n = Number(draft.payday);
-        return draft.payday === 'last' || (Number.isInteger(n) && n >= 1 && n <= 31);
+        return draft.payday === PAYDAY_LAST || (Number.isInteger(n) && n >= 1 && n <= 31);
       }
       case 'shiftHours':
         return draft.templateDrafts.every((t) => isValidTime(t.startLocalTime) && isValidTime(t.endLocalTime) && t.startLocalTime !== t.endLocalTime);
@@ -189,60 +146,22 @@ export default function SetupScreen() {
     setSaving(true);
     setError(null);
     try {
-      const salaryMinor = parseTryMinor(draft.salaryText);
-      const startDate = draft.startDateText.trim() || null;
-      let parsedStart: string | null = null;
-      if (startDate) {
-        const parts = startDate.split('.');
-        if (parts.length === 3) {
-          parsedStart = `${parts[2]}-${parts[1]!.padStart(2, '0')}-${parts[0]!.padStart(2, '0')}`;
-        }
-      }
-
-      await updateSettings(database, {
-        salaryMinor,
-        salaryType: draft.salaryType,
-        payday: draft.payday,
-        workSchedule: draft.workSchedule,
-        shiftPattern: draft.shiftPattern,
-        besEnabled: draft.besEnabled,
-        besRateBp: Number(draft.besRateBp),
-        startDate: parsedStart,
-      });
-
-      const templateIds = draft.templateDrafts.map(() => randomUUID());
-      const templates: ShiftTemplate[] = draft.templateDrafts.map((td, i) => ({
-        id: templateIds[i]!,
-        code: td.code,
-        name: td.name,
-        startLocalTime: td.startLocalTime,
-        endLocalTime: td.endLocalTime,
-        breakMinutes: td.breakMinutes,
-        standardMinutes: shiftNominalMinutes(td.startLocalTime, td.endLocalTime),
-      }));
-
-      const entries = buildCycleEntries(draft.workSchedule, draft.shiftPattern, templateIds);
-      const anchor = mondayOfThisWeek();
-      const startIndex = needsCurrentShiftStep(draft.shiftPattern) ? draft.currentShiftIndex * 7 : 0;
-
-      const cycle: ShiftCycle = {
-        id: randomUUID(),
-        name: 'Vardiya düzenim',
-        timezone: 'Europe/Istanbul',
-        anchorLocalDate: anchor,
-        startIndex: startIndex % entries.length,
-        entries,
-      };
-
-      // effectiveFrom = Monday of the week containing the current pay period's start,
-      // so the cycle covers the full period even for days before this week.
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-      const periodStart = getPayPeriodForDate(todayStr, draft.payday).start;
-      const effectiveFrom = mondayOfDate(periodStart);
-
-      await saveShiftSchedule(database, templates, cycle, effectiveFrom);
+      const templateIds = draft.templateDrafts.map(() => randomUUID());
+      const payload = buildSetupPayload(draft, templateIds, randomUUID(), todayStr);
+      await updateSettings(database, {
+        salaryMinor: payload.salaryMinor,
+        salaryType: payload.salaryType,
+        payday: payload.payday,
+        workSchedule: payload.workSchedule,
+        shiftPattern: payload.shiftPattern,
+        besEnabled: payload.besEnabled,
+        besRateBp: payload.besRateBp,
+        startDate: payload.startDate,
+      });
+      await saveShiftSchedule(database, payload.templates, payload.cycle, payload.effectiveFrom);
       await markSetupCompleted(database);
       router.replace('/(tabs)');
     } catch (e) {
@@ -396,15 +315,15 @@ export default function SetupScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Ayın son günü"
-                accessibilityState={{ selected: draft.payday === 'last' }}
-                onPress={() => setDraft((d) => ({ ...d, payday: 'last' }))}
+                accessibilityState={{ selected: draft.payday === PAYDAY_LAST }}
+                onPress={() => setDraft((d) => ({ ...d, payday: PAYDAY_LAST }))}
                 style={[styles.lastDayBtn, {
-                  backgroundColor: draft.payday === 'last' ? dayPalette.background : theme.surface,
-                  borderColor: draft.payday === 'last' ? theme.ink : theme.border,
-                  borderWidth: draft.payday === 'last' ? 2 : 1,
+                  backgroundColor: draft.payday === PAYDAY_LAST ? dayPalette.background : theme.surface,
+                  borderColor: draft.payday === PAYDAY_LAST ? theme.ink : theme.border,
+                  borderWidth: draft.payday === PAYDAY_LAST ? 2 : 1,
                 }]}
               >
-                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: draft.payday === 'last' ? dayPalette.text : theme.ink }}>Ayın son günü</Text>
+                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: draft.payday === PAYDAY_LAST ? dayPalette.text : theme.ink }}>Ayın son günü</Text>
               </Pressable>
             </Card>
             <Card>
@@ -545,7 +464,7 @@ export default function SetupScreen() {
             <Card>
               <CardHeader icon="receipt-outline" title="Bilgilerin" />
               <SummaryRow label="Maaş" value={draft.salaryText ? `${formatTryMinor(parseTryMinor(draft.salaryText))} (${draft.salaryType === 'GROSS' ? 'Brüt' : 'Net'})` : '—'} theme={theme} />
-              <SummaryRow label="Maaş günü" value={draft.payday === 'last' ? 'Ayın son günü' : `Ayın ${draft.payday}'i`} theme={theme} />
+              <SummaryRow label="Maaş günü" value={draft.payday === PAYDAY_LAST ? 'Ayın son günü' : `Ayın ${draft.payday}'i`} theme={theme} />
               <SummaryRow label="BES" value={draft.besEnabled ? `Evet (%${Number(draft.besRateBp) / 100})` : 'Hayır'} theme={theme} />
               <SummaryRow label="Çalışma düzeni" value={WORK_SCHEDULE_OPTIONS.find((o) => o.value === draft.workSchedule)?.label ?? ''} theme={theme} />
               <SummaryRow label="Vardiya düzeni" value={SHIFT_PATTERN_OPTIONS.find((o) => o.value === draft.shiftPattern)?.label ?? ''} theme={theme} />
