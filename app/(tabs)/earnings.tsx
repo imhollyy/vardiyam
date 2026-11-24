@@ -360,6 +360,14 @@ export default function EarningsScreen() {
             </InkCardRow>
           </InkCard>
 
+          {statement.workedDays === 0 && statement.extraIncomeMinor === 0 && (
+            <EmptyState
+              icon="calendar-outline"
+              title="Bu dönem için veri yok"
+              body="Takvimden gün ekleyerek başlayabilirsin"
+            />
+          )}
+
           <SectionHeader title="Gelir Kalemleri" />
           <Card>
             <ListRow icon="wallet-outline" label="Taban maaş" value={formatTryMinor(statement.baseSalaryMinor)} />
