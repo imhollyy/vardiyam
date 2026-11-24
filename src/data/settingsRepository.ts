@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import type { Settings, SalaryType, WorkSchedule, ShiftPattern } from '../domain/payroll/types.ts';
+import type { Settings, SalaryType, WorkSchedule, ShiftPattern, HourlyLeavePolicy } from '../domain/payroll/types.ts';
+import { HOURLY_LEAVE_POLICY } from '../domain/payroll/types.ts';
 
 type SettingsRow = {
   salary_minor: number;
@@ -12,9 +13,13 @@ type SettingsRow = {
   shift_pattern: string;
   start_date: string | null;
   setup_completed: number;
+  hourly_leave_policy: string | null;
 };
 
 function rowToSettings(row: SettingsRow): Settings {
+  const hlp = row.hourly_leave_policy;
+  const hourlyLeavePolicy: HourlyLeavePolicy =
+    hlp === HOURLY_LEAVE_POLICY.OVERTIME_FIRST ? HOURLY_LEAVE_POLICY.OVERTIME_FIRST : HOURLY_LEAVE_POLICY.BASE_PAY;
   return {
     salaryMinor: row.salary_minor,
     salaryType: row.salary_type as SalaryType,
@@ -25,6 +30,7 @@ function rowToSettings(row: SettingsRow): Settings {
     shiftPattern: row.shift_pattern as ShiftPattern,
     startDate: row.start_date,
     setupCompleted: row.setup_completed === 1,
+    hourlyLeavePolicy,
   };
 }
 
@@ -47,6 +53,7 @@ export async function updateSettings(database: SQLiteDatabase, patch: Partial<Se
   if (patch.shiftPattern !== undefined) { sets.push('shift_pattern = ?'); values.push(patch.shiftPattern); }
   if (patch.startDate !== undefined) { sets.push('start_date = ?'); values.push(patch.startDate); }
   if (patch.setupCompleted !== undefined) { sets.push('setup_completed = ?'); values.push(patch.setupCompleted ? 1 : 0); }
+  if (patch.hourlyLeavePolicy !== undefined) { sets.push('hourly_leave_policy = ?'); values.push(patch.hourlyLeavePolicy); }
 
   if (sets.length === 0) return;
   await database.runAsync(`UPDATE settings SET ${sets.join(', ')} WHERE id = 1;`, values as (string | number | null)[]);

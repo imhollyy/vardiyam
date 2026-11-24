@@ -211,6 +211,12 @@ export const migrations: readonly Migration[] = [
       WHERE leave_type IS NOT NULL AND leave_type <> 'HOURLY';
     `,
   },
+  {
+    version: 104,
+    sql: `
+      ALTER TABLE settings ADD COLUMN hourly_leave_policy TEXT NOT NULL DEFAULT 'BASE_PAY' CHECK (hourly_leave_policy IN ('OVERTIME_FIRST','BASE_PAY'));
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;
