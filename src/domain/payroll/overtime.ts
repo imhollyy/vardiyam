@@ -25,7 +25,9 @@ export type DayOvertime = { localDate: string; scheduledOvertimeMinutes: number 
  *     contribute standardDayMin = weeklyLimit / scheduledWorkDays to weekly total,
  *     but do NOT receive any overtime distribution.
  * - LEAVE (half-day) days:
- *     contribute standardDayMin / 2 to weekly total, no overtime distribution.
+ *     contribute standardDayMin / 2 (leave credit) + actualNet / 2 (worked half)
+ *     to weekly total, no overtime distribution.
+ *     The leave half keeps the threshold intact; the worked half reflects actual hours.
  * - HOLIDAY and OFF days: excluded entirely.
  */
 export function calculateScheduledOvertime(
@@ -66,7 +68,11 @@ export function calculateScheduledOvertime(
       return sum + net;
     }, 0)
       + fullLeaveDays.length * standardDayMin
-      + halfLeaveDays.length * (standardDayMin / 2);
+      + halfLeaveDays.reduce((sum, d) => {
+        const tpl = d.shiftTemplateId ? templateMap.get(d.shiftTemplateId) : null;
+        const actualHalfNet = tpl ? netShiftMinutes(tpl) / 2 : 0;
+        return sum + standardDayMin / 2 + actualHalfNet;
+      }, 0);
 
     const weekExcess = Math.max(0, weekTotal - weeklyLimitMinutes);
     if (weekExcess === 0) continue;
