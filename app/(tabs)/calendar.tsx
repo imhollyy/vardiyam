@@ -9,6 +9,8 @@ import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
 import { listShiftCycles, listShiftTemplates } from '@/src/data/shiftCycleRepository';
 import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { deriveDays, enumerateDays, type DerivedDay } from '@/src/domain/payroll/index';
+import type { LeaveType } from '@/src/domain/payroll/types';
+import { buildMonthEventLists } from '@/src/features/reports/buildMonthEventLists';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
@@ -17,16 +19,41 @@ import { StatTile } from '@/src/components/ui/StatTile';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { SkeletonCard } from '@/src/components/ui/Skeleton';
 import { MonthGrid } from '@/src/components/calendar/MonthGrid';
+import { BottomSheet } from '@/src/components/ui/BottomSheet';
 
 const MONTH_NAMES = [
   'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
 ];
 
+const WEEKDAY_SHORT = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+
+const LEAVE_LABELS: Record<LeaveType, string> = {
+  ANNUAL: 'Yıllık izin', UNPAID: 'Ücretsiz izin', SICK: 'Hastalık raporu',
+  EXCUSE: 'Mazeret izni', MATERNITY: 'Doğum izni', BEREAVEMENT: 'Ölüm izni',
+  SOCIAL: 'Sosyal izin', HOURLY: 'Saatlik izin', HOLIDAY: 'Resmî tatil',
+};
+
 function todayLocal(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
+
+function formatDate(localDate: string): string {
+  const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
+  const date = new Date(y, m - 1, d);
+  const dow = WEEKDAY_SHORT[(date.getDay() + 6) % 7] ?? '';
+  const mn = MONTH_NAMES[m - 1] ?? '';
+  return `${dow} ${d} ${mn}`;
+}
+
+function fmtMin(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const min = minutes % 60;
+  return min > 0 ? `${h} sa ${min} dk` : `${h} sa`;
+}
+
+type SheetKind = 'leave' | 'overtime' | 'lateEarly' | null;
 
 export default function CalendarScreen() {
   const { theme, mode } = useAppTheme();
@@ -38,6 +65,7 @@ export default function CalendarScreen() {
   const [dayMap, setDayMap] = useState<Map<string, DerivedDay>>(new Map());
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
+  const [sheet, setSheet] = useState<SheetKind>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,10 +122,14 @@ export default function CalendarScreen() {
   }).panHandlers);
 
   const templateMap = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
+  const days = useMemo(() => Array.from(dayMap.values()), [dayMap]);
 
-  const worked = Array.from(dayMap.values()).filter((d) => d.status === 'WORKED').length;
-  const overtime = Array.from(dayMap.values()).reduce((s, d) => s + d.overtimeMinutes, 0);
-  const leave = Array.from(dayMap.values()).filter((d) => d.status === 'LEAVE').length;
+  const eventLists = useMemo(() => buildMonthEventLists(days), [days]);
+
+  const worked = days.filter((d) => d.status === 'WORKED').length;
+  const overtime = days.reduce((s, d) => s + d.overtimeMinutes, 0);
+  const leave = days.filter((d) => d.status === 'LEAVE').length;
+  const lateEarlyCount = days.filter((d) => d.lateEarlyMinutes > 0).length;
 
   if (loading) {
     return (
@@ -118,7 +150,7 @@ export default function CalendarScreen() {
             accessibilityRole="button"
             accessibilityLabel="Önceki ay"
             onPress={prevMonth}
-            style={{ width: 36, height: 36, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 44, height: 44, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}
           >
             <Ionicons name="chevron-back" size={18} color={theme.ink} />
           </Pressable>
@@ -126,7 +158,7 @@ export default function CalendarScreen() {
             accessibilityRole="button"
             accessibilityLabel="Sonraki ay"
             onPress={nextMonth}
-            style={{ width: 36, height: 36, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 44, height: 44, borderRadius: layout.radius.control, backgroundColor: theme.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}
           >
             <Ionicons name="chevron-forward" size={18} color={theme.ink} />
           </Pressable>
@@ -161,14 +193,135 @@ export default function CalendarScreen() {
         ))}
       </View>
 
-      {/* Month summary */}
+      {/* Month summary — tappable */}
       <Card>
         <View style={{ flexDirection: 'row', gap: layout.space.md }}>
-          <StatTile value={String(worked)} label="Çalışılan" tone="success" style={{ flex: 1 }} />
-          <StatTile value={overtime > 0 ? `${Math.floor(overtime / 60)}sa` : '0'} label="Fazla mesai" tone="warning" style={{ flex: 1 }} />
-          <StatTile value={String(leave)} label="İzin" tone="danger" style={{ flex: 1 }} />
+          <Pressable
+            style={{ flex: 1 }}
+            accessibilityRole="button"
+            accessibilityLabel={`İzin: ${leave} gün, detayları gör`}
+            onPress={() => setSheet('leave')}
+          >
+            <StatTile value={String(leave)} label="İzin" tone="danger" />
+          </Pressable>
+          <Pressable
+            style={{ flex: 1 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Fazla mesai: ${overtime > 0 ? Math.floor(overtime / 60) + ' sa' : '0'}, detayları gör`}
+            onPress={() => setSheet('overtime')}
+          >
+            <StatTile value={overtime > 0 ? `${Math.floor(overtime / 60)}sa` : '0'} label="Fazla mesai" tone="warning" />
+          </Pressable>
+          <Pressable
+            style={{ flex: 1 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Geç/erken: ${lateEarlyCount}, detayları gör`}
+            onPress={() => setSheet('lateEarly')}
+          >
+            <StatTile value={String(lateEarlyCount)} label="Geç/erken" tone="danger" />
+          </Pressable>
         </View>
+        <Text style={{ fontFamily: fonts.regular, fontSize: layout.type.caption, color: theme.muted, textAlign: 'center', marginTop: 8 }}>
+          Çalışılan: {worked} gün · Detay için dokunun
+        </Text>
       </Card>
+
+      {/* Leave BottomSheet */}
+      <BottomSheet visible={sheet === 'leave'} onClose={() => setSheet(null)}>
+        <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.section, color: theme.ink, marginBottom: 8 }}>
+          {MONTH_NAMES[month - 1]} — İzinler
+        </Text>
+        {eventLists.leaves.length === 0 ? (
+          <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.body, paddingVertical: 16, textAlign: 'center' }}>
+            Bu ay izin yok
+          </Text>
+        ) : (
+          eventLists.leaves.map((ev) => (
+            <Pressable
+              key={ev.localDate}
+              accessibilityRole="button"
+              onPress={() => { setSheet(null); router.push({ pathname: '/day-edit' as never, params: { date: ev.localDate } }); }}
+              style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>
+                    {formatDate(ev.localDate)}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption, marginTop: 2 }}>
+                    {LEAVE_LABELS[ev.leaveType] ?? ev.leaveType}
+                    {ev.leaveHalfDay ? ' · Yarım gün' : ''}
+                    {ev.leaveType === 'HOURLY' && ev.leaveHours > 0 ? ` · ${ev.leaveHours} sa` : ''}
+                  </Text>
+                </View>
+                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: ev.deducted ? theme.danger : theme.success }}>
+                  {ev.deducted ? 'Kesilir' : 'Kesilmez'}
+                </Text>
+              </View>
+            </Pressable>
+          ))
+        )}
+      </BottomSheet>
+
+      {/* Overtime BottomSheet */}
+      <BottomSheet visible={sheet === 'overtime'} onClose={() => setSheet(null)}>
+        <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.section, color: theme.ink, marginBottom: 8 }}>
+          {MONTH_NAMES[month - 1]} — Fazla Mesai
+        </Text>
+        {eventLists.overtime.length === 0 ? (
+          <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.body, paddingVertical: 16, textAlign: 'center' }}>
+            Bu ay fazla mesai yok
+          </Text>
+        ) : (
+          eventLists.overtime.map((ev) => (
+            <Pressable
+              key={ev.localDate}
+              accessibilityRole="button"
+              onPress={() => { setSheet(null); router.push({ pathname: '/day-edit' as never, params: { date: ev.localDate } }); }}
+              style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>
+                  {formatDate(ev.localDate)}
+                </Text>
+                <Text style={{ fontFamily: fonts.semiBold, color: theme.warning, fontSize: layout.type.body }}>
+                  +{fmtMin(ev.overtimeMinutes)}
+                </Text>
+              </View>
+            </Pressable>
+          ))
+        )}
+      </BottomSheet>
+
+      {/* Late/Early BottomSheet */}
+      <BottomSheet visible={sheet === 'lateEarly'} onClose={() => setSheet(null)}>
+        <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.section, color: theme.ink, marginBottom: 8 }}>
+          {MONTH_NAMES[month - 1]} — Geç/Erken
+        </Text>
+        {eventLists.lateEarly.length === 0 ? (
+          <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.body, paddingVertical: 16, textAlign: 'center' }}>
+            Bu ay geç/erken yok
+          </Text>
+        ) : (
+          eventLists.lateEarly.map((ev) => (
+            <Pressable
+              key={ev.localDate}
+              accessibilityRole="button"
+              onPress={() => { setSheet(null); router.push({ pathname: '/day-edit' as never, params: { date: ev.localDate } }); }}
+              style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>
+                  {formatDate(ev.localDate)}
+                </Text>
+                <Text style={{ fontFamily: fonts.semiBold, color: theme.danger, fontSize: layout.type.body }}>
+                  −{fmtMin(ev.lateEarlyMinutes)}
+                </Text>
+              </View>
+            </Pressable>
+          ))
+        )}
+      </BottomSheet>
     </Screen>
   );
 }

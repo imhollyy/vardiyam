@@ -7,8 +7,8 @@ export const shiftPalette = {
     dark:   { background: '#FFD166', text: '#1B1A17', textSecondary: '#5A4300' },
   },
   evening: {
-    light:  { background: '#F4A261', text: '#1B1A17', textSecondary: '#3D2000' },
-    dark:   { background: '#F4A261', text: '#1B1A17', textSecondary: '#3D2000' },
+    light:  { background: '#7DB7F0', text: '#0B2540', textSecondary: '#1A3D6E' },
+    dark:   { background: '#5A9BE0', text: '#0B2540', textSecondary: '#1A3D6E' },
   },
   night: {
     light:  { background: '#23305E', text: '#FFFFFF', textSecondary: '#B4C4FF' },
