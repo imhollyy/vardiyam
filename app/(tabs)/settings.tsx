@@ -310,7 +310,6 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <SectionHeading icon="color-palette-outline" title="Görünüm ve hızlı erişim" theme={theme} />
           <ActionButton label={mode === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} onPress={() => void toggleMode()} variant="secondary" />
-          <ActionButton label="Vardiya değişikliği" onPress={() => router.push('/shift-change' as never)} variant="secondary" />
           <ActionButton label="Ek gelirler" onPress={() => router.push('/additional-income' as never)} variant="secondary" />
         </View>
 
@@ -408,6 +407,7 @@ export default function SettingsScreen() {
                 )}
                 {scheduleSuccess ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{scheduleSuccess}</Text> : null}
                 <ActionButton label="Vardiya düzenini düzenle" onPress={startScheduleEdit} variant="secondary" />
+                <ActionButton label="Vardiya değişikliği" onPress={() => router.push('/shift-change' as never)} variant="secondary" />
               </>
             ) : scheduleValue ? (
               <>
