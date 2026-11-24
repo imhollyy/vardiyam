@@ -4,11 +4,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
-import { getDayEntry, upsertDayEntry, deleteDayEntry, type DayEntryPatch } from '@/src/data/dayEntryRepository';
+import { getDayEntry, upsertDayEntry, deleteDayEntry } from '@/src/data/dayEntryRepository';
 import { getSettings } from '@/src/data/settingsRepository';
 import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
 import { resolvePlannedTemplates, enumerateDays, calculateOvertime, type Settings } from '@/src/domain/payroll/index';
 import type { LeaveType } from '@/src/domain/payroll/types';
+import { buildDayEntryPatch, buildSaveSummary, leaveDefaultDeducted, type QuickMode } from '@/src/features/dayEdit/buildDayEntryPatch';
 import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { formatTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
@@ -20,17 +21,15 @@ import { QuickTile, QuickTileGrid } from '@/src/components/ui/QuickTile';
 import { QuickChips } from '@/src/components/ui/QuickChips';
 import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
 
-type QuickMode = 'overtime' | 'lateEarly' | 'leave' | 'shiftOverride' | null;
-
 const LEAVE_OPTIONS: { value: LeaveType; label: string; deducted: boolean }[] = [
   { value: 'ANNUAL', label: 'Yıllık izin', deducted: false },
   { value: 'UNPAID', label: 'Ücretsiz izin', deducted: true },
-  { value: 'SICK', label: 'Hastalık raporu', deducted: true },
-  { value: 'EXCUSE', label: 'Mazeret izni', deducted: false },
+  { value: 'SICK', label: 'Hastalık raporu', deducted: false },
+  { value: 'EXCUSE', label: 'Mazeret izni', deducted: true },
   { value: 'MATERNITY', label: 'Doğum izni', deducted: false },
   { value: 'BEREAVEMENT', label: 'Ölüm izni', deducted: false },
   { value: 'SOCIAL', label: 'Sosyal izin', deducted: false },
-  { value: 'HOURLY', label: 'Saatlik izin', deducted: false },
+  { value: 'HOURLY', label: 'Saatlik izin', deducted: true },
 ];
 
 function formatDisplayDate(localDate: string): string {
@@ -89,6 +88,8 @@ export default function DayEditScreen() {
         } else if (entry.leaveType) {
           setLeaveType(entry.leaveType);
           setLeaveHalfDay(entry.leaveHalfDay);
+          setLeaveHourly(entry.leaveHours ?? 0);
+          setLeaveDeducted(entry.deductOverride ?? leaveDefaultDeducted(entry.leaveType));
           setQuickMode('leave');
         } else if (entry.shiftOverrideId) {
           setShiftOverrideId(entry.shiftOverrideId);
@@ -104,27 +105,17 @@ export default function DayEditScreen() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const overtime = Math.max(0, Math.round(overtimeHours * 60));
-      const lateEarly = Math.max(0, Math.round(lateEarlyHours * 60));
-      const hasData = overtime > 0 || lateEarly > 0 || leaveType !== null || shiftOverrideId !== null || note.trim().length > 0;
-      if (!hasData) {
+      const patch = buildDayEntryPatch({ quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note });
+      if (patch === null) {
         await deleteDayEntry(database, localDate);
       } else {
-        const patch: DayEntryPatch = {
-          overtimeMinutes: overtime,
-          lateEarlyMinutes: lateEarly,
-          leaveType: leaveType,
-          leaveHalfDay: leaveType !== null && leaveHalfDay,
-          note: note.trim() || null,
-          shiftOverrideId: shiftOverrideId,
-        };
         await upsertDayEntry(database, localDate, patch);
       }
       router.back();
     } catch {
       setSaving(false);
     }
-  }, [database, localDate, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, shiftOverrideId, note, router]);
+  }, [database, localDate, quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note, router]);
 
   const handleReset = useCallback(() => {
     setQuickMode(null);
@@ -140,7 +131,23 @@ export default function DayEditScreen() {
     setIsDirty(false);
   }, []);
 
-  const toggleMode = (m: QuickMode) => setQuickMode((prev) => prev === m ? null : m);
+  const selectMode = (m: QuickMode) => {
+    setQuickMode((prev) => {
+      if (prev === m) return null;
+      if (m === 'leave') {
+        setOvertimeHours(0);
+        setLateEarlyHours(0);
+      } else if (m === 'overtime' || m === 'lateEarly') {
+        setLeaveType(null);
+        setLeaveHalfDay(false);
+        setLeaveHourly(0);
+        setLeaveDeducted(false);
+      }
+      return m;
+    });
+  };
+
+  const saveSummary = buildSaveSummary({ quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note });
 
   if (!localDate) return null;
 
@@ -191,16 +198,16 @@ export default function DayEditScreen() {
         {/* 2×2 QuickTile */}
         <QuickTileGrid>
           <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="timer-outline" label="Mesai yaptım" selected={quickMode === 'overtime'} onPress={() => toggleMode('overtime')} />
+            <QuickTile icon="timer-outline" label="Mesai yaptım" selected={quickMode === 'overtime'} onPress={() => selectMode('overtime')} />
           </View>
           <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="trending-down-outline" label="Geç / erken çıktım" selected={quickMode === 'lateEarly'} onPress={() => toggleMode('lateEarly')} />
+            <QuickTile icon="trending-down-outline" label="Geç / erken çıktım" selected={quickMode === 'lateEarly'} onPress={() => selectMode('lateEarly')} />
           </View>
           <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="bed-outline" label="İzinliydim" selected={quickMode === 'leave'} onPress={() => toggleMode('leave')} />
+            <QuickTile icon="bed-outline" label="İzinliydim" selected={quickMode === 'leave'} onPress={() => selectMode('leave')} />
           </View>
           <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="swap-horizontal-outline" label="Vardiya farklıydı" selected={quickMode === 'shiftOverride'} onPress={() => toggleMode('shiftOverride')} />
+            <QuickTile icon="swap-horizontal-outline" label="Vardiya farklıydı" selected={quickMode === 'shiftOverride'} onPress={() => selectMode('shiftOverride')} />
           </View>
         </QuickTileGrid>
 
@@ -349,7 +356,12 @@ export default function DayEditScreen() {
             <Ionicons name="refresh" size={18} color={theme.muted} />
           </Pressable>
         ) : null}
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, gap: 4 }}>
+          {saveSummary ? (
+            <Text style={{ fontFamily: fonts.medium, fontSize: layout.type.caption, color: theme.muted, textAlign: 'center' }}>
+              {saveSummary}
+            </Text>
+          ) : null}
           <ActionButton label={saving ? 'Kaydediliyor…' : 'Kaydet'} onPress={handleSave} disabled={saving} loading={saving} icon="checkmark" />
         </View>
       </View>
