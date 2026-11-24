@@ -13,6 +13,7 @@ import {
   enumerateDays,
   calculateAnnualLeave,
   calculateOvertime,
+  daysUntilPayday,
   type DerivedDay,
   type MonthlyStatement,
   type Settings,
@@ -53,26 +54,6 @@ function addDays(date: string, n: number): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
   const dt = new Date(y, m - 1, d + n);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-}
-
-function daysUntilPayday(today: string, payday: string): number {
-  const [ty, tm, td] = today.split('-').map(Number) as [number, number, number];
-  const isLast = payday === 'last';
-  const getPayDate = (year: number, month: number) => {
-    if (isLast) return new Date(year, month, 0).getDate();
-    const day = Number(payday);
-    // clamp to last day of month if needed
-    return Math.min(day, new Date(year, month, 0).getDate());
-  };
-  const todayDt = new Date(ty, tm - 1, td);
-  const thisPayDay = getPayDate(ty, tm);
-  const thisPay = new Date(ty, tm - 1, thisPayDay);
-  if (thisPay >= todayDt) return Math.ceil((thisPay.getTime() - todayDt.getTime()) / 86400000);
-  const nextMonth = tm === 12 ? 1 : tm + 1;
-  const nextYear = tm === 12 ? ty + 1 : ty;
-  const nextPayDay = getPayDate(nextYear, nextMonth);
-  const nextPay = new Date(nextYear, nextMonth - 1, nextPayDay);
-  return Math.ceil((nextPay.getTime() - todayDt.getTime()) / 86400000);
 }
 
 function toDayBlockStatus(day: DerivedDay | undefined): DayBlockStatus {

@@ -118,6 +118,14 @@ export function getPayPeriodForDate(localDate: string, payday: string): { start:
   return { start, end, label: buildLabel(sy, sm, sd2, ey, em, end) };
 }
 
+/** Days remaining until the end of the current pay period (0 when today is payday). */
+export function daysUntilPayday(today: string, payday: string): number {
+  const { end } = getPayPeriodForDate(today, payday);
+  const [ey, em, ed] = end.split('-').map(Number) as [number, number, number];
+  const [ty, tm, td] = today.split('-').map(Number) as [number, number, number];
+  return Math.round((new Date(ey, em - 1, ed).getTime() - new Date(ty, tm - 1, td).getTime()) / 86400000);
+}
+
 function buildLabel(sy: number, sm: number, sd: number, ey: number, em: number, end: string): string {
   const endDay = Number(end.split('-')[2]);
   if (sy === ey && sm === em) return `${SHORT_MONTHS[sm - 1]} ${sy}`;
