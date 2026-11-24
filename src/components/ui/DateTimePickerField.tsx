@@ -6,29 +6,32 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout } from '@/src/theme/tokens';
 import { formatPickerValue, localDateForPicker, localTimeForPicker, normalizePickerDraft, pickerDateValue } from '@/src/features/shifts/nativePicker';
+import { getLocalToday } from '@/src/features/shifts/dates';
 
 type Mode = 'date' | 'time';
-type Props = { mode: Mode; label: string; value: string; timezone: string; onChange: (value: string) => void; localDate?: string; disabled?: boolean; onError?: (message: string) => void };
+type Props = { mode: Mode; label: string; value: string; timezone: string; onChange: (value: string) => void; localDate?: string; disabled?: boolean; onError?: (message: string) => void; maximumDate?: Date };
 
-export function DateTimePickerField({ mode, label, value, timezone, onChange, localDate: selectedDate, disabled = false, onError }: Props) {
+export function DateTimePickerField({ mode, label, value, timezone, onChange, localDate: selectedDate, disabled = false, onError, maximumDate }: Props) {
   const { mode: themeMode, theme } = useAppTheme();
   const [visible, setVisible] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const shownValue = formatPickerValue(mode, value);
+  const [draft, setDraft] = useState(value || getLocalToday(timezone));
+  const shownValue = value ? formatPickerValue(mode, value) : 'Seçilmedi';
 
   const convert = (date: Date) => mode === 'date' ? localDateForPicker(date, timezone) : localTimeForPicker(date, timezone);
   const handleChange = (_event: DateTimePickerChangeEvent, date: Date) => setDraft(convert(date));
   const open = () => {
     if (disabled) return;
+    const effectiveValue = value || getLocalToday(timezone);
     let initial: Date;
     try {
-      initial = pickerDateValue(mode, value, timezone, selectedDate);
-      setDraft(normalizePickerDraft(mode, value, timezone, selectedDate));
+      initial = pickerDateValue(mode, effectiveValue, timezone, selectedDate);
+      setDraft(normalizePickerDraft(mode, effectiveValue, timezone, selectedDate));
     }
     catch (cause) { onError?.(cause instanceof Error ? cause.message : 'Saat seçici açılamadı.'); return; }
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         value: initial, mode, timeZoneName: timezone, is24Hour: mode === 'time',
+        maximumDate,
         onValueChange: (_event, picked) => { if (picked) onChange(convert(picked)); },
         onError: () => onError?.('Yerel tarih/saat seçici açılamadı. Yeniden deneyebilirsin.'),
       });
@@ -61,7 +64,7 @@ export function DateTimePickerField({ mode, label, value, timezone, onChange, lo
         <Pressable accessibilityLabel="Seçiciyi kapat" accessibilityRole="button" onPress={() => setVisible(false)} style={StyleSheet.absoluteFill} />
         <SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: theme.background, borderColor: theme.border }]}>
           <View style={styles.header}><Text accessibilityRole="header" style={[styles.title, { color: theme.foreground }]}>{label}</Text><Pressable accessibilityRole="button" accessibilityLabel="Seçiciyi kapat" onPress={() => setVisible(false)} hitSlop={8}><Ionicons name="close-circle" size={26} color={theme.muted} /></Pressable></View>
-          {iosValue ? <DateTimePicker value={iosValue} mode={mode} display="spinner" locale="tr-TR" timeZoneName={timezone} themeVariant={themeMode} onValueChange={handleChange} style={styles.picker} /> : <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>Bu tarih/saat düzeninde seçici açılamadı. Önce zamanı dilimini kontrol et.</Text>}
+          {iosValue ? <DateTimePicker value={iosValue} mode={mode} display="spinner" locale="tr-TR" timeZoneName={timezone} themeVariant={themeMode} maximumDate={maximumDate} onValueChange={handleChange} style={styles.picker} /> : <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>Bu tarih/saat düzeninde seçici açılamadı. Önce zamanı dilimini kontrol et.</Text>}
           <View style={styles.actions}><Pressable accessibilityRole="button" onPress={() => setVisible(false)} style={[styles.action, { borderColor: theme.border }]}><Text style={{ color: theme.foreground, fontWeight: '700' }}>Vazgeç</Text></Pressable><Pressable accessibilityRole="button" disabled={!iosValue} onPress={() => { onChange(draft); setVisible(false); }} style={[styles.action, styles.confirm, { backgroundColor: theme.primaryAction, opacity: iosValue ? 1 : 0.5 }]}><Text style={[styles.confirmText, { color: theme.onPrimaryAction }]}>Seç</Text></Pressable></View>
         </SafeAreaView>
       </View>

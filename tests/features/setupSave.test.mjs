@@ -81,7 +81,7 @@ const SAMPLE_DRAFT = {
     { code: 'G', name: 'Gündüz', startLocalTime: '08:00', endLocalTime: '16:00', breakMinutes: 30 },
   ],
   currentShiftIndex: 0,
-  startDateText: '15.03.2022',
+  startDate: '2022-03-15',
 };
 
 test('buildSetupPayload saf dönüşümü doğru üretir', () => {

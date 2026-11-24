@@ -20,6 +20,8 @@ import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { ProgressDots } from '@/src/components/ui/ProgressDots';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
+import { formatPickerValue } from '@/src/features/shifts/nativePicker';
 
 const STEPS = ['salary', 'workSchedule', 'shiftHours', 'currentShift', 'startDate', 'summary'] as const;
 type StepId = (typeof STEPS)[number];
@@ -70,7 +72,7 @@ type Draft = {
   shiftPattern: ShiftPattern;
   templateDrafts: TemplateDraft[];
   currentShiftIndex: number;
-  startDateText: string;
+  startDate: string;
 };
 
 function defaultTemplateDrafts(ws: WorkSchedule, sp: ShiftPattern): TemplateDraft[] {
@@ -95,7 +97,7 @@ const INITIAL_DRAFT: Draft = {
   shiftPattern: 'FIXED_DAY',
   templateDrafts: defaultTemplateDrafts('MON_FRI', 'FIXED_DAY'),
   currentShiftIndex: 0,
-  startDateText: '',
+  startDate: '',
 };
 
 function isValidTime(t: string): boolean {
@@ -446,14 +448,13 @@ export default function SetupScreen() {
           <View style={styles.stepBody}>
             <Card>
               <CardHeader icon="briefcase-outline" title="İşe başlama tarihi" />
-              <TextInput
-                style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
-                value={draft.startDateText}
-                onChangeText={(t) => setDraft((d) => ({ ...d, startDateText: t }))}
-                placeholder="GG.AA.YYYY"
-                placeholderTextColor={theme.muted}
-                keyboardType="number-pad"
-                accessibilityLabel="İşe başlama tarihi"
+              <DateTimePickerField
+                mode="date"
+                label="Tarih seçin"
+                value={draft.startDate}
+                timezone="Europe/Istanbul"
+                maximumDate={new Date()}
+                onChange={(d) => setDraft((prev) => ({ ...prev, startDate: d }))}
               />
             </Card>
           </View>
@@ -471,7 +472,7 @@ export default function SetupScreen() {
               {draft.templateDrafts.map((td, i) => (
                 <SummaryRow key={i} label={td.name} value={`${td.startLocalTime} – ${td.endLocalTime}`} theme={theme} />
               ))}
-              {draft.startDateText ? <SummaryRow label="İşe başlama" value={draft.startDateText} theme={theme} /> : null}
+              {draft.startDate ? <SummaryRow label="İşe başlama" value={formatPickerValue('date', draft.startDate)} theme={theme} /> : null}
             </Card>
           </View>
         )}

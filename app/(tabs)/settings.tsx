@@ -202,6 +202,7 @@ export default function SettingsScreen() {
   const [besEnabledEdit, setBesEnabledEdit] = useState(false);
   const [besRateBpRaw, setBesRateBpRaw] = useState('3');
   const [savingSalary, setSavingSalary] = useState(false);
+  const [startDateEdit, setStartDateEdit] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
   const loadedOnce = useRef(false);
@@ -305,6 +306,7 @@ export default function SettingsScreen() {
     setPaydayRaw(appSettings.payday === 'LAST' ? '' : String(appSettings.payday));
     setBesEnabledEdit(appSettings.besEnabled);
     setBesRateBpRaw(String(appSettings.besRateBp / 100));
+    setStartDateEdit(appSettings.startDate ?? '');
     setEditingSalary(true);
     setError(null);
   };
@@ -325,7 +327,7 @@ export default function SettingsScreen() {
     }
     setSavingSalary(true); setError(null);
     try {
-      await updateSettings(database, { salaryMinor, salaryType: salaryTypeEdit, payday, besEnabled: besEnabledEdit, besRateBp: besEnabledEdit ? besRateBp : appSettings?.besRateBp ?? 300 });
+      await updateSettings(database, { salaryMinor, salaryType: salaryTypeEdit, payday, besEnabled: besEnabledEdit, besRateBp: besEnabledEdit ? besRateBp : appSettings?.besRateBp ?? 300, startDate: startDateEdit || null });
       const updated = await getSettings(database);
       setAppSettings(updated);
       setEditingSalary(false);
@@ -399,6 +401,15 @@ export default function SettingsScreen() {
               {besEnabledEdit && (
                 <Field label="BES oranı (%)" value={besRateBpRaw} onChangeText={setBesRateBpRaw} theme={theme} placeholder="Örn. 3" keyboardType="numbers-and-punctuation" maxLength={4} />
               )}
+              <DateTimePickerField
+                mode="date"
+                label="İşe başlama tarihi"
+                value={startDateEdit}
+                timezone="Europe/Istanbul"
+                maximumDate={new Date()}
+                onChange={setStartDateEdit}
+                onError={setError}
+              />
               {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
               <View style={styles.actionRow}>
                 <Action label={savingSalary ? 'Kaydediliyor…' : 'Kaydet'} onPress={() => void saveSalaryEdit()} theme={theme} disabled={savingSalary} />
@@ -419,6 +430,12 @@ export default function SettingsScreen() {
                 <Text style={{ color: theme.muted }}>BES</Text>
                 <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.besEnabled ? `%${(appSettings.besRateBp / 100).toFixed(0)}` : 'Kapalı'}</Text>
               </View>
+              {appSettings.startDate ? (
+                <View style={styles.infoRow}>
+                  <Text style={{ color: theme.muted }}>İşe başlama</Text>
+                  <Text style={{ fontFamily: fonts.bold, color: theme.ink }}>{appSettings.startDate.split('-').reverse().join('.')}</Text>
+                </View>
+              ) : null}
               {success ? <Text accessibilityLiveRegion="polite" style={[styles.success, { color: theme.accent }]}>{success}</Text> : null}
               <Action label="Ücret bilgilerini düzenle" onPress={startSalaryEdit} theme={theme} secondary />
             </>

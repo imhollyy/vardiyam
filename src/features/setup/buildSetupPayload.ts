@@ -22,7 +22,7 @@ export type SetupDraft = {
   shiftPattern: ShiftPattern;
   templateDrafts: SetupTemplateDraft[];
   currentShiftIndex: number;
-  startDateText: string;
+  startDate: string;
 };
 
 export type SetupSavePayload = {
@@ -103,7 +103,7 @@ export function buildSetupPayload(
   today: string,
 ): SetupSavePayload {
   const salaryMinor = parseTryMinor(draft.salaryText);
-  const startDate = parseSetupStartDate(draft.startDateText);
+  const startDate = draft.startDate || null;
 
   const templates: ShiftTemplate[] = draft.templateDrafts.map((td, i) => ({
     id: templateIds[i]!,
