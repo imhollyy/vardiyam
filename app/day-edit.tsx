@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -132,12 +132,35 @@ export default function DayEditScreen() {
   }, []);
 
   const selectMode = (m: QuickMode) => {
+    if (m === 'leave' && quickMode !== 'leave') {
+      if (overtimeHours > 0 || lateEarlyHours > 0) {
+        const hours = overtimeHours > 0 ? overtimeHours : lateEarlyHours;
+        const kind = overtimeHours > 0 ? 'mesaisi' : 'gec/erkeni';
+        Alert.alert(
+          'Izin eklenecek',
+          `Bu gunun +${hours} sa ${kind} silinecek.`,
+          [
+            { text: 'Iptal', style: 'cancel' },
+            {
+              text: 'Devam',
+              onPress: () => {
+                setOvertimeHours(0);
+                setLateEarlyHours(0);
+                setQuickMode('leave');
+              },
+            },
+          ],
+        );
+        return;
+      }
+      setOvertimeHours(0);
+      setLateEarlyHours(0);
+      setQuickMode('leave');
+      return;
+    }
     setQuickMode((prev) => {
       if (prev === m) return null;
-      if (m === 'leave') {
-        setOvertimeHours(0);
-        setLateEarlyHours(0);
-      } else if (m === 'overtime' || m === 'lateEarly') {
+      if (m === 'overtime' || m === 'lateEarly') {
         setLeaveType(null);
         setLeaveHalfDay(false);
         setLeaveHourly(0);
@@ -146,6 +169,8 @@ export default function DayEditScreen() {
       return m;
     });
   };
+
+  const isFullDayLeave = quickMode === 'leave' && leaveType !== null && leaveType !== 'HOURLY';
 
   const saveSummary = buildSaveSummary({ quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note });
 
@@ -197,11 +222,11 @@ export default function DayEditScreen() {
       <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
         {/* 2×2 QuickTile */}
         <QuickTileGrid>
-          <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="timer-outline" label="Mesai yaptım" selected={quickMode === 'overtime'} onPress={() => selectMode('overtime')} />
+          <View style={{ flex: 1, minWidth: '45%', opacity: isFullDayLeave ? 0.4 : 1 }}>
+            <QuickTile icon="timer-outline" label="Mesai yaptım" selected={quickMode === 'overtime'} onPress={isFullDayLeave ? () => {} : () => selectMode('overtime')} />
           </View>
-          <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="trending-down-outline" label="Geç / erken çıktım" selected={quickMode === 'lateEarly'} onPress={() => selectMode('lateEarly')} />
+          <View style={{ flex: 1, minWidth: '45%', opacity: isFullDayLeave ? 0.4 : 1 }}>
+            <QuickTile icon="trending-down-outline" label="Geç / erken çıktım" selected={quickMode === 'lateEarly'} onPress={isFullDayLeave ? () => {} : () => selectMode('lateEarly')} />
           </View>
           <View style={{ flex: 1, minWidth: '45%' }}>
             <QuickTile icon="bed-outline" label="İzinliydim" selected={quickMode === 'leave'} onPress={() => selectMode('leave')} />
@@ -210,6 +235,11 @@ export default function DayEditScreen() {
             <QuickTile icon="swap-horizontal-outline" label="Vardiya farklıydı" selected={quickMode === 'shiftOverride'} onPress={() => selectMode('shiftOverride')} />
           </View>
         </QuickTileGrid>
+        {isFullDayLeave && (
+          <Text style={{ fontFamily: fonts.medium, fontSize: layout.type.caption, color: theme.muted, textAlign: 'center' }}>
+            Bu gun izinlisin. Mesai girmek icin once izni kaldir.
+          </Text>
+        )}
 
         {/* Mesai kartı */}
         {quickMode === 'overtime' && (

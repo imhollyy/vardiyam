@@ -13,8 +13,20 @@ export type DayOvertime = { localDate: string; scheduledOvertimeMinutes: number 
 
 /**
  * Distributes weekly scheduled overtime across the worked days of each Mon-starting week.
- * LEAVE, HOLIDAY and OFF days do not count toward the weekly net total.
- * Returns one entry per day with scheduledOvertimeMinutes > 0.
+ *
+ * İzinli gün haftalık limite katkısını standart gün üzerinden yapar ama fazla mesai payı almaz.
+ * Böylece izin alınan hafta diğer günlerin mesaisi değişmez.
+ *
+ * Rules:
+ * - WORKED days (including HOURLY leave, which deriveDays sets to WORKED status):
+ *     contribute their actual net shift minutes to the weekly total and receive overtime share.
+ *     For HOURLY leave: net = shiftNet − leaveHours×60.
+ * - LEAVE (full-day, non-HOURLY) days:
+ *     contribute standardDayMin = weeklyLimit / scheduledWorkDays to weekly total,
+ *     but do NOT receive any overtime distribution.
+ * - LEAVE (half-day) days:
+ *     contribute standardDayMin / 2 to weekly total, no overtime distribution.
+ * - HOLIDAY and OFF days: excluded entirely.
  */
 export function calculateScheduledOvertime(
   days: readonly DerivedDay[],
@@ -35,16 +47,30 @@ export function calculateScheduledOvertime(
 
   for (const weekDays of weekMap.values()) {
     const workedDays = weekDays.filter((d) => d.status === 'WORKED');
-    if (workedDays.length === 0) continue;
+    const fullLeaveDays = weekDays.filter((d) => d.status === 'LEAVE' && !d.leaveHalfDay);
+    const halfLeaveDays = weekDays.filter((d) => d.status === 'LEAVE' && d.leaveHalfDay);
+
+    const scheduledWorkDays = workedDays.length + fullLeaveDays.length + halfLeaveDays.length;
+    if (scheduledWorkDays === 0) continue;
+
+    const standardDayMin = weeklyLimitMinutes / scheduledWorkDays;
 
     const weekTotal = workedDays.reduce((sum, d) => {
       const tpl = d.shiftTemplateId ? templateMap.get(d.shiftTemplateId) : null;
       if (!tpl) return sum;
-      return sum + netShiftMinutes(tpl);
-    }, 0);
+      const net = netShiftMinutes(tpl);
+      // HOURLY leave is WORKED status; its net is reduced by leave hours
+      if (d.leaveType === 'HOURLY') {
+        return sum + Math.max(0, net - d.leaveHours * 60);
+      }
+      return sum + net;
+    }, 0)
+      + fullLeaveDays.length * standardDayMin
+      + halfLeaveDays.length * (standardDayMin / 2);
 
     const weekExcess = Math.max(0, weekTotal - weeklyLimitMinutes);
     if (weekExcess === 0) continue;
+    if (workedDays.length === 0) continue;
 
     const perDay = weekExcess / workedDays.length;
     for (const d of workedDays) {

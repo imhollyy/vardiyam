@@ -219,7 +219,8 @@ export function deriveDays(
     let leaveHours = 0;
 
     if (entry?.leaveType) {
-      status = 'LEAVE';
+      // HOURLY leave: day counts as worked (net reduced by leave hours)
+      status = entry.leaveType === 'HOURLY' ? 'WORKED' : 'LEAVE';
       leaveType = entry.leaveType;
       leaveHalfDay = entry.leaveHalfDay;
       leaveHours = entry.leaveHours;
@@ -238,14 +239,19 @@ export function deriveDays(
       ? shiftNominalMinutes(tpl.startLocalTime, tpl.endLocalTime)
       : 0;
 
+    // Full-day non-HOURLY leave and official holidays: ignore stored overtime/lateEarly
+    const isFullDayNonHourlyLeave = leaveType !== null && leaveType !== 'HOURLY' && !leaveHalfDay;
+    const effectiveOvertimeMinutes = (isFullDayNonHourlyLeave || holiday) ? 0 : (entry?.overtimeMinutes ?? 0);
+    const effectiveLateEarlyMinutes = (isFullDayNonHourlyLeave || holiday) ? 0 : (entry?.lateEarlyMinutes ?? 0);
+
     return {
       localDate,
       status,
       leaveType,
       leaveHalfDay,
       leaveHours,
-      overtimeMinutes: entry?.overtimeMinutes ?? 0,
-      lateEarlyMinutes: entry?.lateEarlyMinutes ?? 0,
+      overtimeMinutes: effectiveOvertimeMinutes,
+      lateEarlyMinutes: effectiveLateEarlyMinutes,
       isHoliday: holiday,
       isWeekend: weekend,
       shiftTemplateId: tplId,
@@ -285,7 +291,10 @@ export function calculateDeductions(
   let totalMinor = 0;
 
   for (const day of days) {
-    if (day.status !== 'LEAVE' || !day.leaveType) continue;
+    const isLeaveDay = day.status === 'LEAVE';
+    const isHourlyWorkedDay = day.status === 'WORKED' && day.leaveType === 'HOURLY';
+    if (!isLeaveDay && !isHourlyWorkedDay) continue;
+    if (!day.leaveType) continue;
     const entry = dayEntries.get(day.localDate);
     const deduct = isLeaveDeducted(day.leaveType, entry?.deductOverride ?? null);
     if (!deduct) continue;

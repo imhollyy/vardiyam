@@ -201,6 +201,16 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE shift_templates_v102 RENAME TO shift_templates;
     `,
   },
+  {
+    version: 103,
+    sql: `
+      -- Remove overtime/late-early from leave days (data consistency fix).
+      -- HOURLY leave is excluded because those days can legitimately have overtime.
+      UPDATE day_entries
+      SET overtime_minutes = 0, late_early_minutes = 0
+      WHERE leave_type IS NOT NULL AND leave_type <> 'HOURLY';
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;
