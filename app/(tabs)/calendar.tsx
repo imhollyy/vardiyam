@@ -6,9 +6,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
-import { deriveDays, enumerateDays, type DerivedDay } from '@/src/domain/payroll/index';
+import { listShiftCycles, listShiftTemplates } from '@/src/data/shiftCycleRepository';
+import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
+import { deriveDays, enumerateDays, type DerivedDay, type LeaveType } from '@/src/domain/payroll/index';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
+import { fonts, layout, shiftPalette, type ShiftKind } from '@/src/theme/tokens';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card } from '@/src/components/ui/Card';
 import { StatTile } from '@/src/components/ui/StatTile';
@@ -17,6 +19,27 @@ import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { SkeletonCard } from '@/src/components/ui/Skeleton';
 
 const WEEKDAY_HEADERS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+
+const LEAVE_ABBREV: Record<LeaveType, string> = {
+  ANNUAL: 'İzin', UNPAID: 'ÜI', SICK: 'Rp', EXCUSE: 'Mz',
+  MATERNITY: 'Dğ', BEREAVEMENT: 'Az', SOCIAL: 'Sy', HOURLY: 'Sl', HOLIDAY: 'Tt',
+};
+
+function fmtHours(minutes: number): string {
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}sa` : `${minutes}dk`;
+}
+
+function shiftStripColor(day: DerivedDay | undefined, templateMap: Map<string, ShiftTemplate>, mode: 'light' | 'dark'): string {
+  if (!day) return 'transparent';
+  if (day.status === 'LEAVE') return shiftPalette.leave[mode].background;
+  if (day.status === 'HOLIDAY') return shiftPalette.holiday[mode].background;
+  if (day.status === 'WORKED' || day.shiftTemplateId) {
+    const template = day.shiftTemplateId ? templateMap.get(day.shiftTemplateId) : undefined;
+    const kind = ((template?.colorToken ?? 'day') as ShiftKind);
+    return (shiftPalette[kind]?.[mode].background ?? shiftPalette.day[mode].background);
+  }
+  return 'transparent';
+}
 
 function todayLocal(): string {
   const now = new Date();
@@ -49,6 +72,7 @@ export default function CalendarScreen() {
   const [dayMap, setDayMap] = useState<Map<string, DerivedDay>>(new Map());
   const [loading, setLoading] = useState(true);
 
+  const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const cells = useMemo(() => monthDays(year, month), [year, month]);
 
   useFocusEffect(
@@ -57,15 +81,19 @@ export default function CalendarScreen() {
       setLoading(true);
       void (async () => {
         try {
-          const s = await getSettings(database);
+          const [s, tmpl, cycles] = await Promise.all([
+            getSettings(database),
+            listShiftTemplates(database),
+            listShiftCycles(database),
+          ]);
           const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
           const daysInMonth = new Date(year, month, 0).getDate();
           const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
           const entries = await getDayEntriesInRange(database, startDate, endDate);
           const dates = enumerateDays(startDate, endDate);
-          const derived = deriveDays(dates, entries, s);
+          const derived = deriveDays(dates, entries, s, tmpl, cycles);
           const map = new Map(derived.map((d) => [d.localDate, d]));
-          if (active) setDayMap(map);
+          if (active) { setDayMap(map); setTemplates(tmpl); }
         } finally {
           if (active) setLoading(false);
         }
@@ -82,6 +110,8 @@ export default function CalendarScreen() {
     if (month === 12) { setMonth(1); setYear((y) => y + 1); }
     else setMonth((m) => m + 1);
   };
+
+  const templateMap = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
 
   const worked = Array.from(dayMap.values()).filter((d) => d.status === 'WORKED').length;
   const overtime = Array.from(dayMap.values()).reduce((s, d) => s + d.overtimeMinutes, 0);
@@ -123,29 +153,29 @@ export default function CalendarScreen() {
             if (!date) return <View key={`e-${i}`} style={styles.cell} />;
             const day = dayMap.get(date);
             const isToday = date === today;
-            const dotBg =
-              day?.status === 'WORKED' ? shiftPalette.day[mode].background :
-              day?.status === 'HOLIDAY' ? shiftPalette.holiday[mode].background :
-              day?.status === 'LEAVE' ? shiftPalette.leave[mode].background :
-              'transparent';
+            const stripColor = shiftStripColor(day, templateMap, mode);
             return (
               <Pressable
                 key={date}
                 accessibilityRole="button"
-                accessibilityLabel={`${date.split('-')[2]}, ${day?.status ?? 'OFF'}`}
+                accessibilityLabel={`${date.split('-')[2]}, ${day?.status ?? 'OFF'}${day?.overtimeMinutes ? `, fazla mesai ${fmtHours(day.overtimeMinutes)}` : ''}`}
                 onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
                 style={({ pressed }) => [
                   styles.cell,
-                  isToday && { borderColor: theme.ink, borderWidth: 2, borderRadius: 10 },
+                  isToday && { borderColor: theme.ink, borderWidth: 1.5, borderRadius: 8 },
                   { opacity: pressed ? 0.7 : 1 },
                 ]}
               >
-                <Text style={[styles.cellText, { color: isToday ? theme.ink : theme.ink }]}>
+                <View style={[styles.cellStrip, { backgroundColor: stripColor }]} />
+                <Text style={[styles.cellText, isToday && { fontFamily: fonts.extraBold }, { color: theme.ink }]}>
                   {date.split('-')[2]}
                 </Text>
-                {day?.status && day.status !== 'OFF' ? (
-                  <View style={[styles.cellDot, { backgroundColor: dotBg }]} />
-                ) : <View style={styles.cellDot} />}
+                <View style={styles.cellBadges}>
+                  {(day?.overtimeMinutes ?? 0) > 0 ? <Text style={[styles.badgeText, { color: theme.warning }]}>+{fmtHours(day!.overtimeMinutes)}</Text> : null}
+                  {(day?.lateEarlyMinutes ?? 0) > 0 ? <Text style={[styles.badgeText, { color: theme.danger }]}>−{fmtHours(day!.lateEarlyMinutes)}</Text> : null}
+                  {day?.leaveType ? <Text style={[styles.badgeText, { color: shiftPalette.leave[mode].text }]}>{LEAVE_ABBREV[day.leaveType]}</Text> : null}
+                  {day?.note ? <View style={[styles.noteDot, { backgroundColor: theme.muted }]} /> : null}
+                </View>
               </Pressable>
             );
           })}
@@ -153,9 +183,11 @@ export default function CalendarScreen() {
       </Card>
 
       <View style={styles.legend}>
-        <LegendItem color={shiftPalette.day[mode].background} label="Çalışma" />
-        <LegendItem color={shiftPalette.holiday[mode].background} label="Tatil" />
+        <LegendItem color={shiftPalette.day[mode].background} label="Gündüz" />
+        <LegendItem color={shiftPalette.evening[mode].background} label="Akşam" />
+        <LegendItem color={shiftPalette.night[mode].background} label="Gece" />
         <LegendItem color={shiftPalette.leave[mode].background} label="İzin" />
+        <LegendItem color={shiftPalette.holiday[mode].background} label="Tatil" />
       </View>
 
       <SectionHeader title="Ay Özeti" />
@@ -183,12 +215,15 @@ const styles = StyleSheet.create({
   weekHeaders: { flexDirection: 'row' },
   weekHeader: { flex: 1, textAlign: 'center', fontSize: layout.type.caption, fontFamily: fonts.semiBold },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  cell: { width: '14.28%', minHeight: 54, alignItems: 'center', paddingVertical: 2, overflow: 'hidden' },
+  cellStrip: { width: '100%', height: 3, borderRadius: 1.5, marginBottom: 2 },
   cellText: { fontFamily: fonts.semiBold, fontSize: layout.type.body },
-  cellDot: { width: 20, height: 5, borderRadius: 3 },
-  legend: { flexDirection: 'row', justifyContent: 'center', gap: 16 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 12, height: 12, borderRadius: 6 },
+  cellBadges: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 1, minHeight: 11 },
+  badgeText: { fontSize: 7, fontFamily: fonts.bold, lineHeight: 10 },
+  noteDot: { width: 4, height: 4, borderRadius: 2, alignSelf: 'center' },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontFamily: fonts.semiBold, fontSize: layout.type.caption },
   statRow: { flexDirection: 'row', gap: layout.space.md },
 });
