@@ -6,7 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getAllExtraIncomes, createExtraIncome, deleteExtraIncome, type CreateExtraIncomeInput } from '@/src/data/extraIncomeRepository';
 import type { ExtraIncome, ExtraIncomeType, ExtraIncomeFrequency } from '@/src/domain/payroll/types';
-import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
+import { formatMoneyInput, formatTryMinor, parseTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout } from '@/src/theme/tokens';
 import { Card, CardHeader } from '@/src/components/ui/Card';
@@ -14,6 +14,8 @@ import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { EmptyState } from '@/src/components/ui/EmptyState';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
+import { getLocalToday } from '@/src/features/shifts/dates';
 
 const TYPE_OPTIONS: { value: ExtraIncomeType; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { value: 'BONUS', label: 'Prim', icon: 'trophy-outline' },
@@ -41,6 +43,9 @@ export default function AdditionalIncomeScreen() {
   const [type, setType] = useState<ExtraIncomeType>('BONUS');
   const [frequency, setFrequency] = useState<ExtraIncomeFrequency>('MONTHLY');
   const [amountText, setAmountText] = useState('');
+  const [customName, setCustomName] = useState('');
+  const [firstPaymentDate, setFirstPaymentDate] = useState(() => getLocalToday('Europe/Istanbul'));
+  const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadIncomes = useCallback(async () => {
@@ -51,20 +56,39 @@ export default function AdditionalIncomeScreen() {
   useFocusEffect(useCallback(() => { void loadIncomes(); }, [loadIncomes]));
 
   const handleAdd = useCallback(async () => {
+    setFormError(null);
+    let amountMinor: number;
+    try {
+      amountMinor = parseTryMinor(amountText);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Tutar geçersiz.');
+      return;
+    }
+    if (type === 'OTHER' && customName.trim() === '') {
+      setFormError('Diğer için özel bir ad girin.');
+      return;
+    }
     setSaving(true);
     try {
-      const amount = parseTryMinor(amountText);
-      const input: CreateExtraIncomeInput = { type, amountMinor: amount, frequency };
+      const input: CreateExtraIncomeInput = {
+        type,
+        amountMinor,
+        frequency,
+        customName: type === 'OTHER' ? customName.trim() : null,
+        firstPaymentDate: frequency !== 'MONTHLY' ? firstPaymentDate : null,
+      };
       await createExtraIncome(database, input);
       setAmountText('');
+      setCustomName('');
+      setFirstPaymentDate(getLocalToday('Europe/Istanbul'));
       setShowForm(false);
       await loadIncomes();
-    } catch {
-      // keep form open
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Kaydedilemedi.');
     } finally {
       setSaving(false);
     }
-  }, [database, type, frequency, amountText, loadIncomes]);
+  }, [database, type, frequency, amountText, customName, firstPaymentDate, loadIncomes]);
 
   const handleDelete = useCallback((id: string) => {
     Alert.alert('Sil', 'Bu ek geliri silmek istediğine emin misin?', [
@@ -143,15 +167,37 @@ export default function AdditionalIncomeScreen() {
               <ChoiceChip key={opt.value} label={opt.label} selected={opt.value === frequency} onPress={() => setFrequency(opt.value)} icon={opt.icon} />
             ))}
           </View>
+          {type === 'OTHER' && (
+            <TextInput
+              style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.background, fontFamily: fonts.medium }]}
+              value={customName}
+              onChangeText={setCustomName}
+              placeholder="Gelir adı (örn. Yakacak yardımı)"
+              placeholderTextColor={theme.muted}
+              maxLength={200}
+              accessibilityLabel="Özel gelir adı"
+            />
+          )}
           <TextInput
             style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.background, fontFamily: fonts.extraBold }]}
             value={amountText}
-            onChangeText={setAmountText}
+            onChangeText={(raw) => setAmountText(formatMoneyInput(raw))}
             placeholder="Tutar (₺)"
             placeholderTextColor={theme.muted}
             keyboardType="decimal-pad"
             accessibilityLabel="Ek gelir tutarı"
           />
+          {frequency !== 'MONTHLY' && (
+            <DateTimePickerField
+              mode="date"
+              label="İlk ödeme tarihi"
+              value={firstPaymentDate}
+              timezone="Europe/Istanbul"
+              onChange={setFirstPaymentDate}
+              onError={setFormError}
+            />
+          )}
+          {formError ? <Text accessibilityRole="alert" style={[styles.errorText, { color: theme.danger }]}>{formError}</Text> : null}
           <ActionButton label={saving ? 'Ekleniyor…' : 'Ekle'} onPress={handleAdd} disabled={saving} loading={saving} icon="checkmark" />
         </View>
       ) : (
@@ -176,4 +222,5 @@ const styles = StyleSheet.create({
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   input: { borderWidth: 1, borderRadius: layout.radius.input, paddingHorizontal: 14, paddingVertical: 12, fontSize: layout.type.body, minHeight: layout.control.minHeight },
   footer: { paddingHorizontal: layout.screen.horizontal, paddingBottom: layout.screen.bottom, paddingTop: 8 },
+  errorText: { fontFamily: fonts.bold, fontSize: layout.type.caption, lineHeight: 20 },
 });
