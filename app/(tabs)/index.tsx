@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -85,8 +85,11 @@ export default function HomeScreen() {
   const router = useRouter();
   const today = useMemo(() => todayLocal(), []);
   const week = useMemo(() => weekDates(today), [today]);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const displayedMonday = useMemo(() => addDays(week[0]!, weekOffset * 7), [week, weekOffset]);
+  const displayedWeek = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(displayedMonday, i)), [displayedMonday]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [days, setDays] = useState<DerivedDay[]>([]);
+  const [dayMap, setDayMap] = useState<Map<string, DerivedDay>>(new Map());
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const [plannedMap, setPlannedMap] = useState<Map<string, string | null>>(new Map());
   const [periodStatement, setPeriodStatement] = useState<MonthlyStatement | null>(null);
@@ -102,15 +105,19 @@ export default function HomeScreen() {
           const s = await getSettings(database);
           const tmpl = await listShiftTemplates(database);
           const cycles = await listShiftCycles(database);
-          const rangeEnd = addDays(week[6]!, 14);
-          const entries = await getDayEntriesInRange(database, week[0]!, rangeEnd);
-          const derived = deriveDays(week, entries, s, tmpl, cycles);
-          const planned = resolvePlannedTemplates(enumerateDays(week[0]!, rangeEnd), cycles, tmpl, entries);
+          const rangeStart = displayedMonday < week[0]! ? displayedMonday : week[0]!;
+          const baseEnd = addDays(week[6]!, 14);
+          const dispEnd = addDays(displayedMonday, 6);
+          const rangeEnd = baseEnd > dispEnd ? baseEnd : dispEnd;
+          const entries = await getDayEntriesInRange(database, rangeStart, rangeEnd);
+          const allDates = enumerateDays(rangeStart, rangeEnd);
+          const derived = deriveDays(allDates, entries, s, tmpl, cycles);
+          const planned = resolvePlannedTemplates(allDates, cycles, tmpl, entries);
           const { statement, period } = await loadCurrentPeriodStatement(database, today);
           if (active) {
             setSettings(s);
             setTemplates(tmpl);
-            setDays(derived);
+            setDayMap(new Map(derived.map((d) => [d.localDate, d])));
             setPlannedMap(planned);
             setPeriodStatement(statement);
             setPeriodInfo(period);
@@ -120,13 +127,15 @@ export default function HomeScreen() {
         }
       })();
       return () => { active = false; };
-    }, [database, week, today]),
+    }, [database, displayedMonday, today]),
   );
 
   const todayTemplateId = plannedMap.get(today);
   const todayTemplate = todayTemplateId ? (templates.find((t) => t.id === todayTemplateId) ?? null) : null;
-  const todayDerived = days.find((d) => d.localDate === today);
+  const todayDerived = dayMap.get(today);
   const todayIsSpecial = !todayTemplate && todayDerived && (todayDerived.status === 'HOLIDAY' || todayDerived.status === 'LEAVE');
+
+  const weekDays = useMemo(() => week.map((d) => dayMap.get(d)).filter((d): d is DerivedDay => d !== undefined), [week, dayMap]);
 
   const nextShiftLabel = useMemo(() => {
     for (let i = 1; i <= 14; i++) {
@@ -145,9 +154,9 @@ export default function HomeScreen() {
 
   const annualLeaveResult = useMemo(() => {
     if (!settings?.startDate) return null;
-    const usedDays = days.filter((d) => d.leaveType === 'ANNUAL').length;
+    const usedDays = weekDays.filter((d) => d.leaveType === 'ANNUAL').length;
     return calculateAnnualLeave(settings.startDate, today, usedDays);
-  }, [settings, days, today]);
+  }, [settings, weekDays, today]);
 
   const totalOvertimeMinutes = periodStatement
     ? (periodStatement.scheduledOvertimeMinutes + periodStatement.manualOvertimeMinutes)
@@ -155,7 +164,21 @@ export default function HomeScreen() {
   const overtimeMinor = settings && totalOvertimeMinutes > 0
     ? calculateOvertime(totalOvertimeMinutes, settings.salaryMinor)
     : 0;
-  const lateEarlyMinutes = days.reduce((s, d) => s + d.lateEarlyMinutes, 0);
+  const lateEarlyMinutes = weekDays.reduce((s, d) => s + d.lateEarlyMinutes, 0);
+
+  const displayedMonth = Number(displayedWeek[3]!.split('-')[1]);
+  const isOutOfMonth = (date: string) => Number(date.split('-')[1]) !== displayedMonth;
+
+  const weekRangeLabel = useMemo(() => {
+    const start = displayedWeek[0]!;
+    const end = displayedWeek[6]!;
+    const startD = Number(start.split('-')[2]);
+    const endD = Number(end.split('-')[2]);
+    const startM = Number(start.split('-')[1]);
+    const endM = Number(end.split('-')[1]);
+    if (startM === endM) return `${startD} – ${endD} ${MONTH_SHORT[startM - 1] ?? ''}`;
+    return `${startD} ${MONTH_SHORT[startM - 1] ?? ''} – ${endD} ${MONTH_SHORT[endM - 1] ?? ''}`;
+  }, [displayedWeek]);
   const daysUntilPay = settings ? daysUntilPayday(today, settings.payday) : null;
 
   const todayDt = new Date(today.replace(/-/g, '/'));
@@ -221,34 +244,64 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* c) 7 DayBlock + "Gelecek hafta" satırı (dönüşümlü düzen için sonraki vardiya) */}
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        {week.map((date) => {
-          const dow = new Date(date.replace(/-/g, '/')).getDay();
-          const day = days.find((d) => d.localDate === date);
-          const dateNum = date.split('-')[2] ?? '';
-          const otMin = day?.overtimeMinutes ?? 0;
-          return (
-            <View key={date} style={{ flex: 1 }}>
-              <DayBlock
-                dayLabel={DAY_LABELS[dow] ?? ''}
-                dateNumber={dateNum}
-                code={toDayCode(day)}
-                status={toDayBlockStatus(day)}
-                isToday={date === today}
-                hasOvertime={otMin > 0}
-                overtimeLabel={otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined}
-                onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
-              />
-            </View>
-          );
-        })}
+      {/* c) Hafta şeridi: başlık + ok navigasyon + DayBlock */}
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Önceki hafta"
+            onPress={() => setWeekOffset((o) => o - 1)}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="chevron-back" size={20} color={theme.ink} />
+          </Pressable>
+          <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.ink }}>
+            {weekRangeLabel}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Sonraki hafta"
+            onPress={() => setWeekOffset((o) => o + 1)}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="chevron-forward" size={20} color={theme.ink} />
+          </Pressable>
+        </View>
+        {weekOffset !== 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setWeekOffset(0)}
+            style={{ alignSelf: 'center' }}
+          >
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.accent }}>
+              Bu haftaya dön
+            </Text>
+          </Pressable>
+        ) : null}
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {displayedWeek.map((date) => {
+            const dow = new Date(date.replace(/-/g, '/')).getDay();
+            const day = dayMap.get(date);
+            const dateNum = date.split('-')[2] ?? '';
+            const otMin = day?.overtimeMinutes ?? 0;
+            const faded = isOutOfMonth(date);
+            return (
+              <View key={date} style={{ flex: 1, opacity: faded ? 0.35 : 1 }}>
+                <DayBlock
+                  dayLabel={DAY_LABELS[dow] ?? ''}
+                  dateNumber={dateNum}
+                  code={toDayCode(day)}
+                  status={toDayBlockStatus(day)}
+                  isToday={date === today}
+                  hasOvertime={otMin > 0}
+                  overtimeLabel={otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined}
+                  onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
+                />
+              </View>
+            );
+          })}
+        </View>
       </View>
-      {nextShiftLabel ? (
-        <Text style={{ fontFamily: fonts.medium, fontSize: layout.type.caption, color: theme.muted }}>
-          Gelecek hafta: {nextShiftLabel}
-        </Text>
-      ) : null}
 
       {/* d) InkCard: Bu dönem tahmini + maaş hapı + mesai/eksik/izin */}
       <View>
