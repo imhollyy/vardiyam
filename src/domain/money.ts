@@ -1,3 +1,21 @@
+/**
+ * Formats raw decimal-pad input into Turkish locale display: "35000,50" → "35.000,50".
+ * Keeps trailing comma and up to 2 decimal digits while user is typing.
+ */
+export function formatMoneyInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d,]/g, '');
+  const commaIdx = cleaned.indexOf(',');
+  if (commaIdx === -1) {
+    if (cleaned === '') return '';
+    const stripped = cleaned.replace(/^0+(\d)/, '$1');
+    return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(Number(stripped));
+  }
+  const wholeRaw = cleaned.slice(0, commaIdx).replace(/^0+(\d)/, '$1');
+  const frac = cleaned.slice(commaIdx + 1, commaIdx + 3);
+  const formattedWhole = wholeRaw === '' ? '0' : new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(Number(wholeRaw));
+  return `${formattedWhole},${frac}`;
+}
+
 /** Parses either 35.000,50 or 35000.50; ambiguous/mixed separators are rejected. */
 export function parseTryMinor(input: string, allowZero = false): number {
   const value = input.trim().replace(/\s/g, '');
