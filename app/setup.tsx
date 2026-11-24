@@ -25,28 +25,14 @@ import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
 import { MoneyField } from '@/src/components/ui/MoneyField';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
-import { ProgressDots } from '@/src/components/ui/ProgressDots';
-import { BottomSheet } from '@/src/components/ui/BottomSheet';
 
-const STEPS = ['salary', 'schedule', 'summary'] as const;
-type StepId = (typeof STEPS)[number];
-
-const STEP_META: Record<StepId, { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; subtitle?: string }> = {
-  salary: { icon: 'wallet-outline', title: 'Maaş bilgilerin', subtitle: 'Aylık ücret ve maaş gününü gir.' },
-  schedule: { icon: 'time-outline', title: 'Çalışma düzenin', subtitle: 'Vardiya düzeni ve saatlerini belirle.' },
-  summary: { icon: 'checkmark-circle-outline', title: 'Hazır!', subtitle: 'Bilgilerin doğru mu? Son bir göz at.' },
-};
+type StepId = 'salary' | 'salaryType' | 'payday' | 'bes' | 'schedule' | 'currentShift' | 'hourlyLeave' | 'summary';
 
 const BES_RATE_OPTIONS: { value: string; label: string }[] = [
   { value: '300', label: '%3 (varsayılan)' },
   { value: '400', label: '%4' },
   { value: '500', label: '%5' },
   { value: '600', label: '%6' },
-];
-
-const SALARY_TYPE_OPTIONS: { value: SalaryType; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
-  { value: 'GROSS', label: 'Brüt', icon: 'trending-up-outline' },
-  { value: 'NET', label: 'Net', icon: 'cash-outline' },
 ];
 
 type SalaryDraft = {
@@ -59,8 +45,8 @@ type SalaryDraft = {
 
 const INITIAL_SALARY: SalaryDraft = {
   salaryText: '',
-  salaryType: 'GROSS',
-  payday: '1',
+  salaryType: 'NET',
+  payday: PAYDAY_LAST,
   besEnabled: false,
   besRateBp: '300',
 };
@@ -85,6 +71,23 @@ const SHIFT_PATTERN_LABEL: Record<string, string> = {
   THREE_SHIFT: '3 vardiya',
 };
 
+const STEP_META: Record<StepId, {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  subtitle?: string;
+  skippable?: boolean;
+  skipLabel?: string;
+}> = {
+  salary:       { icon: 'cash-outline',            title: 'Aylik maasın ne kadar?',       subtitle: 'Brut veya net ucretini gir.' },
+  salaryType:   { icon: 'pricetag-outline',         title: 'Brut mu, net mi?',             subtitle: 'Girdigin ucret brut mu net mi?',                   skippable: true, skipLabel: 'Net (varsayilan)' },
+  payday:       { icon: 'calendar-number-outline',  title: 'Maas gunun hangisi?',           subtitle: 'Ayin hangi gunu maas aliyorsun?',                  skippable: true, skipLabel: 'Ayin son gunu' },
+  bes:          { icon: 'shield-checkmark-outline', title: 'BES kesintisi var mi?',         subtitle: 'Bireysel emeklilik kesintisi uygulanıyor mu?',      skippable: true, skipLabel: 'Yok' },
+  schedule:     { icon: 'time-outline',             title: 'Calisma duzenin',              subtitle: 'Vardiya duzeni ve saatlerini belirle.' },
+  currentShift: { icon: 'swap-horizontal-outline',  title: 'Su an hangi vardiyadasın?',    subtitle: 'Bu hafta hangi vardiyada calısıyorsun?' },
+  hourlyLeave:  { icon: 'hourglass-outline',        title: 'Saatlik izin kurali',           subtitle: 'Saatlik izin aldiginda ne yapilsın?',              skippable: true, skipLabel: 'Maasimdan kesilsin' },
+  summary:      { icon: 'checkmark-circle-outline', title: 'Hazir!',                       subtitle: 'Bilgilerin dogru mu? Son bir goz at.' },
+};
+
 export default function SetupScreen() {
   const { theme, mode } = useAppTheme();
   const database = useAppDatabase();
@@ -92,16 +95,25 @@ export default function SetupScreen() {
   const [step, setStep] = useState(0);
   const [salary, setSalary] = useState<SalaryDraft>(INITIAL_SALARY);
   const [schedule, setSchedule] = useState<ScheduleEditorValue>(INITIAL_SCHEDULE);
+  const [hourlyLeavePolicy, setHourlyLeavePolicy] = useState<HourlyLeavePolicy>(HOURLY_LEAVE_POLICY.BASE_PAY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showBesSheet, setShowBesSheet] = useState(false);
-  const [hourlyLeavePolicy, setHourlyLeavePolicy] = useState<HourlyLeavePolicy>(HOURLY_LEAVE_POLICY.BASE_PAY);
 
-  const currentStep = STEPS[step]!;
+  const steps = useMemo((): StepId[] => {
+    const list: StepId[] = ['salary', 'salaryType', 'payday', 'bes', 'schedule'];
+    if (schedule.shiftPattern === 'TWO_SHIFT' || schedule.shiftPattern === 'THREE_SHIFT') {
+      list.push('currentShift');
+    }
+    list.push('hourlyLeave', 'summary');
+    return list;
+  }, [schedule.shiftPattern]);
+
+  const currentStep = steps[step]!;
   const meta = STEP_META[currentStep];
   const dayPalette = shiftPalette.day[mode];
   const isFirst = step === 0;
-  const isLast = step === STEPS.length - 1;
+  const isLast = step === steps.length - 1;
+  const progress = (step + 1) / steps.length;
 
   const canAdvance = useCallback((): boolean => {
     switch (currentStep) {
@@ -109,14 +121,13 @@ export default function SetupScreen() {
         try {
           if (parseTryMinor(salary.salaryText) <= 0) return false;
         } catch { return false; }
-        const n = Number(salary.payday);
-        return salary.payday === PAYDAY_LAST || (Number.isInteger(n) && n >= 1 && n <= 31);
+        return true;
       }
       case 'schedule':
         return isScheduleValueValid(schedule);
       default: return true;
     }
-  }, [currentStep, salary, schedule]);
+  }, [currentStep, salary.salaryText, schedule]);
 
   const handleFinish = useCallback(async () => {
     setSaving(true);
@@ -173,124 +184,213 @@ export default function SetupScreen() {
     if (!isFirst) setStep((s) => s - 1);
   }, [isFirst]);
 
-  const besLabel = useMemo(() => {
-    const typeLabel = salary.salaryType === 'GROSS' ? 'Brüt' : 'Net';
-    const besStr = salary.besEnabled ? `, BES %${Number(salary.besRateBp) / 100}` : ', BES Kapalı';
-    return `${typeLabel}${besStr}`;
-  }, [salary.salaryType, salary.besEnabled, salary.besRateBp]);
+  const handleSkip = useCallback(() => {
+    switch (currentStep) {
+      case 'salaryType':
+        setSalary((s) => ({ ...s, salaryType: 'NET' }));
+        break;
+      case 'payday':
+        setSalary((s) => ({ ...s, payday: PAYDAY_LAST }));
+        break;
+      case 'bes':
+        setSalary((s) => ({ ...s, besEnabled: false }));
+        break;
+      case 'hourlyLeave':
+        setHourlyLeavePolicy(HOURLY_LEAVE_POLICY.BASE_PAY);
+        break;
+      default: break;
+    }
+    setStep((s) => s + 1);
+  }, [currentStep]);
 
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Step indicator */}
-      <View style={styles.stepIndicator}>
-        <View style={[styles.stepIconCircle, { backgroundColor: theme.surfaceMuted }]}>
-          <Ionicons accessible={false} name={meta.icon} size={22} color={theme.ink} />
-        </View>
-        <ProgressDots total={STEPS.length} current={step + 1} />
+      {/* Linear progress bar */}
+      <View style={[styles.progressTrack, { backgroundColor: theme.surfaceMuted }]}>
+        <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` as `${number}%`, backgroundColor: theme.accent }]} />
+      </View>
+
+      {/* Back / Skip row */}
+      <View style={styles.headerRow}>
+        {!isFirst ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Geri"
+            onPress={handleBack}
+            style={styles.navBtn}
+          >
+            <Ionicons name="chevron-back" size={22} color={theme.ink} />
+          </Pressable>
+        ) : <View style={styles.navBtn} />}
+        {meta.skippable && !isLast ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Atla: ${meta.skipLabel ?? 'Simdi degil'}`}
+            onPress={handleSkip}
+            style={[styles.navBtn, styles.skipBtnInner]}
+          >
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.muted }}>Atla</Text>
+          </Pressable>
+        ) : <View style={styles.navBtn} />}
       </View>
 
       <Screen contentStyle={styles.scrollContent}>
-        <PageHeading eyebrow={`ADIM ${step + 1}`} title={meta.title} subtitle={meta.subtitle} />
+        <View style={[styles.stepIconCircle, { backgroundColor: theme.surfaceMuted }]}>
+          <Ionicons accessible={false} name={meta.icon} size={22} color={theme.ink} />
+        </View>
+        <PageHeading eyebrow={`${step + 1} / ${steps.length}`} title={meta.title} subtitle={meta.subtitle} />
 
         {currentStep === 'salary' && (
-          <View style={styles.stepBody}>
-            <Card>
-              <CardHeader icon="cash-outline" title="Aylık maaş" />
-              <MoneyField
-                label="Aylık maaş (TL)"
-                value={salary.salaryText}
-                onChangeText={(v) => setSalary((s) => ({ ...s, salaryText: v }))}
-                placeholder="Örn: 22.500"
-                autoFocus
-              />
-              {/* Brüt/BES row */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Maaş türü ve BES ayarları"
-                onPress={() => setShowBesSheet(true)}
-                style={[styles.besRow, { borderColor: theme.border }]}
-              >
-                <View style={styles.besRowLeft}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color={theme.muted} />
-                  <Text style={{ color: theme.muted, fontSize: layout.type.body }}>Brüt / BES</Text>
-                </View>
-                <View style={styles.besRowRight}>
-                  <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>{besLabel}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={theme.muted} />
-                </View>
-              </Pressable>
-            </Card>
+          <Card>
+            <MoneyField
+              label="Aylik maas (TL)"
+              value={salary.salaryText}
+              onChangeText={(v) => setSalary((s) => ({ ...s, salaryText: v }))}
+              placeholder="Orn: 22.500"
+              autoFocus
+            />
+          </Card>
+        )}
 
-            <Card>
-              <CardHeader icon="calendar-number-outline" title="Maaş günü" />
-              <View style={styles.paydayGrid}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                  const val = String(day);
-                  const sel = salary.payday === val;
-                  return (
-                    <Pressable
-                      key={day}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Ayın ${day}. günü`}
-                      accessibilityState={{ selected: sel }}
-                      onPress={() => setSalary((s) => ({ ...s, payday: val }))}
-                      style={[styles.paydayCell, {
-                        backgroundColor: sel ? dayPalette.background : theme.surface,
-                        borderColor: sel ? theme.ink : theme.border,
-                        borderWidth: sel ? 2 : 1,
-                      }]}
-                    >
-                      <Text style={{ fontFamily: sel ? fonts.extraBold : fonts.regular, fontSize: 13, color: sel ? dayPalette.text : theme.ink }}>{day}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Ayın son günü"
-                accessibilityState={{ selected: salary.payday === PAYDAY_LAST }}
-                onPress={() => setSalary((s) => ({ ...s, payday: PAYDAY_LAST }))}
-                style={[styles.lastDayBtn, {
-                  backgroundColor: salary.payday === PAYDAY_LAST ? dayPalette.background : theme.surface,
-                  borderColor: salary.payday === PAYDAY_LAST ? theme.ink : theme.border,
-                  borderWidth: salary.payday === PAYDAY_LAST ? 2 : 1,
-                }]}
-              >
-                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: salary.payday === PAYDAY_LAST ? dayPalette.text : theme.ink }}>Ayın son günü</Text>
-              </Pressable>
-            </Card>
-          </View>
+        {currentStep === 'salaryType' && (
+          <Card>
+            <ChoiceGroup
+              options={[
+                { value: 'NET' as SalaryType, label: 'Net', icon: 'cash-outline' as const },
+                { value: 'GROSS' as SalaryType, label: 'Brut', icon: 'trending-up-outline' as const },
+              ]}
+              selected={salary.salaryType}
+              onSelect={(v) => setSalary((s) => ({ ...s, salaryType: v }))}
+            />
+          </Card>
+        )}
+
+        {currentStep === 'payday' && (
+          <Card>
+            <View style={styles.paydayGrid}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                const val = String(day);
+                const sel = salary.payday === val;
+                return (
+                  <Pressable
+                    key={day}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ayin ${day}. gunu`}
+                    accessibilityState={{ selected: sel }}
+                    onPress={() => setSalary((s) => ({ ...s, payday: val }))}
+                    style={[styles.paydayCell, {
+                      backgroundColor: sel ? dayPalette.background : theme.surface,
+                      borderColor: sel ? theme.ink : theme.border,
+                      borderWidth: sel ? 2 : 1,
+                    }]}
+                  >
+                    <Text style={{ fontFamily: sel ? fonts.extraBold : fonts.regular, fontSize: 13, color: sel ? dayPalette.text : theme.ink }}>{day}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ayin son gunu"
+              accessibilityState={{ selected: salary.payday === PAYDAY_LAST }}
+              onPress={() => setSalary((s) => ({ ...s, payday: PAYDAY_LAST }))}
+              style={[styles.lastDayBtn, {
+                backgroundColor: salary.payday === PAYDAY_LAST ? dayPalette.background : theme.surface,
+                borderColor: salary.payday === PAYDAY_LAST ? theme.ink : theme.border,
+                borderWidth: salary.payday === PAYDAY_LAST ? 2 : 1,
+              }]}
+            >
+              <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: salary.payday === PAYDAY_LAST ? dayPalette.text : theme.ink }}>Ayin son gunu</Text>
+            </Pressable>
+          </Card>
+        )}
+
+        {currentStep === 'bes' && (
+          <Card>
+            <ChoiceGroup
+              options={[
+                { value: 'no' as const, label: 'Hayir', icon: 'close-circle-outline' as const },
+                { value: 'yes' as const, label: 'Evet', icon: 'checkmark-circle-outline' as const },
+              ]}
+              selected={salary.besEnabled ? 'yes' : 'no'}
+              onSelect={(v) => setSalary((s) => ({ ...s, besEnabled: v === 'yes' }))}
+            />
+            {salary.besEnabled && (
+              <>
+                <CardHeader icon="settings-outline" title="BES orani" />
+                <ChoiceGroup
+                  options={BES_RATE_OPTIONS}
+                  selected={salary.besRateBp}
+                  onSelect={(v: string) => setSalary((s) => ({ ...s, besRateBp: v }))}
+                />
+              </>
+            )}
+          </Card>
         )}
 
         {currentStep === 'schedule' && (
           <ScheduleEditor value={schedule} onChange={setSchedule} />
         )}
 
+        {currentStep === 'currentShift' && (
+          <Card>
+            <View style={{ gap: 10 }}>
+              {schedule.templateDrafts.map((td, i) => {
+                const sel = schedule.currentShiftIndex === i;
+                return (
+                  <Pressable
+                    key={i}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: sel }}
+                    accessibilityLabel={`${td.name}: ${td.startLocalTime} – ${td.endLocalTime}`}
+                    onPress={() => setSchedule((s) => ({ ...s, currentShiftIndex: i }))}
+                    style={[styles.shiftOption, {
+                      borderWidth: sel ? 2 : StyleSheet.hairlineWidth,
+                      borderColor: sel ? theme.ink : theme.border,
+                      backgroundColor: sel ? theme.surfaceMuted : theme.surface,
+                    }]}
+                  >
+                    <Ionicons name={sel ? 'radio-button-on' : 'radio-button-off'} size={20} color={sel ? theme.ink : theme.muted} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>{td.name}</Text>
+                      <Text style={{ color: theme.muted, fontSize: layout.type.caption }}>{td.startLocalTime} – {td.endLocalTime}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Card>
+        )}
+
+        {currentStep === 'hourlyLeave' && (
+          <Card>
+            <HourlyLeavePolicySelector value={hourlyLeavePolicy} onChange={setHourlyLeavePolicy} theme={theme} />
+          </Card>
+        )}
+
         {currentStep === 'summary' && (
           <View style={styles.stepBody}>
             <Card>
               <CardHeader icon="receipt-outline" title="Bilgilerin" />
-              <SummaryRow label="Maaş" value={`${salary.salaryText} TL (${salary.salaryType === 'GROSS' ? 'Brüt' : 'Net'})`} theme={theme} />
-              <SummaryRow label="Maaş günü" value={salary.payday === PAYDAY_LAST ? 'Ayın son günü' : `Ayın ${salary.payday}'i`} theme={theme} />
-              <SummaryRow label="BES" value={salary.besEnabled ? `Evet (%${Number(salary.besRateBp) / 100})` : 'Hayır'} theme={theme} />
-              <SummaryRow label="Çalışma düzeni" value={WORK_SCHEDULE_LABEL[schedule.workSchedule] ?? ''} theme={theme} />
-              <SummaryRow label="Vardiya düzeni" value={SHIFT_PATTERN_LABEL[schedule.shiftPattern] ?? ''} theme={theme} />
+              <SummaryRow label="Maas" value={`${salary.salaryText} TL (${salary.salaryType === 'GROSS' ? 'Brut' : 'Net'})`} theme={theme} />
+              <SummaryRow label="Maas gunu" value={salary.payday === PAYDAY_LAST ? 'Ayin son gunu' : `Ayin ${salary.payday}. gunu`} theme={theme} />
+              <SummaryRow label="BES" value={salary.besEnabled ? `Evet (%${Number(salary.besRateBp) / 100})` : 'Hayir'} theme={theme} />
+              <SummaryRow label="Calisma duzeni" value={WORK_SCHEDULE_LABEL[schedule.workSchedule] ?? ''} theme={theme} />
+              <SummaryRow label="Vardiya duzeni" value={SHIFT_PATTERN_LABEL[schedule.shiftPattern] ?? ''} theme={theme} />
               {schedule.templateDrafts.map((td, i) => (
                 <SummaryRow key={i} label={td.name} value={`${td.startLocalTime} – ${td.endLocalTime}`} theme={theme} />
               ))}
-            </Card>
-            <Card>
-              <CardHeader icon="time-outline" title="Saatlik izin aldığında" />
-              <HourlyLeavePolicySelector value={hourlyLeavePolicy} onChange={setHourlyLeavePolicy} theme={theme} />
-              <Text style={[styles.hint, { color: theme.muted, marginTop: 8 }]}>
-                {'Emin değilsen sonra Ayarlar\'dan değiştirebilirsin.'}
-              </Text>
+              <SummaryRow
+                label="Saatlik izin"
+                value={hourlyLeavePolicy === HOURLY_LEAVE_POLICY.OVERTIME_FIRST ? 'Once mesaiden dusulsun' : 'Maasimdan kesilsin'}
+                theme={theme}
+              />
             </Card>
             <Text style={[styles.hint, { color: theme.muted }]}>
-              {`İşe başlama tarihinizi daha sonra Ayarlar'dan ekleyebilirsiniz.`}
+              {'Ise baslama tarihinizi daha sonra Ayarlar\'dan ekleyebilirsiniz.'}
             </Text>
           </View>
         )}
@@ -301,48 +401,14 @@ export default function SetupScreen() {
       </Screen>
 
       <View style={styles.buttons}>
-        {!isFirst && (
-          <ActionButton label="Geri" onPress={handleBack} variant="secondary" icon="chevron-back" />
-        )}
-        <View style={{ flex: 1 }}>
-          <ActionButton
-            label={saving ? 'Kaydediliyor…' : isLast ? 'Başla' : 'İleri'}
-            onPress={handleNext}
-            disabled={!canAdvance() || saving}
-            icon={isLast ? 'checkmark' : 'chevron-forward'}
-            loading={saving}
-          />
-        </View>
+        <ActionButton
+          label={saving ? 'Kaydediliyor...' : isLast ? 'Basla' : 'Ileri'}
+          onPress={handleNext}
+          disabled={!canAdvance() || saving}
+          icon={isLast ? 'checkmark' : 'chevron-forward'}
+          loading={saving}
+        />
       </View>
-
-      {/* Brüt/BES BottomSheet */}
-      <BottomSheet visible={showBesSheet} onClose={() => setShowBesSheet(false)}>
-        <Text style={[styles.sheetTitle, { color: theme.ink }]}>Maaş türü ve BES</Text>
-        <CardHeader icon="pricetag-outline" title="Brüt mü, net mi?" />
-        <ChoiceGroup
-          options={SALARY_TYPE_OPTIONS}
-          selected={salary.salaryType}
-          onSelect={(v) => setSalary((s) => ({ ...s, salaryType: v }))}
-        />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <CardHeader icon="shield-checkmark-outline" title="BES kesintisi" />
-        <ChoiceGroup
-          options={[
-            { value: 'no' as const, label: 'Hayır', icon: 'close-circle-outline' as const },
-            { value: 'yes' as const, label: 'Evet', icon: 'checkmark-circle-outline' as const },
-          ]}
-          selected={salary.besEnabled ? 'yes' : 'no'}
-          onSelect={(v) => setSalary((s) => ({ ...s, besEnabled: v === 'yes' }))}
-        />
-        {salary.besEnabled && (
-          <ChoiceGroup
-            options={BES_RATE_OPTIONS}
-            selected={salary.besRateBp}
-            onSelect={(v: string) => setSalary((s) => ({ ...s, besRateBp: v }))}
-          />
-        )}
-        <ActionButton label="Tamam" onPress={() => setShowBesSheet(false)} />
-      </BottomSheet>
     </KeyboardAvoidingView>
   );
 }
@@ -350,13 +416,13 @@ export default function SetupScreen() {
 const HOURLY_LEAVE_OPTIONS: { value: HourlyLeavePolicy; title: string; description: string }[] = [
   {
     value: HOURLY_LEAVE_POLICY.BASE_PAY,
-    title: 'Maaşımdan kesilsin',
-    description: 'Mesain etkilenmez, izin saatin maaşından kesilir.',
+    title: 'Maasimdan kesilsin',
+    description: 'Mesain etkilenmez, izin saatin maasından kesilir.',
   },
   {
     value: HOURLY_LEAVE_POLICY.OVERTIME_FIRST,
-    title: 'Önce mesaimden düşülsün',
-    description: 'Mesain varsa izin saatin oradan düşülür, yetmezse maaşından kesilir.',
+    title: 'Once mesaimden dusulsun',
+    description: 'Mesain varsa izin saatin oradan dusulur, yetmezse maasından kesilir.',
   },
 ];
 
@@ -423,27 +489,20 @@ function SummaryRow({ label, value, theme }: { label: string; value: string; the
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  stepIndicator: { alignItems: 'center', paddingTop: 56, paddingBottom: 8, gap: 10 },
+  progressTrack: { height: 3, marginTop: 56, marginHorizontal: 0 },
+  progressFill: { height: 3, borderRadius: 2 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: layout.screen.horizontal, paddingTop: 8 },
+  navBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  skipBtnInner: { width: 'auto', paddingHorizontal: 8 },
   stepIconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { paddingBottom: 16, gap: layout.space.md },
   stepBody: { gap: layout.space.md },
   paydayGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
   paydayCell: { width: `${100 / 7}%` as `${number}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
   lastDayBtn: { borderRadius: layout.radius.control, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 2 },
-  besRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 12,
-    minHeight: layout.control.touchTarget,
-  },
-  besRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  besRowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  shiftOption: { borderRadius: layout.radius.control, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.2)' },
-  buttons: { flexDirection: 'row', gap: 12, paddingHorizontal: layout.screen.horizontal, paddingTop: 12, paddingBottom: layout.screen.bottom },
+  buttons: { paddingHorizontal: layout.screen.horizontal, paddingTop: 12, paddingBottom: layout.screen.bottom },
   error: { marginTop: 4, textAlign: 'center', fontSize: layout.type.caption },
   hint: { fontSize: layout.type.caption, textAlign: 'center', lineHeight: 18 },
-  sheetTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.section, marginBottom: 4 },
-  divider: { height: 1, marginVertical: 4 },
 });

@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getDayEntry, upsertDayEntry, deleteDayEntry } from '@/src/data/dayEntryRepository';
 import { getSettings } from '@/src/data/settingsRepository';
-import type { DayEntryPatch } from '@/src/data/dayEntryRepository';
 import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
 import { resolvePlannedTemplates, enumerateDays } from '@/src/domain/payroll/index';
 import type { LeaveType, HourlyLeavePolicy } from '@/src/domain/payroll/types';
@@ -95,22 +94,18 @@ export default function DayEditScreen() {
   const [lateEarlyDiger, setLateEarlyDiger] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const [plannedTemplateId, setPlannedTemplateId] = useState<string | null>(null);
 
   const [hourlyLeavePolicy, setHourlyLeavePolicy] = useState<HourlyLeavePolicy>(HOURLY_LEAVE_POLICY.BASE_PAY);
   const [salaryMinorForRate, setSalaryMinorForRate] = useState(0);
-  const [toastVisible, setToastVisible] = useState(false);
   const [dayEditCoachmark, setDayEditCoachmark] = useState(false);
   const coachmarkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const toastAnim = useMemo(() => new Animated.Value(0), []);
-  const prevPatchRef = useRef<DayEntryPatch | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (coachmarkTimer.current) clearTimeout(coachmarkTimer.current);
     };
   }, []);
@@ -151,16 +146,6 @@ export default function DayEditScreen() {
 
       if (entry) {
         setIsDirty(true);
-        prevPatchRef.current = {
-          overtimeMinutes: entry.overtimeMinutes,
-          lateEarlyMinutes: entry.lateEarlyMinutes,
-          leaveType: entry.leaveType,
-          leaveHalfDay: entry.leaveHalfDay,
-          leaveHours: entry.leaveHours ?? 0,
-          deductOverride: entry.deductOverride ?? null,
-          note: entry.note ?? null,
-          shiftOverrideId: entry.shiftOverrideId,
-        };
 
         // Always load these
         setNote(entry.note ?? '');
@@ -196,6 +181,7 @@ export default function DayEditScreen() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const patch = buildDayEntryPatch({ quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note });
       if (patch === null) {
@@ -203,36 +189,12 @@ export default function DayEditScreen() {
       } else {
         await upsertDayEntry(database, localDate, patch);
       }
-      setSaving(false);
-      setToastVisible(true);
-      Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-      toastTimerRef.current = setTimeout(() => {
-        Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-          setToastVisible(false);
-          router.back();
-        });
-        toastTimerRef.current = null;
-      }, 5000);
-    } catch {
+      router.back();
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Kaydedilemedi.');
       setSaving(false);
     }
-  }, [database, localDate, quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note, router, toastAnim]);
-
-  const handleUndo = useCallback(async () => {
-    if (toastTimerRef.current) { clearTimeout(toastTimerRef.current); toastTimerRef.current = null; }
-    try {
-      const prev = prevPatchRef.current;
-      if (prev === null) {
-        await deleteDayEntry(database, localDate);
-      } else {
-        await upsertDayEntry(database, localDate, prev);
-      }
-    } catch { /* best effort */ }
-    Animated.timing(toastAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-      setToastVisible(false);
-      router.back();
-    });
-  }, [database, localDate, router, toastAnim]);
+  }, [database, localDate, quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note, router]);
 
   const handleReset = useCallback(() => {
     setQuickMode(null); setOvertimeHours(0); setLateEarlyHours(0);
@@ -582,7 +544,7 @@ export default function DayEditScreen() {
 
       {/* Footer */}
       <View style={[styles.footer, { borderTopColor: theme.border }]}>
-        {isDirty && !toastVisible ? (
+        {isDirty ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Varsayılana döndür"
@@ -598,28 +560,14 @@ export default function DayEditScreen() {
               {saveSummary}
             </Text>
           ) : null}
-          <ActionButton label={saving ? 'Kaydediliyor…' : 'Kaydet'} onPress={handleSave} disabled={saving || toastVisible} loading={saving} icon="checkmark" />
+          {saveError ? (
+            <Text accessibilityRole="alert" style={{ fontFamily: fonts.medium, fontSize: layout.type.caption, color: theme.danger, textAlign: 'center' }}>
+              {saveError}
+            </Text>
+          ) : null}
+          <ActionButton label={saving ? 'Kaydediliyor…' : 'Kaydet'} onPress={handleSave} disabled={saving} loading={saving} icon="checkmark" />
         </View>
       </View>
-
-      {/* Undo toast */}
-      {toastVisible && (
-        <Animated.View style={[styles.toast, { opacity: toastAnim, backgroundColor: theme.ink }]}>
-          <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.onInk, flex: 1 }}>
-            Kaydedildi
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Geri al"
-            onPress={handleUndo}
-            style={{ paddingHorizontal: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Text style={{ fontFamily: fonts.bold, fontSize: layout.type.body, color: theme.onInk, textDecorationLine: 'underline' }}>
-              Geri al
-            </Text>
-          </Pressable>
-        </Animated.View>
-      )}
     </KeyboardAvoidingView>
   );
 }
@@ -635,5 +583,4 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', gap: 12, paddingHorizontal: layout.screen.horizontal, paddingBottom: layout.screen.bottom, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
   resetButton: { width: 48, height: layout.control.minHeight, borderWidth: 1.5, borderRadius: layout.radius.control, alignItems: 'center', justifyContent: 'center' },
   noteInput: { borderWidth: 1, borderRadius: layout.radius.input, paddingHorizontal: 14, paddingVertical: 12, fontSize: layout.type.body, minHeight: 80, textAlignVertical: 'top' },
-  toast: { position: 'absolute', bottom: 100, left: layout.screen.horizontal, right: layout.screen.horizontal, borderRadius: layout.radius.control, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, minHeight: 48 },
 });

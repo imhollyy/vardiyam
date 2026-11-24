@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, StyleSheet } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
-import { getSettings } from '@/src/data/settingsRepository';
+import { getSettings, updateSettings } from '@/src/data/settingsRepository';
+import { BottomSheet } from '@/src/components/ui/BottomSheet';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
 import { getStartDatePromptDismissed, saveStartDatePromptDismissed, getCoachmarkDismissed, saveCoachmarkDismissed } from '@/src/data/appPreferencesRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
 import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
@@ -47,7 +49,6 @@ function templateToKind(t: ShiftTemplate): ShiftBlockKind {
 }
 
 const WEEKDAY_NAMES = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
-const MONTH_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 const MONTH_NAMES = [
   'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
@@ -67,6 +68,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [promptDismissed, setPromptDismissed] = useState(false);
   const [coachmarkVisible, setCoachmarkVisible] = useState(false);
+  const [startDateSheetVisible, setStartDateSheetVisible] = useState(false);
+  const [startDateDraft, setStartDateDraft] = useState(today);
 
   const todayYear = Number(today.split('-')[0]);
   const todayMonth = Number(today.split('-')[1]);
@@ -154,8 +157,6 @@ export default function HomeScreen() {
 
   const todayDt = new Date(today.replace(/-/g, '/'));
   const todayName = WEEKDAY_NAMES[todayDt.getDay()] ?? '';
-  const todayNumStr = today.split('-')[2] ?? '';
-  const monthStr = MONTH_SHORT[todayDt.getMonth()] ?? '';
   const monthName = MONTH_NAMES[todayMonth - 1] ?? '';
 
   if (loading) {
@@ -177,14 +178,9 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingHorizontal: layout.screen.horizontal, paddingTop: layout.screen.top, gap: layout.space.md, paddingBottom: 100 }}
       >
         {/* Header */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <Text style={{ fontFamily: fonts.extraBold, fontSize: 30, color: theme.ink, letterSpacing: -1, lineHeight: 36 }}>
-            {todayName}
-          </Text>
-          <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.muted, paddingBottom: 4 }}>
-            {Number(todayNumStr)} {monthStr}
-          </Text>
-        </View>
+        <Text style={{ fontFamily: fonts.extraBold, fontSize: 30, color: theme.ink, letterSpacing: -1, lineHeight: 36 }}>
+          {todayName}
+        </Text>
 
         {/* Big answer card — taps to Earnings */}
         <InkCard
@@ -240,7 +236,7 @@ export default function HomeScreen() {
         {/* Empty state */}
         {!hasAnyEntry && settings?.setupCompleted && (
           <View style={{ backgroundColor: theme.surfaceMuted, borderRadius: layout.radius.card, padding: layout.space.lg, alignItems: 'center', gap: layout.space.sm }}>
-            <Text style={{ fontSize: 32 }}>📅</Text>
+            <Ionicons name="calendar-outline" size={32} color={theme.muted} accessible={false} />
             <Text style={{ fontFamily: fonts.bold, fontSize: layout.type.section, color: theme.ink, textAlign: 'center' }}>
               {daysSinceStart !== null && daysSinceStart <= 7 ? 'Henüz gün eklenmedi' : 'Bu ayki mesailerini ekledin mi?'}
             </Text>
@@ -259,11 +255,14 @@ export default function HomeScreen() {
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Ayarlar'dan girin"
-              onPress={() => router.push('/(tabs)/settings' as never)}
+              accessibilityLabel="Tarih gir"
+              onPress={() => {
+                setStartDateDraft(today);
+                setStartDateSheetVisible(true);
+              }}
               style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: layout.radius.control, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}
             >
-              <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.ink }}>Ayarlar</Text>
+              <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.ink }}>Tarih gir</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -335,6 +334,47 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       )}
+
+      {/* Start-date BottomSheet */}
+      <BottomSheet visible={startDateSheetVisible} onClose={() => setStartDateSheetVisible(false)}>
+        <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.section, color: theme.ink }}>
+          İşe başlama tarihi
+        </Text>
+        <DateTimePickerField
+          mode="date"
+          label="Tarih"
+          value={startDateDraft}
+          timezone="Europe/Istanbul"
+          onChange={setStartDateDraft}
+          maximumDate={new Date()}
+        />
+        <View style={{ flexDirection: 'row', gap: layout.space.sm }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Şimdi değil"
+            onPress={() => setStartDateSheetVisible(false)}
+            style={{ flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center', borderRadius: layout.radius.control, borderWidth: 1, borderColor: theme.border }}
+          >
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.ink }}>Şimdi değil</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Kaydet"
+            onPress={() => {
+              void (async () => {
+                await updateSettings(database, { startDate: startDateDraft });
+                setSettings((s) => s ? { ...s, startDate: startDateDraft } : s);
+                setPromptDismissed(true);
+                void saveStartDatePromptDismissed(database);
+                setStartDateSheetVisible(false);
+              })();
+            }}
+            style={{ flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center', borderRadius: layout.radius.control, backgroundColor: theme.accent }}
+          >
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.onInk }}>Kaydet</Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
 
       {/* FAB — mesai/izin ekle for today */}
       <Pressable
