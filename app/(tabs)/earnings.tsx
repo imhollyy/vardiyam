@@ -379,10 +379,22 @@ export default function EarningsScreen() {
                   {`Planlı: ${overtimeHoursStr(statement.scheduledOvertimeMinutes)} · Elle: ${overtimeHoursStr(statement.manualOvertimeMinutes)}`}
                 </Text>
               )}
+              {statement.hourlyLeaveOffsetMinutes > 0 && (
+                <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption, paddingLeft: 44, paddingBottom: 6 }}>
+                  {`Saatlik izin: ${overtimeHoursStr(statement.hourlyLeaveOffsetMinutes)} mesaiden düşüldü`}
+                </Text>
+              )}
             </View>
             <ListRow icon="flag-outline" label="Tatil primi" value={formatTryMinor(statement.holidayBonusMinor)} />
             <ListRow icon="cash-outline" label="Ek gelirler" value={formatTryMinor(statement.extraIncomeMinor)} />
-            <ListRow icon="remove-circle-outline" label="Kesintiler" value={`−${formatTryMinor(statement.deductionMinor)}`} />
+            <View>
+              <ListRow icon="remove-circle-outline" label="Kesintiler" value={`−${formatTryMinor(statement.deductionMinor)}`} />
+              {statement.hourlyLeaveDeductionMinor > 0 && (
+                <Text style={{ fontFamily: fonts.regular, color: theme.muted, fontSize: layout.type.caption, paddingLeft: 44, paddingBottom: 6 }}>
+                  {`Saatlik izin kesintisi · −${formatTryMinor(statement.hourlyLeaveDeductionMinor)}`}
+                </Text>
+              )}
+            </View>
           </Card>
 
           <Pressable

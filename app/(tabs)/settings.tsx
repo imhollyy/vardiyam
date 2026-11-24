@@ -27,7 +27,8 @@ import {
 import type { ShiftCycle, ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { getLocalToday, mondayOfLocalDate } from '@/src/features/shifts/dates';
 import { getSettings, updateSettings } from '@/src/data/settingsRepository';
-import type { Settings } from '@/src/domain/payroll/types';
+import type { Settings, HourlyLeavePolicy } from '@/src/domain/payroll/types';
+import { HOURLY_LEAVE_POLICY } from '@/src/domain/payroll/types';
 import { formatMoneyInput, formatTryMinor, parseTryMinor } from '@/src/domain/money';
 import { MoneyField } from '@/src/components/ui/MoneyField';
 import { fonts, layout } from '@/src/theme/tokens';
@@ -376,6 +377,54 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* Hourly leave policy */}
+        {appSettings && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <SectionHeading icon="time-outline" title="Saatlik izin kuralı" theme={theme} />
+            {[
+              {
+                value: HOURLY_LEAVE_POLICY.BASE_PAY as HourlyLeavePolicy,
+                title: 'Maaşımdan kesilsin',
+                description: 'Mesain etkilenmez, izin saatin maaşından kesilir.',
+              },
+              {
+                value: HOURLY_LEAVE_POLICY.OVERTIME_FIRST as HourlyLeavePolicy,
+                title: 'Önce mesaimden düşülsün',
+                description: 'Mesain varsa izin saatin oradan düşülür, yetmezse maaşından kesilir.',
+              },
+            ].map((opt) => {
+              const selected = appSettings.hourlyLeavePolicy === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={opt.title}
+                  onPress={() => {
+                    void updateSettings(database, { hourlyLeavePolicy: opt.value }).then(() =>
+                      getSettings(database).then(setAppSettings),
+                    );
+                  }}
+                  style={[
+                    styles.hlpOption,
+                    {
+                      borderColor: selected ? theme.ink : theme.border,
+                      borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+                      backgroundColor: selected ? theme.surfaceMuted : theme.surface,
+                    },
+                  ]}
+                >
+                  <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={20} color={selected ? theme.ink : theme.muted} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>{opt.title}</Text>
+                    <Text style={{ color: theme.muted, fontSize: layout.type.caption, marginTop: 2 }}>{opt.description}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
         {/* Shift schedule */}
         {loading ? (
           <View accessibilityLiveRegion="polite" style={styles.statusRow}>
@@ -506,4 +555,5 @@ const styles = StyleSheet.create({
   modalSheet: { borderWidth: 1, borderRadius: 24, padding: 24, gap: 16 },
   modalTitle: { fontFamily: fonts.extraBold, fontSize: layout.type.heading },
   modalCancel: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
+  hlpOption: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, padding: 12, minHeight: 44 },
 });

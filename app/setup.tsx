@@ -7,8 +7,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { markSetupCompleted, updateSettings } from '@/src/data/settingsRepository';
 import { saveShiftSchedule } from '@/src/data/shiftCycleRepository';
-import type { SalaryType } from '@/src/domain/payroll/types';
-import { PAYDAY_LAST } from '@/src/domain/payroll/types';
+import type { SalaryType, HourlyLeavePolicy } from '@/src/domain/payroll/types';
+import { PAYDAY_LAST, HOURLY_LEAVE_POLICY } from '@/src/domain/payroll/types';
 import { buildSetupPayload } from '@/src/features/setup/buildSetupPayload';
 import {
   ScheduleEditor,
@@ -95,6 +95,7 @@ export default function SetupScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBesSheet, setShowBesSheet] = useState(false);
+  const [hourlyLeavePolicy, setHourlyLeavePolicy] = useState<HourlyLeavePolicy>(HOURLY_LEAVE_POLICY.BASE_PAY);
 
   const currentStep = STEPS[step]!;
   const meta = STEP_META[currentStep];
@@ -151,6 +152,7 @@ export default function SetupScreen() {
         besEnabled: payload.besEnabled,
         besRateBp: payload.besRateBp,
         startDate: null,
+        hourlyLeavePolicy,
       });
       await saveShiftSchedule(database, payload.templates, payload.cycle, payload.effectiveFrom);
       await markSetupCompleted(database);
@@ -160,7 +162,7 @@ export default function SetupScreen() {
     } finally {
       setSaving(false);
     }
-  }, [database, salary, schedule, router]);
+  }, [database, salary, schedule, router, hourlyLeavePolicy]);
 
   const handleNext = useCallback(() => {
     if (isLast) { void handleFinish(); }
@@ -280,6 +282,13 @@ export default function SetupScreen() {
                 <SummaryRow key={i} label={td.name} value={`${td.startLocalTime} – ${td.endLocalTime}`} theme={theme} />
               ))}
             </Card>
+            <Card>
+              <CardHeader icon="time-outline" title="Saatlik izin aldığında" />
+              <HourlyLeavePolicySelector value={hourlyLeavePolicy} onChange={setHourlyLeavePolicy} theme={theme} />
+              <Text style={[styles.hint, { color: theme.muted, marginTop: 8 }]}>
+                {'Emin değilsen sonra Ayarlar\'dan değiştirebilirsin.'}
+              </Text>
+            </Card>
             <Text style={[styles.hint, { color: theme.muted }]}>
               {`İşe başlama tarihinizi daha sonra Ayarlar'dan ekleyebilirsiniz.`}
             </Text>
@@ -337,6 +346,71 @@ export default function SetupScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const HOURLY_LEAVE_OPTIONS: { value: HourlyLeavePolicy; title: string; description: string }[] = [
+  {
+    value: HOURLY_LEAVE_POLICY.BASE_PAY,
+    title: 'Maaşımdan kesilsin',
+    description: 'Mesain etkilenmez, izin saatin maaşından kesilir.',
+  },
+  {
+    value: HOURLY_LEAVE_POLICY.OVERTIME_FIRST,
+    title: 'Önce mesaimden düşülsün',
+    description: 'Mesain varsa izin saatin oradan düşülür, yetmezse maaşından kesilir.',
+  },
+];
+
+function HourlyLeavePolicySelector({
+  value,
+  onChange,
+  theme,
+}: {
+  value: HourlyLeavePolicy;
+  onChange: (v: HourlyLeavePolicy) => void;
+  theme: Record<string, string>;
+}) {
+  return (
+    <View style={{ gap: 8, marginTop: 4 }}>
+      {HOURLY_LEAVE_OPTIONS.map((opt) => {
+        const selected = value === opt.value;
+        return (
+          <Pressable
+            key={opt.value}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            accessibilityLabel={opt.title}
+            onPress={() => onChange(opt.value)}
+            style={[
+              hlpStyles.optionCard,
+              {
+                borderColor: selected ? theme.ink : theme.border,
+                borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+                backgroundColor: selected ? theme.surfaceMuted : theme.surface,
+              },
+            ]}
+          >
+            <View style={hlpStyles.optionRow}>
+              <Ionicons
+                name={selected ? 'radio-button-on' : 'radio-button-off'}
+                size={20}
+                color={selected ? theme.ink : theme.muted}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>{opt.title}</Text>
+                <Text style={{ color: theme.muted, fontSize: layout.type.caption, marginTop: 2 }}>{opt.description}</Text>
+              </View>
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const hlpStyles = StyleSheet.create({
+  optionCard: { borderRadius: layout.radius.control, padding: 12 },
+  optionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+});
 
 function SummaryRow({ label, value, theme }: { label: string; value: string; theme: Record<string, string> }) {
   return (

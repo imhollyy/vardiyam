@@ -5,11 +5,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getDayEntry, upsertDayEntry, deleteDayEntry } from '@/src/data/dayEntryRepository';
+import { getSettings } from '@/src/data/settingsRepository';
 import type { DayEntryPatch } from '@/src/data/dayEntryRepository';
 import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
 import { resolvePlannedTemplates, enumerateDays } from '@/src/domain/payroll/index';
-import type { LeaveType } from '@/src/domain/payroll/types';
+import type { LeaveType, HourlyLeavePolicy } from '@/src/domain/payroll/types';
+import { HOURLY_LEAVE_POLICY } from '@/src/domain/payroll/types';
 import { buildDayEntryPatch, buildSaveSummary, leaveDefaultDeducted, type QuickMode } from '@/src/features/dayEdit/buildDayEntryPatch';
+import { HOURLY_RATE_DIVISOR } from '@/src/config/payroll';
 import { getCoachmarkDismissed, saveCoachmarkDismissed } from '@/src/data/appPreferencesRepository';
 import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
@@ -96,6 +99,8 @@ export default function DayEditScreen() {
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const [plannedTemplateId, setPlannedTemplateId] = useState<string | null>(null);
 
+  const [hourlyLeavePolicy, setHourlyLeavePolicy] = useState<HourlyLeavePolicy>(HOURLY_LEAVE_POLICY.BASE_PAY);
+  const [salaryMinorForRate, setSalaryMinorForRate] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
   const [dayEditCoachmark, setDayEditCoachmark] = useState(false);
   const coachmarkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,11 +133,16 @@ export default function DayEditScreen() {
     if (!localDate) return;
     let active = true;
     void (async () => {
-      const [entry, tmpl, cycles] = await Promise.all([
+      const [entry, tmpl, cycles, settings] = await Promise.all([
         getDayEntry(database, localDate),
         listShiftTemplates(database),
         listShiftCycles(database),
+        getSettings(database),
       ]);
+      if (active) {
+        setHourlyLeavePolicy(settings.hourlyLeavePolicy);
+        setSalaryMinorForRate(settings.salaryMinor);
+      }
       if (!active) return;
       setTemplates(tmpl);
       const entryMap = entry ? new Map([[localDate, entry]]) : new Map<string, typeof entry>();
@@ -421,9 +431,23 @@ export default function DayEditScreen() {
               ))}
             </View>
           )}
-          {isLeaveActive && (
+          {isLeaveActive && leaveType !== 'HOURLY' && (
             <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.muted }}>
               {leaveIsDeductedByDefault ? 'Maaştan kesilir' : 'Maaştan kesilmez'}
+            </Text>
+          )}
+          {isLeaveActive && leaveType === 'HOURLY' && (
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.muted }}>
+              {hourlyLeavePolicy === HOURLY_LEAVE_POLICY.OVERTIME_FIRST
+                ? 'Önce bu maaştaki mesainden düşülür.'
+                : (() => {
+                  if (leaveHourly > 0 && salaryMinorForRate > 0) {
+                    const rate = Math.round(salaryMinorForRate / HOURLY_RATE_DIVISOR);
+                    const amt = (rate * leaveHourly / 100).toFixed(2).replace('.', ',');
+                    return `Maaşından kesilir · ≈ −${amt} ₺`;
+                  }
+                  return 'Maaşından kesilir.';
+                })()}
             </Text>
           )}
           {quickMode === 'leave' && leaveType === 'HOURLY' && (
