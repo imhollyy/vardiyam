@@ -6,10 +6,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getAllExtraIncomes, createExtraIncome, deleteExtraIncome, type CreateExtraIncomeInput } from '@/src/data/extraIncomeRepository';
 import type { ExtraIncome, ExtraIncomeType, ExtraIncomeFrequency } from '@/src/domain/payroll/types';
-import { formatMoneyInput, formatTryMinor, parseTryMinor } from '@/src/domain/money';
+import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout } from '@/src/theme/tokens';
 import { Card, CardHeader } from '@/src/components/ui/Card';
+import { MoneyField } from '@/src/components/ui/MoneyField';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
@@ -178,14 +179,11 @@ export default function AdditionalIncomeScreen() {
               accessibilityLabel="Özel gelir adı"
             />
           )}
-          <TextInput
-            style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.background, fontFamily: fonts.extraBold }]}
+          <MoneyField
+            label="Tutar"
             value={amountText}
-            onChangeText={(raw) => setAmountText(formatMoneyInput(raw))}
-            placeholder="Tutar (₺)"
-            placeholderTextColor={theme.muted}
-            keyboardType="decimal-pad"
-            accessibilityLabel="Ek gelir tutarı"
+            onChangeText={setAmountText}
+            placeholder="0"
           />
           {frequency !== 'MONTHLY' && (
             <DateTimePickerField

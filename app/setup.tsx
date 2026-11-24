@@ -17,6 +17,7 @@ import { parseTryMinor, formatTryMinor } from '@/src/domain/money';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
+import { MoneyField } from '@/src/components/ui/MoneyField';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 import { ProgressDots } from '@/src/components/ui/ProgressDots';
@@ -276,14 +277,12 @@ export default function SetupScreen() {
           <View style={styles.stepBody}>
             <Card>
               <CardHeader icon="cash-outline" title="Aylık maaş" />
-              <TextInput
-                style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
+              <MoneyField
+                label="Aylık maaş (TL)"
                 value={draft.salaryText}
-                onChangeText={(t) => setDraft((d) => ({ ...d, salaryText: t }))}
+                onChangeText={(v) => setDraft((d) => ({ ...d, salaryText: v }))}
                 placeholder="Örn: 22.500"
-                placeholderTextColor={theme.muted}
-                keyboardType="decimal-pad"
-                accessibilityLabel="Maaş tutarı"
+                autoFocus
               />
             </Card>
             <Card>

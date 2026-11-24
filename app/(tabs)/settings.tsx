@@ -39,7 +39,8 @@ import {
 } from '@/src/features/shifts/schedule';
 import { getSettings, updateSettings } from '@/src/data/settingsRepository';
 import type { Settings } from '@/src/domain/payroll/types';
-import { formatTryMinor, parseTryMinor } from '@/src/domain/money';
+import { formatMoneyInput, formatTryMinor, parseTryMinor } from '@/src/domain/money';
+import { MoneyField } from '@/src/components/ui/MoneyField';
 import { fonts, layout } from '@/src/theme/tokens';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { PageHeading } from '@/src/components/ui/PageHeading';
@@ -301,7 +302,7 @@ export default function SettingsScreen() {
 
   const startSalaryEdit = () => {
     if (!appSettings) return;
-    setSalaryRaw((appSettings.salaryMinor / 100).toFixed(2));
+    setSalaryRaw(formatMoneyInput(String(Math.round(appSettings.salaryMinor / 100))));
     setSalaryTypeEdit(appSettings.salaryType);
     setPaydayRaw(appSettings.payday === 'LAST' ? '' : String(appSettings.payday));
     setBesEnabledEdit(appSettings.besEnabled);
@@ -386,7 +387,7 @@ export default function SettingsScreen() {
           <SectionHeading icon="wallet-outline" title="Ücret bilgileri" theme={theme} />
           {editingSalary ? (
             <>
-              <Field label="Maaş (TL)" value={salaryRaw} onChangeText={setSalaryRaw} theme={theme} placeholder="Örn. 25000.00" keyboardType="numbers-and-punctuation" />
+              <MoneyField label="Maaş" value={salaryRaw} onChangeText={setSalaryRaw} placeholder="Örn. 25.000" />
               <Text style={[styles.fieldLabel, { color: theme.muted }]}>Maaş türü</Text>
               <View style={styles.chipWrap}>
                 {(['GROSS', 'NET'] as const).map((type) => (
