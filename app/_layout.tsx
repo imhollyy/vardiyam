@@ -78,7 +78,6 @@ function ThemedRouter() {
         <Stack.Screen name="additional-income" />
         <Stack.Screen name="legal/kvkk" />
         <Stack.Screen name="legal/privacy" />
-        {__DEV__ && <Stack.Screen name="_dev/components" />}
       </Stack>
     </>
   );
