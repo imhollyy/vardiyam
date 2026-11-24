@@ -1,42 +1,72 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getDayEntry, upsertDayEntry, deleteDayEntry } from '@/src/data/dayEntryRepository';
-import { getSettings } from '@/src/data/settingsRepository';
+import type { DayEntryPatch } from '@/src/data/dayEntryRepository';
 import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
-import { resolvePlannedTemplates, enumerateDays, calculateOvertime, type Settings } from '@/src/domain/payroll/index';
+import { resolvePlannedTemplates, enumerateDays } from '@/src/domain/payroll/index';
 import type { LeaveType } from '@/src/domain/payroll/types';
 import { buildDayEntryPatch, buildSaveSummary, leaveDefaultDeducted, type QuickMode } from '@/src/features/dayEdit/buildDayEntryPatch';
 import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
-import { formatTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
 import { Card } from '@/src/components/ui/Card';
 import { Stepper } from '@/src/components/ui/Stepper';
 import { ActionButton } from '@/src/components/ui/ActionButton';
-import { QuickTile, QuickTileGrid } from '@/src/components/ui/QuickTile';
-import { QuickChips } from '@/src/components/ui/QuickChips';
 import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
 
-const LEAVE_OPTIONS: { value: LeaveType; label: string; deducted: boolean }[] = [
-  { value: 'ANNUAL', label: 'Yıllık izin', deducted: false },
-  { value: 'UNPAID', label: 'Ücretsiz izin', deducted: true },
-  { value: 'SICK', label: 'Hastalık raporu', deducted: false },
-  { value: 'EXCUSE', label: 'Mazeret izni', deducted: true },
-  { value: 'MATERNITY', label: 'Doğum izni', deducted: false },
-  { value: 'BEREAVEMENT', label: 'Ölüm izni', deducted: false },
-  { value: 'SOCIAL', label: 'Sosyal izin', deducted: false },
-  { value: 'HOURLY', label: 'Saatlik izin', deducted: true },
+// --- Leave type config ----------------------------------------------------------
+
+const PRIMARY_LEAVE: { value: LeaveType; label: string }[] = [
+  { value: 'ANNUAL', label: 'Yıllık' },
+  { value: 'SICK', label: 'Raporlu' },
+  { value: 'UNPAID', label: 'Ücretsiz' },
 ];
 
+const OTHER_LEAVE: { value: LeaveType; label: string }[] = [
+  { value: 'EXCUSE', label: 'Mazeret' },
+  { value: 'MATERNITY', label: 'Doğum' },
+  { value: 'BEREAVEMENT', label: 'Ölüm' },
+  { value: 'SOCIAL', label: 'Sosyal' },
+  { value: 'HOURLY', label: 'Saatlik' },
+];
+
+const OTHER_LEAVE_CODES = new Set<LeaveType>(['EXCUSE', 'MATERNITY', 'BEREAVEMENT', 'SOCIAL', 'HOURLY']);
+
+// --- Helpers -------------------------------------------------------------------
+
 function formatDisplayDate(localDate: string): string {
-  const [y, m, d] = localDate.split('-');
+  const [, m, d] = localDate.split('-');
   const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-  return `${Number(d)} ${months[Number(m) - 1] ?? ''} ${y}`;
+  return `${Number(d)} ${months[Number(m) - 1] ?? ''}`;
 }
+
+// --- Chip component ----------------------------------------------------------
+
+function Chip({ label, selected, onPress, theme }: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  theme: ReturnType<typeof useAppTheme>['theme'];
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={{ paddingHorizontal: 14, paddingVertical: 8, minHeight: 36, borderRadius: layout.radius.control, borderWidth: selected ? 0 : 1, borderColor: theme.border, backgroundColor: selected ? theme.ink : theme.surface, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: selected ? theme.onInk : theme.ink }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+// --- Main screen ---------------------------------------------------------------
 
 export default function DayEditScreen() {
   const { theme, mode } = useAppTheme();
@@ -54,53 +84,85 @@ export default function DayEditScreen() {
   const [leaveDeducted, setLeaveDeducted] = useState(false);
   const [shiftOverrideId, setShiftOverrideId] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  const [noteExpanded, setNoteExpanded] = useState(false);
+
+  const [leaveOtherExpanded, setLeaveOtherExpanded] = useState(false);
+  const [otherSectionOpen, setOtherSectionOpen] = useState(false);
+  const [overtimeDiger, setOvertimeDiger] = useState(false);
+  const [lateEarlyDiger, setLateEarlyDiger] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [settings, setSettings] = useState<Settings | null>(null);
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const [plannedTemplateId, setPlannedTemplateId] = useState<string | null>(null);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastAnim = useMemo(() => new Animated.Value(0), []);
+  const prevPatchRef = useRef<DayEntryPatch | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+  }, []);
 
   useEffect(() => {
     if (!localDate) return;
     let active = true;
     void (async () => {
-      const [entry, s, tmpl, cycles] = await Promise.all([
+      const [entry, tmpl, cycles] = await Promise.all([
         getDayEntry(database, localDate),
-        getSettings(database),
         listShiftTemplates(database),
         listShiftCycles(database),
       ]);
       if (!active) return;
-      setSettings(s);
       setTemplates(tmpl);
       const entryMap = entry ? new Map([[localDate, entry]]) : new Map<string, typeof entry>();
       const planned = resolvePlannedTemplates(enumerateDays(localDate, localDate), cycles, tmpl, entryMap as Map<string, NonNullable<typeof entry>>);
       setPlannedTemplateId(planned.get(localDate) ?? null);
+
       if (entry) {
         setIsDirty(true);
+        prevPatchRef.current = {
+          overtimeMinutes: entry.overtimeMinutes,
+          lateEarlyMinutes: entry.lateEarlyMinutes,
+          leaveType: entry.leaveType,
+          leaveHalfDay: entry.leaveHalfDay,
+          leaveHours: entry.leaveHours ?? 0,
+          deductOverride: entry.deductOverride ?? null,
+          note: entry.note ?? null,
+          shiftOverrideId: entry.shiftOverrideId,
+        };
+
+        // Always load these
+        setNote(entry.note ?? '');
+        setShiftOverrideId(entry.shiftOverrideId);
+
         if (entry.overtimeMinutes > 0) {
-          setOvertimeHours(entry.overtimeMinutes / 60);
+          const h = entry.overtimeMinutes / 60;
+          setOvertimeHours(h);
           setQuickMode('overtime');
+          if (![1, 2, 3].includes(h)) setOvertimeDiger(true);
         } else if (entry.lateEarlyMinutes > 0) {
-          setLateEarlyHours(entry.lateEarlyMinutes / 60);
+          const h = entry.lateEarlyMinutes / 60;
+          setLateEarlyHours(h);
           setQuickMode('lateEarly');
+          if (![0.5, 1, 2].includes(h)) setLateEarlyDiger(true);
         } else if (entry.leaveType) {
           setLeaveType(entry.leaveType);
           setLeaveHalfDay(entry.leaveHalfDay);
           setLeaveHourly(entry.leaveHours ?? 0);
           setLeaveDeducted(entry.deductOverride ?? leaveDefaultDeducted(entry.leaveType));
           setQuickMode('leave');
-        } else if (entry.shiftOverrideId) {
-          setShiftOverrideId(entry.shiftOverrideId);
-          setQuickMode('shiftOverride');
+          if (OTHER_LEAVE_CODES.has(entry.leaveType)) setLeaveOtherExpanded(true);
         }
-        setNote(entry.note ?? '');
-        if (entry.note) setNoteExpanded(true);
+
+        if (entry.shiftOverrideId || entry.note) setOtherSectionOpen(true);
+        if (entry.leaveType && (entry.leaveHalfDay || entry.deductOverride !== null)) setOtherSectionOpen(true);
       }
     })();
     return () => { active = false; };
   }, [database, localDate]);
+
+  // --- Save/undo ----------------------------------------------------------------
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -111,81 +173,86 @@ export default function DayEditScreen() {
       } else {
         await upsertDayEntry(database, localDate, patch);
       }
-      router.back();
+      setSaving(false);
+      setToastVisible(true);
+      Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      toastTimerRef.current = setTimeout(() => {
+        Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+          setToastVisible(false);
+          router.back();
+        });
+        toastTimerRef.current = null;
+      }, 5000);
     } catch {
       setSaving(false);
     }
-  }, [database, localDate, quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note, router]);
+  }, [database, localDate, quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note, router, toastAnim]);
+
+  const handleUndo = useCallback(async () => {
+    if (toastTimerRef.current) { clearTimeout(toastTimerRef.current); toastTimerRef.current = null; }
+    try {
+      const prev = prevPatchRef.current;
+      if (prev === null) {
+        await deleteDayEntry(database, localDate);
+      } else {
+        await upsertDayEntry(database, localDate, prev);
+      }
+    } catch { /* best effort */ }
+    Animated.timing(toastAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+      setToastVisible(false);
+      router.back();
+    });
+  }, [database, localDate, router, toastAnim]);
 
   const handleReset = useCallback(() => {
-    setQuickMode(null);
-    setOvertimeHours(0);
-    setLateEarlyHours(0);
-    setLeaveType(null);
-    setLeaveHalfDay(false);
-    setLeaveHourly(0);
-    setLeaveDeducted(false);
-    setShiftOverrideId(null);
-    setNote('');
-    setNoteExpanded(false);
+    setQuickMode(null); setOvertimeHours(0); setLateEarlyHours(0);
+    setLeaveType(null); setLeaveHalfDay(false); setLeaveHourly(0); setLeaveDeducted(false);
+    setShiftOverrideId(null); setNote('');
+    setLeaveOtherExpanded(false); setOvertimeDiger(false); setLateEarlyDiger(false);
     setIsDirty(false);
   }, []);
 
-  const selectMode = (m: QuickMode) => {
-    if (m === 'leave' && quickMode !== 'leave') {
-      if (overtimeHours > 0 || lateEarlyHours > 0) {
-        const hours = overtimeHours > 0 ? overtimeHours : lateEarlyHours;
-        const kind = overtimeHours > 0 ? 'mesaisi' : 'gec/erkeni';
-        Alert.alert(
-          'Izin eklenecek',
-          `Bu gunun +${hours} sa ${kind} silinecek.`,
-          [
-            { text: 'Iptal', style: 'cancel' },
-            {
-              text: 'Devam',
-              onPress: () => {
-                setOvertimeHours(0);
-                setLateEarlyHours(0);
-                setQuickMode('leave');
-              },
-            },
-          ],
-        );
-        return;
-      }
-      setOvertimeHours(0);
-      setLateEarlyHours(0);
-      setQuickMode('leave');
-      return;
-    }
-    setQuickMode((prev) => {
-      if (prev === m) return null;
-      if (m === 'overtime' || m === 'lateEarly') {
-        setLeaveType(null);
-        setLeaveHalfDay(false);
-        setLeaveHourly(0);
-        setLeaveDeducted(false);
-      }
-      return m;
-    });
-  };
+  // --- Leave selection ---------------------------------------------------------
 
-  const isFullDayLeave = quickMode === 'leave' && leaveType !== null && leaveType !== 'HOURLY';
+  const selectLeave = useCallback((type: LeaveType) => {
+    const doSelect = () => {
+      setOvertimeHours(0); setLateEarlyHours(0);
+      setLeaveType(type); setLeaveDeducted(leaveDefaultDeducted(type));
+      setQuickMode('leave'); setOvertimeDiger(false); setLateEarlyDiger(false);
+    };
+    if (overtimeHours > 0 || lateEarlyHours > 0) {
+      const h = overtimeHours > 0 ? overtimeHours : lateEarlyHours;
+      const kind = overtimeHours > 0 ? 'mesaisi' : 'gec/erkeni';
+      Alert.alert('Izin eklenecek', `Bu gunun +${h} sa ${kind} silinecek.`, [
+        { text: 'Iptal', style: 'cancel' },
+        { text: 'Devam', onPress: doSelect },
+      ]);
+    } else { doSelect(); }
+  }, [overtimeHours, lateEarlyHours]);
+
+  const deselectLeave = useCallback(() => {
+    setLeaveType(null); setLeaveHalfDay(false); setLeaveHourly(0); setLeaveDeducted(false);
+    setLeaveOtherExpanded(false); setQuickMode(null);
+  }, []);
+
+  // --- Derived -----------------------------------------------------------------
+
+  const isLeaveActive = quickMode === 'leave' && leaveType !== null;
+  const isFullDayLeave = isLeaveActive && leaveType !== 'HOURLY';
+  const isLeaveOtherType = leaveType !== null && OTHER_LEAVE_CODES.has(leaveType);
+  const leaveIsDeductedByDefault = leaveType ? leaveDefaultDeducted(leaveType) : false;
 
   const saveSummary = buildSaveSummary({ quickMode, overtimeHours, lateEarlyHours, leaveType, leaveHalfDay, leaveHourly, leaveDeducted, shiftOverrideId, note });
-
-  if (!localDate) return null;
 
   const plannedTemplate = plannedTemplateId ? templates.find((t) => t.id === plannedTemplateId) : null;
   const headerPalette = shiftPalette.day[mode];
 
-  const overtimeEstimate = settings && overtimeHours > 0
-    ? calculateOvertime(Math.round(overtimeHours * 60), settings.salaryMinor)
-    : null;
-  const lateEarlyEstimate = settings && lateEarlyHours > 0
-    ? calculateOvertime(Math.round(lateEarlyHours * 60), settings.salaryMinor)
-    : null;
-  const leaveInfo = leaveType ? LEAVE_OPTIONS.find((o) => o.value === leaveType) : null;
+  const otActivePre = quickMode === 'overtime' && [1, 2, 3].includes(overtimeHours) ? overtimeHours : null;
+  const otDigerActive = quickMode === 'overtime' && otActivePre === null;
+  const leActivePre = quickMode === 'lateEarly' && [0.5, 1, 2].includes(lateEarlyHours) ? lateEarlyHours : null;
+  const leDigerActive = quickMode === 'lateEarly' && leActivePre === null;
+
+  if (!localDate) return null;
 
   return (
     <KeyboardAvoidingView
@@ -197,7 +264,7 @@ export default function DayEditScreen() {
         <View style={[styles.handleBar, { backgroundColor: theme.border }]} />
       </View>
 
-      {/* Header: vardiya renginde tarih + başlık */}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: headerPalette.background }]}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.section, color: headerPalette.text }}>
@@ -220,81 +287,185 @@ export default function DayEditScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-        {/* 2×2 QuickTile */}
-        <QuickTileGrid>
-          <View style={{ flex: 1, minWidth: '45%', opacity: isFullDayLeave ? 0.4 : 1 }}>
-            <QuickTile icon="timer-outline" label="Mesai yaptım" selected={quickMode === 'overtime'} onPress={isFullDayLeave ? () => {} : () => selectMode('overtime')} />
-          </View>
-          <View style={{ flex: 1, minWidth: '45%', opacity: isFullDayLeave ? 0.4 : 1 }}>
-            <QuickTile icon="trending-down-outline" label="Geç / erken çıktım" selected={quickMode === 'lateEarly'} onPress={isFullDayLeave ? () => {} : () => selectMode('lateEarly')} />
-          </View>
-          <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="bed-outline" label="İzinliydim" selected={quickMode === 'leave'} onPress={() => selectMode('leave')} />
-          </View>
-          <View style={{ flex: 1, minWidth: '45%' }}>
-            <QuickTile icon="swap-horizontal-outline" label="Vardiya farklıydı" selected={quickMode === 'shiftOverride'} onPress={() => selectMode('shiftOverride')} />
-          </View>
-        </QuickTileGrid>
-        {isFullDayLeave && (
-          <Text style={{ fontFamily: fonts.medium, fontSize: layout.type.caption, color: theme.muted, textAlign: 'center' }}>
-            Bu gun izinlisin. Mesai girmek icin once izni kaldir.
-          </Text>
-        )}
 
-        {/* Mesai kartı */}
-        {quickMode === 'overtime' && (
-          <Card>
-            <Text style={[styles.cardTitle, { color: theme.ink }]}>Fazla mesai</Text>
-            <QuickChips
-              options={[{ value: 1, label: '+1' }, { value: 2, label: '+2' }, { value: 3, label: '+3' }, { value: 4, label: '+4' }]}
-              selected={Number.isInteger(overtimeHours) && overtimeHours >= 1 && overtimeHours <= 4 ? overtimeHours : null}
-              onSelect={(v) => setOvertimeHours(v)}
-            />
-            <Stepper value={overtimeHours} onValueChange={setOvertimeHours} min={0} max={12} step={0.5} />
-            {overtimeEstimate !== null && (
-              <Text style={[styles.estimate, { color: theme.muted }]}>
-                ≈ +{formatTryMinor(overtimeEstimate)} bu döneme eklenecek
-              </Text>
-            )}
-          </Card>
-        )}
-
-        {/* Geç/erken kartı */}
-        {quickMode === 'lateEarly' && (
-          <Card>
-            <Text style={[styles.cardTitle, { color: theme.ink }]}>Geç kalma / erken çıkış</Text>
-            <QuickChips
-              options={[{ value: 1, label: '+1' }, { value: 2, label: '+2' }, { value: 3, label: '+3' }, { value: 4, label: '+4' }]}
-              selected={Number.isInteger(lateEarlyHours) && lateEarlyHours >= 1 && lateEarlyHours <= 4 ? lateEarlyHours : null}
-              onSelect={(v) => setLateEarlyHours(v)}
-            />
-            <Stepper value={lateEarlyHours} onValueChange={setLateEarlyHours} min={0} max={8} step={0.5} />
-            {lateEarlyEstimate !== null && (
-              <Text style={[styles.estimate, { color: theme.muted }]}>
-                ≈ −{formatTryMinor(lateEarlyEstimate)} bu dönemden düşülecek
-              </Text>
-            )}
-          </Card>
-        )}
-
-        {/* İzin kartı */}
-        {quickMode === 'leave' && (
-          <Card>
-            <Text style={[styles.cardTitle, { color: theme.ink }]}>İzin türü</Text>
-            <ChoiceGroup
-              options={LEAVE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-              selected={leaveType ?? ''}
-              onSelect={(v) => {
-                setLeaveType(v as LeaveType);
-                setLeaveDeducted(LEAVE_OPTIONS.find((o) => o.value === v)?.deducted ?? false);
+        {/* Row 1 — Mesai yaptım */}
+        <Card style={{ opacity: isFullDayLeave ? 0.4 : 1 }}>
+          <Text style={[styles.rowLabel, { color: theme.ink }]}>Mesai yaptım</Text>
+          <View style={styles.chipRow}>
+            {([{ v: 1, l: '+1 sa' }, { v: 2, l: '+2 sa' }, { v: 3, l: '+3 sa' }] as const).map(({ v, l }) => (
+              <Chip
+                key={l}
+                label={l}
+                selected={quickMode === 'overtime' && overtimeHours === v}
+                theme={theme}
+                onPress={() => {
+                  if (isFullDayLeave) return;
+                  if (quickMode === 'overtime' && overtimeHours === v) {
+                    setQuickMode(null); setOvertimeHours(0);
+                  } else {
+                    setLeaveType(null); setLeaveHalfDay(false); setLeaveHourly(0); setLeaveDeducted(false);
+                    setOvertimeHours(v); setQuickMode('overtime'); setOvertimeDiger(false);
+                  }
+                }}
+              />
+            ))}
+            <Chip
+              label="Diğer"
+              selected={otDigerActive}
+              theme={theme}
+              onPress={() => {
+                if (isFullDayLeave) return;
+                if (otDigerActive) {
+                  setQuickMode(null); setOvertimeHours(0); setOvertimeDiger(false);
+                } else {
+                  setLeaveType(null); setLeaveHalfDay(false); setLeaveHourly(0); setLeaveDeducted(false);
+                  setQuickMode('overtime'); setOvertimeDiger(true);
+                  if (overtimeHours === 0 || [1, 2, 3].includes(overtimeHours)) setOvertimeHours(4);
+                }
               }}
             />
-            {leaveInfo ? (
-              <View style={{ gap: 10, marginTop: 8 }}>
-                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.muted }}>
-                  {leaveInfo.deducted ? 'Maaştan kesilir' : 'Maaştan kesilmez'}
-                </Text>
-                {/* Tam / Yarım segment */}
+          </View>
+          {(overtimeDiger || otDigerActive) && quickMode === 'overtime' && (
+            <Stepper value={overtimeHours} onValueChange={setOvertimeHours} min={0} max={12} step={0.5} />
+          )}
+        </Card>
+
+        {/* Row 2 — İzinliydim */}
+        <Card>
+          <Text style={[styles.rowLabel, { color: theme.ink }]}>İzinliydim</Text>
+          <View style={styles.chipRow}>
+            {PRIMARY_LEAVE.map(({ value, label }) => (
+              <Chip
+                key={value}
+                label={label}
+                selected={quickMode === 'leave' && leaveType === value}
+                theme={theme}
+                onPress={() => {
+                  if (quickMode === 'leave' && leaveType === value) {
+                    deselectLeave();
+                  } else {
+                    selectLeave(value);
+                    setLeaveOtherExpanded(false);
+                  }
+                }}
+              />
+            ))}
+            <Chip
+              label="Diğer"
+              selected={isLeaveOtherType}
+              theme={theme}
+              onPress={() => {
+                if (isLeaveOtherType) {
+                  deselectLeave();
+                } else {
+                  setLeaveOtherExpanded((v) => !v);
+                }
+              }}
+            />
+          </View>
+          {(leaveOtherExpanded || isLeaveOtherType) && (
+            <View style={styles.chipRow}>
+              {OTHER_LEAVE.map(({ value, label }) => (
+                <Chip
+                  key={value}
+                  label={label}
+                  selected={quickMode === 'leave' && leaveType === value}
+                  theme={theme}
+                  onPress={() => {
+                    if (quickMode === 'leave' && leaveType === value) {
+                      deselectLeave();
+                    } else {
+                      selectLeave(value);
+                    }
+                  }}
+                />
+              ))}
+            </View>
+          )}
+          {isLeaveActive && (
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.muted }}>
+              {leaveIsDeductedByDefault ? 'Maaştan kesilir' : 'Maaştan kesilmez'}
+            </Text>
+          )}
+          {quickMode === 'leave' && leaveType === 'HOURLY' && (
+            <Stepper value={leaveHourly} onValueChange={setLeaveHourly} min={0} max={8} step={0.5} />
+          )}
+        </Card>
+
+        {/* Row 3 — Geç/erken */}
+        <Card style={{ opacity: isFullDayLeave ? 0.4 : 1 }}>
+          <Text style={[styles.rowLabel, { color: theme.ink }]}>Geç geldim / erken çıktım</Text>
+          <View style={styles.chipRow}>
+            {([{ v: 0.5, l: '+0,5 sa' }, { v: 1, l: '+1 sa' }, { v: 2, l: '+2 sa' }] as const).map(({ v, l }) => (
+              <Chip
+                key={l}
+                label={l}
+                selected={quickMode === 'lateEarly' && lateEarlyHours === v}
+                theme={theme}
+                onPress={() => {
+                  if (isFullDayLeave) return;
+                  if (quickMode === 'lateEarly' && lateEarlyHours === v) {
+                    setQuickMode(null); setLateEarlyHours(0);
+                  } else {
+                    setLeaveType(null); setLeaveHalfDay(false); setLeaveHourly(0); setLeaveDeducted(false);
+                    setLateEarlyHours(v); setQuickMode('lateEarly'); setLateEarlyDiger(false);
+                  }
+                }}
+              />
+            ))}
+            <Chip
+              label="Diğer"
+              selected={leDigerActive}
+              theme={theme}
+              onPress={() => {
+                if (isFullDayLeave) return;
+                if (leDigerActive) {
+                  setQuickMode(null); setLateEarlyHours(0); setLateEarlyDiger(false);
+                } else {
+                  setLeaveType(null); setLeaveHalfDay(false); setLeaveHourly(0); setLeaveDeducted(false);
+                  setQuickMode('lateEarly'); setLateEarlyDiger(true);
+                  if (lateEarlyHours === 0 || [0.5, 1, 2].includes(lateEarlyHours)) setLateEarlyHours(3);
+                }
+              }}
+            />
+          </View>
+          {(lateEarlyDiger || leDigerActive) && quickMode === 'lateEarly' && (
+            <Stepper value={lateEarlyHours} onValueChange={setLateEarlyHours} min={0} max={8} step={0.5} />
+          )}
+        </Card>
+
+        {/* Diğer seçenekler (collapsible) */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={otherSectionOpen ? 'Diğer seçenekleri gizle' : 'Diğer seçenekler'}
+          accessibilityState={{ expanded: otherSectionOpen }}
+          onPress={() => setOtherSectionOpen((v) => !v)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}
+        >
+          <Ionicons name={otherSectionOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
+          <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.muted }}>
+            Diğer seçenekler
+          </Text>
+        </Pressable>
+
+        {otherSectionOpen && (
+          <>
+            {/* Shift override */}
+            {templates.length > 0 && (
+              <Card>
+                <Text style={[styles.rowLabel, { color: theme.ink }]}>Vardiya farklıydı</Text>
+                <ChoiceGroup
+                  options={templates.map((t) => ({ value: t.id, label: `${t.name}  ${t.startLocalTime} – ${t.endLocalTime}` }))}
+                  selected={shiftOverrideId ?? ''}
+                  onSelect={(v) => setShiftOverrideId(v === shiftOverrideId ? null : v)}
+                />
+              </Card>
+            )}
+
+            {/* Half day — only for non-HOURLY leave */}
+            {isLeaveActive && leaveType !== 'HOURLY' && (
+              <Card>
+                <Text style={[styles.rowLabel, { color: theme.ink }]}>İzin süresi</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {(['Tam gün', 'Yarım gün'] as const).map((label) => {
                     const isHalf = label === 'Yarım gün';
@@ -312,71 +483,43 @@ export default function DayEditScreen() {
                     );
                   })}
                 </View>
-                {/* Saatlik giriş */}
-                {leaveType === 'HOURLY' && (
-                  <Stepper value={leaveHourly} onValueChange={setLeaveHourly} min={0} max={8} step={0.5} />
-                )}
-                {/* Maaştan kesilsin */}
-                {!leaveInfo.deducted && (
-                  <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: leaveDeducted }}
-                    onPress={() => setLeaveDeducted((v) => !v)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}
-                  >
-                    <View style={{ width: 22, height: 22, borderWidth: 2, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderColor: leaveDeducted ? theme.ink : theme.border, backgroundColor: leaveDeducted ? theme.ink : 'transparent' }}>
-                      {leaveDeducted && <Ionicons name="checkmark" size={14} color={theme.onInk} />}
-                    </View>
-                    <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>Maaştan kesilsin</Text>
-                  </Pressable>
-                )}
-              </View>
-            ) : null}
-          </Card>
-        )}
+              </Card>
+            )}
 
-        {/* Vardiya seçimi kartı */}
-        {quickMode === 'shiftOverride' && templates.length > 0 && (
-          <Card>
-            <Text style={[styles.cardTitle, { color: theme.ink }]}>Hangi vardiyaydı?</Text>
-            <ChoiceGroup
-              options={templates.map((t) => ({ value: t.id, label: `${t.name}  ${t.startLocalTime} – ${t.endLocalTime}` }))}
-              selected={shiftOverrideId ?? ''}
-              onSelect={(v) => setShiftOverrideId(v)}
-            />
-          </Card>
-        )}
+            {/* Deduct override — only when default is non-deducted */}
+            {isLeaveActive && !leaveIsDeductedByDefault && (
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: leaveDeducted }}
+                onPress={() => setLeaveDeducted((v) => !v)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 4 }}
+              >
+                <View style={{ width: 22, height: 22, borderWidth: 2, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderColor: leaveDeducted ? theme.ink : theme.border, backgroundColor: leaveDeducted ? theme.ink : 'transparent' }}>
+                  {leaveDeducted && <Ionicons name="checkmark" size={14} color={theme.onInk} />}
+                </View>
+                <Text style={{ fontFamily: fonts.semiBold, color: theme.ink, fontSize: layout.type.body }}>Maaştan kesilsin</Text>
+              </Pressable>
+            )}
 
-        {/* Not — katlanabilir */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={noteExpanded ? 'Notu gizle' : 'Not ekle'}
-          onPress={() => setNoteExpanded((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}
-        >
-          <Ionicons accessible={false} name={noteExpanded ? 'chevron-up' : 'chatbubble-outline'} size={18} color={theme.muted} />
-          <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.muted }}>
-            {noteExpanded ? 'Notu gizle' : (note ? `Not: ${note.slice(0, 40)}` : 'Not ekle')}
-          </Text>
-        </Pressable>
-        {noteExpanded && (
-          <Card>
-            <TextInput
-              style={[styles.noteInput, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface, fontFamily: fonts.regular }]}
-              value={note}
-              onChangeText={setNote}
-              placeholder="Bugüne dair not"
-              placeholderTextColor={theme.muted}
-              multiline
-              accessibilityLabel="Gün notu"
-            />
-          </Card>
+            {/* Note */}
+            <Card>
+              <TextInput
+                style={[styles.noteInput, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface, fontFamily: fonts.regular }]}
+                value={note}
+                onChangeText={setNote}
+                placeholder="Bugüne dair not"
+                placeholderTextColor={theme.muted}
+                multiline
+                accessibilityLabel="Gün notu"
+              />
+            </Card>
+          </>
         )}
       </ScrollView>
 
       {/* Footer */}
       <View style={[styles.footer, { borderTopColor: theme.border }]}>
-        {isDirty ? (
+        {isDirty && !toastVisible ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Varsayılana döndür"
@@ -392,9 +535,28 @@ export default function DayEditScreen() {
               {saveSummary}
             </Text>
           ) : null}
-          <ActionButton label={saving ? 'Kaydediliyor…' : 'Kaydet'} onPress={handleSave} disabled={saving} loading={saving} icon="checkmark" />
+          <ActionButton label={saving ? 'Kaydediliyor…' : 'Kaydet'} onPress={handleSave} disabled={saving || toastVisible} loading={saving} icon="checkmark" />
         </View>
       </View>
+
+      {/* Undo toast */}
+      {toastVisible && (
+        <Animated.View style={[styles.toast, { opacity: toastAnim, backgroundColor: theme.ink }]}>
+          <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.onInk, flex: 1 }}>
+            Kaydedildi
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Geri al"
+            onPress={handleUndo}
+            style={{ paddingHorizontal: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ fontFamily: fonts.bold, fontSize: layout.type.body, color: theme.onInk, textDecorationLine: 'underline' }}>
+              Geri al
+            </Text>
+          </Pressable>
+        </Animated.View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -405,9 +567,10 @@ const styles = StyleSheet.create({
   handleBar: { width: 36, height: 4, borderRadius: layout.radius.handle },
   header: { paddingHorizontal: layout.screen.horizontal, paddingVertical: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   form: { paddingHorizontal: layout.screen.horizontal, paddingBottom: 16, gap: layout.space.md, paddingTop: layout.space.sm },
-  cardTitle: { fontFamily: fonts.bold, fontSize: layout.type.body, marginBottom: 4 },
-  estimate: { fontFamily: fonts.medium, fontSize: layout.type.caption, lineHeight: 18 },
-  noteInput: { borderWidth: 1, borderRadius: layout.radius.input, paddingHorizontal: 14, paddingVertical: 12, fontSize: layout.type.body, minHeight: 80, textAlignVertical: 'top' },
+  rowLabel: { fontFamily: fonts.bold, fontSize: layout.type.body },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   footer: { flexDirection: 'row', gap: 12, paddingHorizontal: layout.screen.horizontal, paddingBottom: layout.screen.bottom, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
   resetButton: { width: 48, height: layout.control.minHeight, borderWidth: 1.5, borderRadius: layout.radius.control, alignItems: 'center', justifyContent: 'center' },
+  noteInput: { borderWidth: 1, borderRadius: layout.radius.input, paddingHorizontal: 14, paddingVertical: 12, fontSize: layout.type.body, minHeight: 80, textAlignVertical: 'top' },
+  toast: { position: 'absolute', bottom: 100, left: layout.screen.horizontal, right: layout.screen.horizontal, borderRadius: layout.radius.control, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, minHeight: 48 },
 });
