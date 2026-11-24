@@ -1,8 +1,9 @@
 import { Component, useEffect, type PropsWithChildren, type ErrorInfo } from 'react';
-import { ScrollView, Text } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as SystemUI from 'expo-system-ui';
 import {
   useFonts,
   PlusJakartaSans_400Regular,
@@ -50,6 +51,11 @@ export default function RootLayout() {
 
 function ThemedRouter() {
   const { mode, ready, theme } = useAppTheme();
+
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(theme.background);
+  }, [theme.background]);
+
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -65,7 +71,7 @@ function ThemedRouter() {
   if (!ready || !fontsLoaded) return null;
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="index" />
@@ -79,6 +85,6 @@ function ThemedRouter() {
         <Stack.Screen name="legal/kvkk" />
         <Stack.Screen name="legal/privacy" />
       </Stack>
-    </>
+    </View>
   );
 }
