@@ -12,13 +12,14 @@ import { getPayPeriodForDate } from '@/src/domain/payroll/index';
 import type { ShiftTemplate, CycleEntry, ShiftCycle } from '@/src/domain/shift-cycle/index';
 import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { fonts, layout } from '@/src/theme/tokens';
+import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
 import { parseTryMinor, formatTryMinor } from '@/src/domain/money';
 import { Screen } from '@/src/components/ui/Screen';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
+import { ProgressDots } from '@/src/components/ui/ProgressDots';
 
 const STEPS = ['salary', 'workSchedule', 'shiftHours', 'currentShift', 'startDate', 'summary'] as const;
 type StepId = (typeof STEPS)[number];
@@ -154,7 +155,7 @@ function getEffectiveSteps(draft: Draft): StepId[] {
 }
 
 export default function SetupScreen() {
-  const { theme } = useAppTheme();
+  const { theme, mode } = useAppTheme();
   const database = useAppDatabase();
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -165,6 +166,7 @@ export default function SetupScreen() {
   const effectiveSteps = useMemo(() => getEffectiveSteps(draft), [draft]);
   const currentStep = effectiveSteps[step]!;
   const meta = STEP_META[currentStep];
+  const dayPalette = shiftPalette.day[mode];
   const isFirst = step === 0;
   const isLast = step === effectiveSteps.length - 1;
 
@@ -175,7 +177,7 @@ export default function SetupScreen() {
           if (parseTryMinor(draft.salaryText) <= 0) return false;
         } catch { return false; }
         const n = Number(draft.payday);
-        return draft.payday === 'LAST' || (Number.isInteger(n) && n >= 1 && n <= 31);
+        return draft.payday === 'last' || (Number.isInteger(n) && n >= 1 && n <= 31);
       }
       case 'shiftHours':
         return draft.templateDrafts.every((t) => isValidTime(t.startLocalTime) && isValidTime(t.endLocalTime) && t.startLocalTime !== t.endLocalTime);
@@ -343,14 +345,7 @@ export default function SetupScreen() {
         <View style={[styles.stepIconCircle, { backgroundColor: theme.surfaceMuted }]}>
           <Ionicons accessible={false} name={meta.icon} size={22} color={theme.ink} />
         </View>
-        <Text style={[styles.stepLabel, { color: theme.muted }]}>
-          ADIM {step + 1}/{effectiveSteps.length}
-        </Text>
-        <View style={styles.dots}>
-          {effectiveSteps.map((_, i) => (
-            <View key={i} style={[styles.dot, { backgroundColor: i <= step ? theme.ink : theme.border }]} />
-          ))}
-        </View>
+        <ProgressDots total={effectiveSteps.length} current={step + 1} />
       </View>
 
       <Screen contentStyle={styles.scrollContent}>
@@ -376,22 +371,41 @@ export default function SetupScreen() {
             </Card>
             <Card>
               <CardHeader icon="calendar-number-outline" title="Maaş günü" />
-              <TextInput
-                style={[styles.input, { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface }]}
-                value={draft.payday}
-                onChangeText={(t) => {
-                  const upper = t.toUpperCase().trim();
-                  if (upper === 'S' || upper === 'SO' || upper === 'SON') {
-                    setDraft((d) => ({ ...d, payday: upper === 'SON' ? 'LAST' : upper }));
-                  } else {
-                    setDraft((d) => ({ ...d, payday: t.replace(/[^0-9]/g, '') }));
-                  }
-                }}
-                placeholder="Örn: 15 veya SON"
-                placeholderTextColor={theme.muted}
-                keyboardType="number-pad"
-                accessibilityLabel="Maaş günü"
-              />
+              <View style={styles.paydayGrid}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                  const val = String(day);
+                  const sel = draft.payday === val;
+                  return (
+                    <Pressable
+                      key={day}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ayın ${day}. günü`}
+                      accessibilityState={{ selected: sel }}
+                      onPress={() => setDraft((d) => ({ ...d, payday: val }))}
+                      style={[styles.paydayCell, {
+                        backgroundColor: sel ? dayPalette.background : theme.surface,
+                        borderColor: sel ? theme.ink : theme.border,
+                        borderWidth: sel ? 2 : 1,
+                      }]}
+                    >
+                      <Text style={{ fontFamily: sel ? fonts.extraBold : fonts.regular, fontSize: 13, color: sel ? dayPalette.text : theme.ink }}>{day}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ayın son günü"
+                accessibilityState={{ selected: draft.payday === 'last' }}
+                onPress={() => setDraft((d) => ({ ...d, payday: 'last' }))}
+                style={[styles.lastDayBtn, {
+                  backgroundColor: draft.payday === 'last' ? dayPalette.background : theme.surface,
+                  borderColor: draft.payday === 'last' ? theme.ink : theme.border,
+                  borderWidth: draft.payday === 'last' ? 2 : 1,
+                }]}
+              >
+                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: draft.payday === 'last' ? dayPalette.text : theme.ink }}>Ayın son günü</Text>
+              </Pressable>
             </Card>
             <Card>
               <CardHeader icon="shield-checkmark-outline" title="BES kesintisi" />
@@ -531,7 +545,7 @@ export default function SetupScreen() {
             <Card>
               <CardHeader icon="receipt-outline" title="Bilgilerin" />
               <SummaryRow label="Maaş" value={draft.salaryText ? `${formatTryMinor(parseTryMinor(draft.salaryText))} (${draft.salaryType === 'GROSS' ? 'Brüt' : 'Net'})` : '—'} theme={theme} />
-              <SummaryRow label="Maaş günü" value={draft.payday === 'LAST' ? 'Ayın son günü' : `Ayın ${draft.payday}'i`} theme={theme} />
+              <SummaryRow label="Maaş günü" value={draft.payday === 'last' ? 'Ayın son günü' : `Ayın ${draft.payday}'i`} theme={theme} />
               <SummaryRow label="BES" value={draft.besEnabled ? `Evet (%${Number(draft.besRateBp) / 100})` : 'Hayır'} theme={theme} />
               <SummaryRow label="Çalışma düzeni" value={WORK_SCHEDULE_OPTIONS.find((o) => o.value === draft.workSchedule)?.label ?? ''} theme={theme} />
               <SummaryRow label="Vardiya düzeni" value={SHIFT_PATTERN_OPTIONS.find((o) => o.value === draft.shiftPattern)?.label ?? ''} theme={theme} />
@@ -577,11 +591,11 @@ function SummaryRow({ label, value, theme }: { label: string; value: string; the
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  stepIndicator: { alignItems: 'center', paddingTop: 56, paddingBottom: 8, gap: 8 },
+  stepIndicator: { alignItems: 'center', paddingTop: 56, paddingBottom: 8, gap: 10 },
   stepIconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  stepLabel: { fontFamily: fonts.extraBold, fontSize: layout.type.caption, letterSpacing: 1.5 },
-  dots: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  paydayGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
+  paydayCell: { width: `${100 / 7}%` as `${number}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  lastDayBtn: { borderRadius: layout.radius.control, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 2 },
   scrollContent: { paddingBottom: 16, gap: layout.space.md },
   stepBody: { gap: layout.space.md },
   input: { borderWidth: 1, borderRadius: layout.radius.input, paddingHorizontal: 16, paddingVertical: 14, fontSize: layout.type.section, minHeight: layout.control.minHeight },
