@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
-import { getStartDatePromptDismissed, saveStartDatePromptDismissed } from '@/src/data/appPreferencesRepository';
+import { getStartDatePromptDismissed, saveStartDatePromptDismissed, getCoachmarkDismissed, saveCoachmarkDismissed } from '@/src/data/appPreferencesRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
 import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
 import {
@@ -66,6 +66,7 @@ export default function HomeScreen() {
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [promptDismissed, setPromptDismissed] = useState(false);
+  const [coachmarkVisible, setCoachmarkVisible] = useState(false);
 
   const todayYear = Number(today.split('-')[0]);
   const todayMonth = Number(today.split('-')[1]);
@@ -90,6 +91,7 @@ export default function HomeScreen() {
           const derived = deriveDays(allDates, entries, s, tmpl, cycles);
           const planned = resolvePlannedTemplates(allDates, cycles, tmpl, entries);
           const { statement, period } = await loadCurrentPeriodStatement(database, today);
+          const coachDismissed = await getCoachmarkDismissed(database, 'coachmark_home_v1');
           if (active) {
             setSettings(s);
             setPromptDismissed(dismissed);
@@ -98,6 +100,7 @@ export default function HomeScreen() {
             setPlannedMap(planned);
             setPeriodStatement(statement);
             setPeriodInfo(period);
+            if (!coachDismissed) setCoachmarkVisible(true);
           }
         } finally {
           if (active) setLoading(false);
@@ -130,6 +133,22 @@ export default function HomeScreen() {
   }, [plannedMap, templates, today]);
 
   const daysUntilPay = settings ? daysUntilPayday(today, settings.payday) : null;
+
+  const hasAnyEntry = useMemo(() => {
+    for (const d of dayMap.values()) {
+      if (d.overtimeMinutes > 0 || d.lateEarlyMinutes > 0 || d.leaveType !== null) return true;
+    }
+    return false;
+  }, [dayMap]);
+
+  const startDate = settings?.startDate ?? null;
+  const daysSinceStart = useMemo(() => {
+    if (!startDate) return null;
+    const [sy, sm, sd] = startDate.split('-').map(Number) as [number, number, number];
+    const [ty, tm, td] = today.split('-').map(Number) as [number, number, number];
+    const diff = new Date(ty, tm - 1, td).getTime() - new Date(sy, sm - 1, sd).getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  }, [startDate, today]);
 
   const leavePalette = shiftPalette.leave[mode];
 
@@ -218,6 +237,19 @@ export default function HomeScreen() {
           />
         )}
 
+        {/* Empty state */}
+        {!hasAnyEntry && settings?.setupCompleted && (
+          <View style={{ backgroundColor: theme.surfaceMuted, borderRadius: layout.radius.card, padding: layout.space.lg, alignItems: 'center', gap: layout.space.sm }}>
+            <Text style={{ fontSize: 32 }}>📅</Text>
+            <Text style={{ fontFamily: fonts.bold, fontSize: layout.type.section, color: theme.ink, textAlign: 'center' }}>
+              {daysSinceStart !== null && daysSinceStart <= 7 ? 'Henüz gün eklenmedi' : 'Bu ayki mesailerini ekledin mi?'}
+            </Text>
+            <Text style={{ fontFamily: fonts.regular, fontSize: layout.type.body, color: theme.muted, textAlign: 'center' }}>
+              Bir güne dokunarak mesai veya izin ekleyebilirsin
+            </Text>
+          </View>
+        )}
+
         {/* Start-date prompt */}
         {!settings?.startDate && !promptDismissed && (
           <View style={{ backgroundColor: theme.surfaceMuted, borderRadius: layout.radius.card, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -283,6 +315,26 @@ export default function HomeScreen() {
           onPress={() => router.push('/additional-income' as never)}
         />
       </ScrollView>
+
+      {/* Home coachmark — shown once after setup */}
+      {coachmarkVisible && (
+        <View style={{ position: 'absolute', bottom: 92, right: 16, maxWidth: 240, backgroundColor: theme.ink, borderRadius: layout.radius.card, padding: 14, gap: 8 }}>
+          <Text style={{ fontFamily: fonts.regular, fontSize: layout.type.body, color: theme.onInk, lineHeight: 20 }}>
+            Günü düzenlemek için bir güne dokun veya + düğmesine bas
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tamam, anladım"
+            onPress={() => {
+              setCoachmarkVisible(false);
+              void saveCoachmarkDismissed(database, 'coachmark_home_v1');
+            }}
+            style={{ alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 6, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: layout.radius.control, backgroundColor: theme.onInk }}
+          >
+            <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.ink }}>Tamam</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* FAB — mesai/izin ekle for today */}
       <Pressable

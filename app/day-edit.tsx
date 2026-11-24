@@ -10,6 +10,7 @@ import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleReposi
 import { resolvePlannedTemplates, enumerateDays } from '@/src/domain/payroll/index';
 import type { LeaveType } from '@/src/domain/payroll/types';
 import { buildDayEntryPatch, buildSaveSummary, leaveDefaultDeducted, type QuickMode } from '@/src/features/dayEdit/buildDayEntryPatch';
+import { getCoachmarkDismissed, saveCoachmarkDismissed } from '@/src/data/appPreferencesRepository';
 import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
@@ -57,7 +58,7 @@ function Chip({ label, selected, onPress, theme }: {
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={{ paddingHorizontal: 14, paddingVertical: 8, minHeight: 36, borderRadius: layout.radius.control, borderWidth: selected ? 0 : 1, borderColor: theme.border, backgroundColor: selected ? theme.ink : theme.surface, alignItems: 'center', justifyContent: 'center' }}
+      style={{ paddingHorizontal: 14, paddingVertical: 8, minHeight: 44, borderRadius: layout.radius.control, borderWidth: selected ? 0 : 1, borderColor: theme.border, backgroundColor: selected ? theme.ink : theme.surface, alignItems: 'center', justifyContent: 'center' }}
     >
       <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: selected ? theme.onInk : theme.ink }}>
         {label}
@@ -96,13 +97,32 @@ export default function DayEditScreen() {
   const [plannedTemplateId, setPlannedTemplateId] = useState<string | null>(null);
 
   const [toastVisible, setToastVisible] = useState(false);
+  const [dayEditCoachmark, setDayEditCoachmark] = useState(false);
+  const coachmarkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastAnim = useMemo(() => new Animated.Value(0), []);
   const prevPatchRef = useRef<DayEntryPatch | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (coachmarkTimer.current) clearTimeout(coachmarkTimer.current);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!localDate) return;
+    void (async () => {
+      const dismissed = await getCoachmarkDismissed(database, 'coachmark_dayedit_v1');
+      if (!dismissed) {
+        setDayEditCoachmark(true);
+        coachmarkTimer.current = setTimeout(() => {
+          setDayEditCoachmark(false);
+          void saveCoachmarkDismissed(database, 'coachmark_dayedit_v1');
+        }, 3000);
+      }
+    })();
+  }, [database, localDate]);
 
   useEffect(() => {
     if (!localDate) return;
@@ -285,6 +305,25 @@ export default function DayEditScreen() {
           <Ionicons name="close" size={20} color={headerPalette.text} />
         </Pressable>
       </View>
+
+      {/* Day-edit coachmark banner — shown once, auto-dismisses in 3s */}
+      {dayEditCoachmark && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Kapat ipucu"
+          onPress={() => {
+            if (coachmarkTimer.current) { clearTimeout(coachmarkTimer.current); coachmarkTimer.current = null; }
+            setDayEditCoachmark(false);
+            void saveCoachmarkDismissed(database, 'coachmark_dayedit_v1');
+          }}
+          style={{ backgroundColor: theme.accent, paddingHorizontal: layout.screen.horizontal, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+        >
+          <Ionicons name="information-circle-outline" size={16} color={theme.onInk} accessible={false} />
+          <Text style={{ flex: 1, fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.onInk }}>
+            İzin veya mesai eklemek için bir satıra dokun
+          </Text>
+        </Pressable>
+      )}
 
       <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
 
