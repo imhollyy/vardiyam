@@ -10,6 +10,7 @@ type MigrationDatabase = Pick<
 type Migration = {
   version: number;
   sql: string;
+  requiresFKOff?: boolean;
 };
 
 function canonicalLocalDateCheck(column: string): string {
@@ -169,6 +170,7 @@ export const migrations: readonly Migration[] = [
   },
   {
     version: 102,
+    requiresFKOff: true,
     sql: `
       CREATE TABLE shift_templates_v102 (
         id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
@@ -229,14 +231,30 @@ export async function runMigrations(database: MigrationDatabase): Promise<Migrat
       return { previousVersion: initialVersion, currentVersion: initialVersion, needsReset: false };
     }
 
-    await database.withTransactionAsync(async () => {
+    for (const migration of migrations) {
       const currentVersion = await getSchemaVersion(database);
-      for (const migration of migrations) {
-        if (migration.version <= currentVersion) continue;
-        await database.execAsync(migration.sql);
-        await database.execAsync('PRAGMA user_version = ' + migration.version + ';');
+      if (migration.version <= currentVersion) continue;
+
+      if (migration.requiresFKOff) {
+        // PRAGMA foreign_keys is a no-op inside a transaction; it must be set
+        // before the transaction begins so DDL (DROP TABLE + RENAME) can run
+        // without triggering FK constraint checks on referencing tables.
+        await database.execAsync('PRAGMA foreign_keys = OFF;');
+        try {
+          await database.withTransactionAsync(async () => {
+            await database.execAsync(migration.sql);
+            await database.execAsync('PRAGMA user_version = ' + migration.version + ';');
+          });
+        } finally {
+          await database.execAsync('PRAGMA foreign_keys = ON;');
+        }
+      } else {
+        await database.withTransactionAsync(async () => {
+          await database.execAsync(migration.sql);
+          await database.execAsync('PRAGMA user_version = ' + migration.version + ';');
+        });
       }
-    });
+    }
 
     return { previousVersion: initialVersion, currentVersion: CURRENT_SCHEMA_VERSION, needsReset: false };
   });
