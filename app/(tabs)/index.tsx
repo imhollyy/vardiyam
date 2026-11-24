@@ -134,7 +134,7 @@ export default function HomeScreen() {
         }
       })();
       return () => { active = false; };
-    }, [database, displayedMonday, today]),
+    }, [database, displayedMonday, today, week]),
   );
 
   const todayTemplateId = plannedMap.get(today);

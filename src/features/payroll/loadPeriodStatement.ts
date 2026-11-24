@@ -4,7 +4,8 @@ import { getSettings } from '../../data/settingsRepository.ts';
 import { getDayEntriesInRange } from '../../data/dayEntryRepository.ts';
 import { getAllExtraIncomes } from '../../data/extraIncomeRepository.ts';
 import { listShiftTemplates, listShiftCycles } from '../../data/shiftCycleRepository.ts';
-import { generateMonthlyStatement, getPayPeriodForDate, type MonthlyStatement } from '../../domain/payroll/index.ts';
+import { generateMonthlyStatement, getPayPeriodForDate, getPayPeriod, deriveDays, enumerateDays, type MonthlyStatement, type DerivedDay } from '../../domain/payroll/index.ts';
+import type { ShiftTemplate } from '../../domain/shift-cycle/index.ts';
 
 export type PeriodInfo = { start: string; end: string; label: string };
 
@@ -26,6 +27,40 @@ export async function loadPeriodStatement(
   const year = Number(period.end.split('-')[0]);
   const month = Number(period.end.split('-')[1]);
   return generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates, cycles);
+}
+
+export type PeriodDetails = {
+  statement: MonthlyStatement;
+  days: DerivedDay[];
+  templateMap: Map<string, Pick<ShiftTemplate, 'startLocalTime'>>;
+};
+
+/** Like loadPeriodStatement but also returns the DerivedDay list for analytics. */
+export async function loadPeriodDetails(
+  database: SQLiteDatabase,
+  period: PeriodInfo,
+  cumulativeTaxableMinor = 0,
+): Promise<PeriodDetails> {
+  const settings = await getSettings(database);
+  const templates = await listShiftTemplates(database);
+  const cycles = await listShiftCycles(database);
+  const extras = await getAllExtraIncomes(database);
+
+  const rangeStart = expandWeekStart(period.start);
+  const rangeEnd = expandWeekEnd(period.end);
+  const entries = await getDayEntriesInRange(database, rangeStart, rangeEnd);
+
+  const year = Number(period.end.split('-')[0]);
+  const month = Number(period.end.split('-')[1]);
+  const statement = generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates, cycles);
+
+  const { start, end } = getPayPeriod(year, month, settings.payday);
+  const periodDates = enumerateDays(start, end);
+  const days = deriveDays(periodDates, entries, settings, templates, cycles);
+
+  const templateMap = new Map(templates.map((t) => [t.id, { startLocalTime: t.startLocalTime }]));
+
+  return { statement, days, templateMap };
 }
 
 export async function loadCurrentPeriodStatement(

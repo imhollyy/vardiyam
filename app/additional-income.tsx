@@ -245,7 +245,7 @@ export default function AdditionalIncomeScreen() {
         {formError ? <Text accessibilityRole="alert" style={[styles.errorText, { color: theme.danger }]}>{formError}</Text> : null}
         <ActionButton label={saving ? 'Kaydediliyor…' : (editingId ? 'Güncelle' : 'Ekle')} onPress={handleSave} disabled={saving} loading={saving} icon="checkmark" />
         {editingId ? (
-          <ActionButton label="Sil" onPress={handleDelete} variant="danger" icon="trash-outline" />
+          <ActionButton label="Sil" onPress={handleDelete} variant="destructive" icon="trash-outline" />
         ) : null}
       </BottomSheet>
     </KeyboardAvoidingView>

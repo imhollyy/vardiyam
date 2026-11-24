@@ -6,8 +6,15 @@ import Svg, { Circle, G, Polyline, Rect, Text as SvgText } from 'react-native-sv
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
-import { type MonthlyStatement, getPayPeriod, calculateAnnualLeave, calculateSeverance } from '@/src/domain/payroll/index';
-import { loadPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
+import { type MonthlyStatement, type DerivedDay, getPayPeriod, calculateAnnualLeave, calculateSeverance } from '@/src/domain/payroll/index';
+import { loadPeriodDetails, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
+import {
+  computeShiftDistribution,
+  computeDayOfWeekOvertime,
+  computePeriodDelta,
+  type ShiftDistribution,
+  type DowOvertimeEntry,
+} from '@/src/features/reports/reportCalculations';
 import { formatTryMinor } from '@/src/domain/money';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
@@ -86,15 +93,14 @@ function DonutChart({ slices, size = 110, strokeWidth = 18 }: {
   const total = slices.reduce((s, sl) => s + sl.value, 0);
   if (total === 0) return null;
 
-  let offset = 0;
-  const paths = slices.map((sl) => {
+  const paths = slices.reduce<{ dash: number; gap: number; rot: number; color: string }[]>((acc, sl) => {
+    const prevOffset = acc.reduce((s, p) => s + (p.dash / circumference), 0);
     const frac = sl.value / total;
     const dash = frac * circumference;
     const gap = circumference - dash;
-    const rot = offset * 360 - 90;
-    offset += frac;
-    return { dash, gap, rot, color: sl.color };
-  });
+    const rot = prevOffset * 360 - 90;
+    return [...acc, { dash, gap, rot, color: sl.color }];
+  }, []);
 
   return (
     <Svg width={size} height={size} accessibilityLabel="Gelir dağılımı donut grafiği">
@@ -149,10 +155,11 @@ export default function ReportsScreen() {
   const currentYear = useMemo(() => Number(today.split('-')[0]), [today]);
   const [year, setYear] = useState(currentYear);
   const [statements, setStatements] = useState<MonthlyStatement[]>([]);
-  const [periods, setPeriods] = useState<PeriodInfo[]>([]);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [grossMinor, setGrossMinor] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [shiftDist, setShiftDist] = useState<ShiftDistribution>({ day: 0, evening: 0, night: 0, leave: 0, holiday: 0 });
+  const [dowOvertime, setDowOvertime] = useState<DowOvertimeEntry[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -163,21 +170,27 @@ export default function ReportsScreen() {
           const settings = await getSettings(database);
           const maxMonth = year === currentYear ? new Date().getMonth() + 1 : 12;
           const stmts: MonthlyStatement[] = [];
-          const pds: PeriodInfo[] = [];
           let cumulativeTaxable = 0;
+          // Accumulate days across all months for shift distribution + dow overtime
+          const allDays: DerivedDay[] = [];
+          const mergedTemplateMap: Map<string, { startLocalTime: string }> = new Map();
           for (let m = 1; m <= maxMonth; m++) {
             const { start, end } = getPayPeriod(year, m, settings.payday);
             const period: PeriodInfo = { start, end, label: `${MONTH_NAMES[m - 1]!} ${year}` };
-            const stmt = await loadPeriodStatement(database, period, cumulativeTaxable);
-            stmts.push(stmt);
-            pds.push(period);
-            cumulativeTaxable += stmt.grossMinor - stmt.sgkWorkerMinor - stmt.unemploymentWorkerMinor;
+            const details = await loadPeriodDetails(database, period, cumulativeTaxable);
+            stmts.push(details.statement);
+            allDays.push(...details.days);
+            details.templateMap.forEach((v, k) => { mergedTemplateMap.set(k, v); });
+            cumulativeTaxable += details.statement.grossMinor - details.statement.sgkWorkerMinor - details.statement.unemploymentWorkerMinor;
           }
           if (active) {
             setStatements(stmts);
-            setPeriods(pds);
             setStartDate(settings.startDate ?? null);
             setGrossMinor(settings.salaryMinor ?? 0);
+            const yearStart = `${year}-01-01`;
+            const yearEnd = `${year}-12-31`;
+            setShiftDist(computeShiftDistribution(allDays, mergedTemplateMap, yearStart, yearEnd));
+            setDowOvertime(computeDayOfWeekOvertime(allDays));
           }
         } finally {
           if (active) setLoading(false);
@@ -220,6 +233,24 @@ export default function ReportsScreen() {
     { value: totalNet, color: theme.success, label: 'Net' },
     { value: totalDeductions > 0 ? totalDeductions : 0, color: theme.muted, label: 'Kesintiler' },
   ];
+
+  // Period delta: last vs second-to-last month
+  const lastNetMinor = statements.length > 0 ? (statements[statements.length - 1]?.netMinor ?? 0) : 0;
+  const prevNetMinor = statements.length > 1 ? (statements[statements.length - 2]?.netMinor ?? null) : null;
+  const periodDelta = computePeriodDelta(lastNetMinor, prevNetMinor);
+
+  // Shift distribution: stacked bar colours
+  const distItems: { label: string; count: number; color: string }[] = [
+    { label: 'Gündüz', count: shiftDist.day, color: shiftPalette.day[mode].background },
+    { label: 'Akşam', count: shiftDist.evening, color: shiftPalette.evening[mode].background },
+    { label: 'Gece', count: shiftDist.night, color: shiftPalette.night[mode].background },
+    { label: 'İzin', count: shiftDist.leave, color: shiftPalette.leave[mode].background },
+    { label: 'Tatil', count: shiftDist.holiday, color: shiftPalette.holiday[mode].background },
+  ].filter((item) => item.count > 0);
+
+  // Day-of-week overtime
+  const maxDowMin = Math.max(...dowOvertime.map((d) => d.totalMinutes), 1);
+  const bestDow = dowOvertime.reduce((best, d) => (d.totalMinutes > best.totalMinutes ? d : best), dowOvertime[0] ?? { label: '', totalMinutes: 0 });
 
   if (loading) {
     return (
@@ -265,12 +296,20 @@ export default function ReportsScreen() {
         <EmptyState icon="bar-chart-outline" title="Veri yok" body={`Bu yıl için hesaplama yok.\nVardiya ve maaş ayarlarını tamamla.`} />
       ) : (
         <>
-          {/* Yıl özeti + sparkline */}
+          {/* Yıl özeti + sparkline + dönem delta */}
           <InkCard eyebrow={`${year} Yılı Toplamı`} amount={formatTryMinor(totalNet)} daysLabel={`${totalWorkedDays} gün`}>
             <InkCardRow>
               <InkCardStat label="Brüt" value={formatTryMinor(totalGross)} />
               <InkCardStat label="Fazla mesai" value={formatTryMinor(totalOvertime)} />
             </InkCardRow>
+            {periodDelta !== null ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 6 }}>
+                <Ionicons accessible={false} name={periodDelta >= 0 ? 'trending-up' : 'trending-down'} size={14} color={periodDelta >= 0 ? theme.success : theme.danger} />
+                <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: periodDelta >= 0 ? theme.success : theme.danger }}>
+                  {periodDelta >= 0 ? '▲' : '▼'} {Math.abs(periodDelta)}% geçen aya göre
+                </Text>
+              </View>
+            ) : null}
             {sparkValues.length >= 2 ? (
               <View style={{ alignItems: 'center', paddingTop: 8 }}>
                 <Sparkline values={sparkValues} color={theme.onInk} />
@@ -318,6 +357,60 @@ export default function ReportsScreen() {
                       </View>
                     ))}
                   </View>
+                </View>
+              </Card>
+            </>
+          ) : null}
+
+          {/* Vardiya dağılımı yatay yığılmış çubuk */}
+          {distItems.length > 0 ? (
+            <>
+              <SectionHeader title="Vardiya Dağılımı" />
+              <Card>
+                <View style={{ gap: 10 }}>
+                  <View style={styles.stackedBar}>
+                    {distItems.map((item) => (
+                      <View
+                        key={item.label}
+                        style={{ flex: item.count, backgroundColor: item.color, height: 16, borderRadius: 4 }}
+                        accessibilityLabel={`${item.label}: ${item.count} gün`}
+                      />
+                    ))}
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                    {distItems.map((item) => (
+                      <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: item.color }} />
+                        <Text style={{ fontFamily: fonts.regular, fontSize: layout.type.caption, color: theme.muted }}>
+                          {item.label} {item.count} gün
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </Card>
+            </>
+          ) : null}
+
+          {/* Haftanın günlerine göre mesai */}
+          {dowOvertime.some((d) => d.totalMinutes > 0) ? (
+            <>
+              <SectionHeader title="Haftanın Günlerine Göre Mesai" />
+              <Card>
+                <View style={{ gap: 8 }}>
+                  <OvertimeBarChart
+                    values={dowOvertime.map((d) => d.totalMinutes)}
+                    labels={dowOvertime.map((d) => d.label)}
+                    color={theme.warning}
+                    maxVal={maxDowMin}
+                    width={280}
+                    height={70}
+                  />
+                  {bestDow.totalMinutes > 0 ? (
+                    <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.caption, color: theme.muted, textAlign: 'center' }}>
+                      En çok mesai yaptığın gün: {bestDow.label} ({Math.floor(bestDow.totalMinutes / 60)}sa {bestDow.totalMinutes % 60}dk)
+                    </Text>
+                  ) : null}
                 </View>
               </Card>
             </>
@@ -411,6 +504,7 @@ export default function ReportsScreen() {
 
 const styles = StyleSheet.create({
   donutRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 8 },
+  stackedBar: { flexDirection: 'row', gap: 2, borderRadius: 4, overflow: 'hidden', height: 16 },
   monthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   monthLabel: { width: 32, fontFamily: fonts.bold, fontSize: layout.type.caption },
   barContainer: { flex: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(128,128,128,0.1)' },
