@@ -121,6 +121,26 @@ export function buildShiftSchedule(draft: ScheduleDraft): BuiltSchedule {
   return { templates: [...draft.templates], cycle };
 }
 
+export type TemplateChangePlan = {
+  toInsert: ShiftTemplate[];
+  toUpdate: ShiftTemplate[];
+};
+
+/**
+ * Compares draft templates against stored templates to produce a minimal change plan.
+ * A draft template is an UPDATE if its id already exists in stored; INSERT otherwise.
+ */
+export function planTemplateChanges(
+  stored: readonly ShiftTemplate[],
+  drafts: readonly ShiftTemplate[],
+): TemplateChangePlan {
+  const storedIds = new Set(stored.map((t) => t.id));
+  return {
+    toInsert: drafts.filter((t) => !storedIds.has(t.id)),
+    toUpdate: drafts.filter((t) => storedIds.has(t.id)),
+  };
+}
+
 export function previewShiftSchedule(
   draft: ScheduleDraft,
   startLocalDate: LocalDate,

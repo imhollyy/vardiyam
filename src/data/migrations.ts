@@ -167,6 +167,38 @@ export const migrations: readonly Migration[] = [
       END;
     `,
   },
+  {
+    version: 102,
+    sql: `
+      CREATE TABLE shift_templates_v102 (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        code TEXT NOT NULL CHECK (length(trim(code)) > 0),
+        name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        start_local_time TEXT NOT NULL CHECK (
+          length(start_local_time) = 5
+          AND start_local_time GLOB '[0-2][0-9]:[0-5][0-9]'
+          AND CAST(substr(start_local_time, 1, 2) AS INTEGER) < 24
+        ),
+        end_local_time TEXT NOT NULL CHECK (
+          length(end_local_time) = 5
+          AND end_local_time GLOB '[0-2][0-9]:[0-5][0-9]'
+          AND CAST(substr(end_local_time, 1, 2) AS INTEGER) < 24
+        ),
+        standard_minutes INTEGER NOT NULL DEFAULT 480 CHECK (standard_minutes > 0 AND standard_minutes <= 1440),
+        break_minutes INTEGER NOT NULL DEFAULT 0,
+        color_token TEXT,
+        icon_key TEXT
+      );
+
+      INSERT INTO shift_templates_v102
+        SELECT id, code, name, start_local_time, end_local_time, standard_minutes, break_minutes, color_token, icon_key
+        FROM shift_templates;
+
+      DROP TABLE shift_templates;
+
+      ALTER TABLE shift_templates_v102 RENAME TO shift_templates;
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;

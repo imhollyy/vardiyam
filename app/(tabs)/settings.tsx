@@ -29,7 +29,7 @@ import {
   listShiftTemplates,
   saveShiftSchedule,
 } from '@/src/data/shiftCycleRepository';
-import { getLocalToday } from '@/src/features/shifts/dates';
+import { getLocalToday, mondayOfLocalDate } from '@/src/features/shifts/dates';
 import {
   buildShiftSchedule,
   previewShiftSchedule,
@@ -264,7 +264,8 @@ export default function SettingsScreen() {
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Bilgileri kontrol edin.'); return; }
     setSaving(true);
     try {
-      await saveShiftSchedule(database, built.templates, built.cycle);
+      const effectiveFrom = mondayOfLocalDate(getLocalToday('Europe/Istanbul'));
+      await saveShiftSchedule(database, built.templates, built.cycle, effectiveFrom);
       setCycle(built.cycle); setStoredTemplates(built.templates);
       setDraft({ ...draft, templates: built.templates }); setEditing(false);
       setSuccess('Vardiya düzeni kaydedildi.');
