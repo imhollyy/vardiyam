@@ -1,65 +1,78 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { getSettings } from '@/src/data/settingsRepository';
 import { getDayEntriesInRange } from '@/src/data/dayEntryRepository';
-import { deriveDays, type DerivedDay, type MonthlyStatement, type Settings } from '@/src/domain/payroll/index';
+import { listShiftTemplates, listShiftCycles } from '@/src/data/shiftCycleRepository';
+import {
+  deriveDays,
+  resolvePlannedTemplates,
+  enumerateDays,
+  calculateAnnualLeave,
+  calculateOvertime,
+  type DerivedDay,
+  type MonthlyStatement,
+  type Settings,
+} from '@/src/domain/payroll/index';
+import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { formatTryMinor } from '@/src/domain/money';
 import { loadCurrentPeriodStatement, type PeriodInfo } from '@/src/features/payroll/loadPeriodStatement';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
-import { fonts, layout } from '@/src/theme/tokens';
-import { Screen } from '@/src/components/ui/Screen';
-import { Card } from '@/src/components/ui/Card';
-import { PageHeading } from '@/src/components/ui/PageHeading';
+import { fonts, layout, shiftPalette } from '@/src/theme/tokens';
 import { InkCard, InkCardRow, InkCardStat } from '@/src/components/ui/InkCard';
 import { DayBlock, type DayBlockStatus } from '@/src/components/ui/DayBlock';
+import { ShiftBlock, type ShiftBlockKind } from '@/src/components/ui/ShiftBlock';
 import { ActionButton } from '@/src/components/ui/ActionButton';
-import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { SkeletonCard } from '@/src/components/ui/Skeleton';
 
+const WEEKDAY_NAMES = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+const MONTH_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 const DAY_LABELS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
 function todayLocal(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function weekDates(center: string): string[] {
   const [y, m, d] = center.split('-').map(Number) as [number, number, number];
   const date = new Date(y, m - 1, d);
-  const dow = date.getDay();
   const monday = new Date(date);
-  monday.setDate(date.getDate() - ((dow + 6) % 7));
-  const dates: string[] = [];
-  for (let i = 0; i < 7; i++) {
+  monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, i) => {
     const cur = new Date(monday);
     cur.setDate(monday.getDate() + i);
-    const cy = cur.getFullYear();
-    const cm = String(cur.getMonth() + 1).padStart(2, '0');
-    const cd = String(cur.getDate()).padStart(2, '0');
-    dates.push(`${cy}-${cm}-${cd}`);
-  }
-  return dates;
+    return `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+  });
 }
 
-function formatGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 6) return 'İyi geceler';
-  if (hour < 12) return 'Günaydın';
-  if (hour < 18) return 'İyi günler';
-  return 'İyi akşamlar';
+function addDays(date: string, n: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const dt = new Date(y, m - 1, d + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-function formatDate(localDate: string): string {
-  const [y, m, d] = localDate.split('-');
-  const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-  return `${Number(d)} ${months[Number(m) - 1]} ${y}`;
+function daysUntilPayday(today: string, payday: string): number {
+  const [ty, tm, td] = today.split('-').map(Number) as [number, number, number];
+  const isLast = payday === 'last';
+  const getPayDate = (year: number, month: number) => {
+    if (isLast) return new Date(year, month, 0).getDate();
+    const day = Number(payday);
+    // clamp to last day of month if needed
+    return Math.min(day, new Date(year, month, 0).getDate());
+  };
+  const todayDt = new Date(ty, tm - 1, td);
+  const thisPayDay = getPayDate(ty, tm);
+  const thisPay = new Date(ty, tm - 1, thisPayDay);
+  if (thisPay >= todayDt) return Math.ceil((thisPay.getTime() - todayDt.getTime()) / 86400000);
+  const nextMonth = tm === 12 ? 1 : tm + 1;
+  const nextYear = tm === 12 ? ty + 1 : ty;
+  const nextPayDay = getPayDate(nextYear, nextMonth);
+  const nextPay = new Date(nextYear, nextMonth - 1, nextPayDay);
+  return Math.ceil((nextPay.getTime() - todayDt.getTime()) / 86400000);
 }
 
 function toDayBlockStatus(day: DerivedDay | undefined): DayBlockStatus {
@@ -78,14 +91,23 @@ function toDayCode(day: DerivedDay | undefined): string {
   return '—';
 }
 
+function templateToKind(t: ShiftTemplate): ShiftBlockKind {
+  const start = Number(t.startLocalTime.split(':')[0] ?? '8');
+  if (start >= 6 && start < 14) return 'day';
+  if (start >= 14 && start < 22) return 'evening';
+  return 'night';
+}
+
 export default function HomeScreen() {
-  const { theme } = useAppTheme();
+  const { theme, mode } = useAppTheme();
   const database = useAppDatabase();
   const router = useRouter();
   const today = useMemo(() => todayLocal(), []);
   const week = useMemo(() => weekDates(today), [today]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [days, setDays] = useState<DerivedDay[]>([]);
+  const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
+  const [plannedMap, setPlannedMap] = useState<Map<string, string | null>>(new Map());
   const [periodStatement, setPeriodStatement] = useState<MonthlyStatement | null>(null);
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,12 +119,18 @@ export default function HomeScreen() {
       void (async () => {
         try {
           const s = await getSettings(database);
-          const entries = await getDayEntriesInRange(database, week[0]!, week[6]!);
-          const derived = deriveDays(week, entries, s);
+          const tmpl = await listShiftTemplates(database);
+          const cycles = await listShiftCycles(database);
+          const rangeEnd = addDays(week[6]!, 14);
+          const entries = await getDayEntriesInRange(database, week[0]!, rangeEnd);
+          const derived = deriveDays(week, entries, s, tmpl, cycles);
+          const planned = resolvePlannedTemplates(enumerateDays(week[0]!, rangeEnd), cycles, tmpl, entries);
           const { statement, period } = await loadCurrentPeriodStatement(database, today);
           if (active) {
             setSettings(s);
+            setTemplates(tmpl);
             setDays(derived);
+            setPlannedMap(planned);
             setPeriodStatement(statement);
             setPeriodInfo(period);
           }
@@ -114,53 +142,111 @@ export default function HomeScreen() {
     }, [database, week, today]),
   );
 
+  const todayTemplateId = plannedMap.get(today);
+  const todayTemplate = todayTemplateId ? (templates.find((t) => t.id === todayTemplateId) ?? null) : null;
+  const todayDerived = days.find((d) => d.localDate === today);
+  const todayIsSpecial = !todayTemplate && todayDerived && (todayDerived.status === 'HOLIDAY' || todayDerived.status === 'LEAVE');
+
+  const nextShiftLabel = useMemo(() => {
+    for (let i = 1; i <= 14; i++) {
+      const d = addDays(today, i);
+      const tmplId = plannedMap.get(d);
+      if (tmplId) {
+        const t = templates.find((x) => x.id === tmplId);
+        if (t) {
+          const dow = new Date(d.replace(/-/g, '/')).getDay();
+          return `${WEEKDAY_NAMES[dow] ?? ''}: ${t.startLocalTime} – ${t.endLocalTime}`;
+        }
+      }
+    }
+    return null;
+  }, [plannedMap, templates, today]);
+
+  const annualLeaveResult = useMemo(() => {
+    if (!settings?.startDate) return null;
+    const usedDays = days.filter((d) => d.leaveType === 'ANNUAL').length;
+    return calculateAnnualLeave(settings.startDate, today, usedDays);
+  }, [settings, days, today]);
+
+  const totalOvertimeMinutes = periodStatement
+    ? (periodStatement.scheduledOvertimeMinutes + periodStatement.manualOvertimeMinutes)
+    : 0;
+  const overtimeMinor = settings && totalOvertimeMinutes > 0
+    ? calculateOvertime(totalOvertimeMinutes, settings.salaryMinor)
+    : 0;
+  const lateEarlyMinutes = days.reduce((s, d) => s + d.lateEarlyMinutes, 0);
+  const daysUntilPay = settings ? daysUntilPayday(today, settings.payday) : null;
+
+  const todayDt = new Date(today.replace(/-/g, '/'));
+  const todayName = WEEKDAY_NAMES[todayDt.getDay()] ?? '';
+  const todayNumStr = today.split('-')[2] ?? '';
+  const monthStr = MONTH_SHORT[todayDt.getMonth()] ?? '';
+
+  const leavePalette = shiftPalette.leave[mode];
+
   if (loading) {
     return (
-      <Screen>
-        <PageHeading eyebrow={formatGreeting()} title={formatDate(today)} />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: theme.background }}
+        contentContainerStyle={{ paddingHorizontal: layout.screen.horizontal, paddingTop: layout.screen.top, gap: layout.space.md, paddingBottom: 32 }}
+      >
+        <SkeletonCard rows={1} />
         <SkeletonCard rows={2} />
         <SkeletonCard rows={4} />
-      </Screen>
+      </ScrollView>
     );
   }
 
   return (
-    <Screen>
-      {/* Heading: greeting + date, salary pill */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <PageHeading eyebrow={formatGreeting()} title={formatDate(today)} />
-        {settings && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.surfaceMuted, paddingHorizontal: 10, paddingVertical: 6, borderRadius: layout.radius.pill, marginTop: 6 }}>
-            <Ionicons accessible={false} name="wallet" size={14} color={theme.muted} />
-            <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.caption, color: theme.muted }}>
-              {formatTryMinor(settings.salaryMinor)}
-            </Text>
-          </View>
-        )}
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      contentContainerStyle={{ paddingHorizontal: layout.screen.horizontal, paddingTop: layout.screen.top, gap: layout.space.md, paddingBottom: 32 }}
+    >
+      {/* a) Başlık: gün adı büyük sol, tarih sağ */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <Text style={{ fontFamily: fonts.extraBold, fontSize: 30, color: theme.ink, letterSpacing: -1, lineHeight: 36 }}>
+          {todayName}
+        </Text>
+        <Text style={{ fontFamily: fonts.semiBold, fontSize: layout.type.body, color: theme.muted, paddingBottom: 4 }}>
+          {Number(todayNumStr)} {monthStr}
+        </Text>
       </View>
 
-      {/* Period summary ink card */}
-      <InkCard
-        eyebrow={periodInfo?.label ?? 'Bu dönem'}
-        amount={periodStatement ? formatTryMinor(periodStatement.netMinor) : '—'}
-        daysLabel={periodStatement ? `${periodStatement.workedDays} gün` : undefined}
-      >
-        <InkCardRow>
-          <InkCardStat label="Çalışılan" value={periodStatement ? String(periodStatement.workedDays) : '—'} />
-          <InkCardStat label="Fazla mesai" value={periodStatement && periodStatement.overtimeMinutes > 0 ? `${Math.floor(periodStatement.overtimeMinutes / 60)} sa` : '0 sa'} />
-          <InkCardStat label="İzin/Tatil" value={periodStatement ? String(periodStatement.totalDays - periodStatement.workedDays) : '—'} />
-        </InkCardRow>
-      </InkCard>
+      {/* b) ShiftBlock: bugünün vardiyası veya izin/tatil */}
+      {todayIsSpecial ? (
+        <View style={{ backgroundColor: leavePalette.background, borderRadius: layout.radius.block, padding: 20, gap: 10 }}>
+          <Text style={{ fontFamily: fonts.semiBold, fontSize: 11, color: leavePalette.textSecondary, letterSpacing: 1, textTransform: 'uppercase' }}>
+            BUGÜN
+          </Text>
+          <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.heading, color: leavePalette.text }}>
+            {todayDerived?.status === 'HOLIDAY' ? 'Bugün resmi tatil' : 'Bugün izinlisin'}
+          </Text>
+          {nextShiftLabel ? (
+            <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: leavePalette.textSecondary }}>
+              Sonraki vardiya: {nextShiftLabel}
+            </Text>
+          ) : null}
+        </View>
+      ) : (
+        <ShiftBlock
+          kind={todayTemplate ? templateToKind(todayTemplate) : 'day'}
+          shiftName={todayTemplate?.name ?? 'Bugün'}
+          timeRange={todayTemplate ? `${todayTemplate.startLocalTime} – ${todayTemplate.endLocalTime}` : undefined}
+          breakLabel={todayTemplate?.breakMinutes ? `${todayTemplate.breakMinutes} dk mola` : undefined}
+          onChangePress={() => router.push('/shift-change' as never)}
+          primaryLabel="Mesai / izin ekle"
+          onPrimaryPress={() => router.push({ pathname: '/day-edit' as never, params: { date: today } })}
+          nextShiftLabel={nextShiftLabel ? `Sonraki: ${nextShiftLabel}` : undefined}
+        />
+      )}
 
-      {/* Week strip */}
-      <SectionHeader title="Bu Hafta" />
+      {/* c) 7 DayBlock + "Gelecek hafta" satırı (dönüşümlü düzen için sonraki vardiya) */}
       <View style={{ flexDirection: 'row', gap: 6 }}>
         {week.map((date) => {
           const dow = new Date(date.replace(/-/g, '/')).getDay();
           const day = days.find((d) => d.localDate === date);
           const dateNum = date.split('-')[2] ?? '';
           const otMin = day?.overtimeMinutes ?? 0;
-          const otLabel = otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined;
           return (
             <View key={date} style={{ flex: 1 }}>
               <DayBlock
@@ -170,30 +256,58 @@ export default function HomeScreen() {
                 status={toDayBlockStatus(day)}
                 isToday={date === today}
                 hasOvertime={otMin > 0}
-                overtimeLabel={otLabel}
+                overtimeLabel={otMin > 0 ? `+${Math.floor(otMin / 60)}sa` : undefined}
                 onPress={() => router.push({ pathname: '/day-edit' as never, params: { date } })}
               />
             </View>
           );
         })}
       </View>
+      {nextShiftLabel ? (
+        <Text style={{ fontFamily: fonts.medium, fontSize: layout.type.caption, color: theme.muted }}>
+          Gelecek hafta: {nextShiftLabel}
+        </Text>
+      ) : null}
 
-      {/* Quick actions */}
-      <SectionHeader title="Hızlı Erişim" />
-      <Card>
-        <ActionButton
-          label="Ek gelir ekle"
-          variant="secondary"
-          icon="cash-outline"
-          onPress={() => router.push('/additional-income' as never)}
-        />
-        <ActionButton
-          label="Vardiya değişikliği"
-          variant="secondary"
-          icon="swap-horizontal-outline"
-          onPress={() => router.push('/shift-change' as never)}
-        />
-      </Card>
-    </Screen>
+      {/* d) InkCard: Bu dönem tahmini + maaş hapı + mesai/eksik/izin */}
+      <View>
+        {daysUntilPay !== null ? (
+          <View style={{ alignSelf: 'flex-end', marginBottom: 6, backgroundColor: theme.surfaceMuted, paddingHorizontal: 10, paddingVertical: 5, borderRadius: layout.radius.pill, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Ionicons accessible={false} name="calendar-outline" size={12} color={theme.muted} />
+            <Text style={{ fontFamily: fonts.extraBold, fontSize: 11, color: theme.muted }}>
+              Maaşa {daysUntilPay} gün
+            </Text>
+          </View>
+        ) : null}
+        <InkCard
+          eyebrow={periodInfo?.label ?? 'Bu dönem tahmini'}
+          amount={periodStatement ? formatTryMinor(periodStatement.netMinor) : '—'}
+          daysLabel={periodStatement ? `${periodStatement.workedDays} gün` : undefined}
+        >
+          <InkCardRow>
+            <InkCardStat
+              label="Mesai"
+              value={totalOvertimeMinutes > 0 ? `+${formatTryMinor(overtimeMinor)}` : '0 ₺'}
+            />
+            <InkCardStat
+              label="Eksik saat"
+              value={lateEarlyMinutes > 0 ? `−${Math.round(lateEarlyMinutes / 60 * 10) / 10} sa` : '—'}
+            />
+            <InkCardStat
+              label="İzin kalan"
+              value={annualLeaveResult ? `${annualLeaveResult.remainingDays} gün` : 'Tarih gir'}
+            />
+          </InkCardRow>
+        </InkCard>
+      </View>
+
+      {/* e) Ek gelir ekle ikincil buton */}
+      <ActionButton
+        label="Ek gelir ekle"
+        variant="secondary"
+        icon="cash-outline"
+        onPress={() => router.push('/additional-income' as never)}
+      />
+    </ScrollView>
   );
 }
