@@ -3,6 +3,7 @@ import { getPayPeriodForDate } from '../../domain/payroll/index.ts';
 import { shiftNominalMinutes } from '../../config/shifts.ts';
 import type { SalaryType, WorkSchedule, ShiftPattern } from '../../domain/payroll/types.ts';
 import type { ShiftTemplate, CycleEntry, ShiftCycle } from '../../domain/shift-cycle/index.ts';
+import { shiftKindOf } from '../../domain/shift-cycle/shiftKind.ts';
 
 export type SetupTemplateDraft = {
   code: string;
@@ -105,15 +106,24 @@ export function buildSetupPayload(
   const salaryMinor = parseTryMinor(draft.salaryText);
   const startDate = draft.startDate || null;
 
-  const templates: ShiftTemplate[] = draft.templateDrafts.map((td, i) => ({
-    id: templateIds[i]!,
-    code: td.code,
-    name: td.name,
-    startLocalTime: td.startLocalTime,
-    endLocalTime: td.endLocalTime,
-    breakMinutes: td.breakMinutes,
-    standardMinutes: shiftNominalMinutes(td.startLocalTime, td.endLocalTime),
-  }));
+  const templates: ShiftTemplate[] = draft.templateDrafts.map((td, i) => {
+    const partial = {
+      code: td.code,
+      startLocalTime: td.startLocalTime,
+      colorToken: undefined as string | undefined,
+    };
+    const kind = shiftKindOf(partial);
+    return {
+      id: templateIds[i]!,
+      code: td.code,
+      name: td.name,
+      startLocalTime: td.startLocalTime,
+      endLocalTime: td.endLocalTime,
+      breakMinutes: td.breakMinutes,
+      standardMinutes: shiftNominalMinutes(td.startLocalTime, td.endLocalTime),
+      colorToken: kind,
+    };
+  });
 
   const entries = buildCycleEntries(draft.workSchedule, draft.shiftPattern, templateIds);
   const anchor = mondayOfLocalDate(today);

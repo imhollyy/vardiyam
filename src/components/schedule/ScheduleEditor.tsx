@@ -47,6 +47,7 @@ function formatNetMinutes(net: number): string {
 type Props = {
   value: ScheduleEditorValue;
   onChange: (v: ScheduleEditorValue) => void;
+  showCurrentShift?: boolean;
 };
 
 const WORK_SCHEDULE_OPTIONS: { value: WorkSchedule; label: string }[] = [
@@ -75,7 +76,7 @@ const BREAK_OPTIONS: { label: string; value: number }[] = [
   { label: '90 dk', value: 90 },
 ];
 
-export function ScheduleEditor({ value, onChange }: Props) {
+export function ScheduleEditor({ value, onChange, showCurrentShift = true }: Props) {
   const { theme } = useAppTheme();
   const [expanded, setExpanded] = useState(false);
 
@@ -369,7 +370,7 @@ export function ScheduleEditor({ value, onChange }: Props) {
       </Card>
 
       {/* Current shift selector for multi-shift patterns */}
-      {isMultiShift && (
+      {showCurrentShift && isMultiShift && (
         <Card>
           <CardHeader icon="swap-horizontal-outline" title="Bu hafta hangi vardiyadasın?" />
           <ChoiceGroup

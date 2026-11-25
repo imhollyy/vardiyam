@@ -217,6 +217,39 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE settings ADD COLUMN hourly_leave_policy TEXT NOT NULL DEFAULT 'BASE_PAY' CHECK (hourly_leave_policy IN ('OVERTIME_FIRST','BASE_PAY'));
     `,
   },
+  {
+    version: 105,
+    // If a user has exactly one shift_cycle row and its effective_from is in the future
+    // relative to the earliest known day_entries date (or simply > '2000-01-01' anchor
+    // heuristic), reset it to the Monday of the cycle's anchor_local_date.
+    // This fixes users whose only cycle row had effective_from overwritten by the old
+    // updateShiftCycle bug.
+    sql: `
+      UPDATE shift_cycles
+      SET effective_from = anchor_local_date
+      WHERE (SELECT COUNT(*) FROM shift_cycles) = 1
+        AND effective_from > anchor_local_date;
+    `,
+  },
+  {
+    version: 106,
+    // Backfill color_token for shift_templates that have NULL or empty value.
+    // Heuristic: infer from the shift code (G/S=day, A=evening, GC=night) or start time.
+    sql: `
+      UPDATE shift_templates
+      SET color_token = CASE
+        WHEN UPPER(code) = 'GC' THEN 'night'
+        WHEN UPPER(code) = 'A'  THEN 'evening'
+        WHEN UPPER(code) IN ('G','S') THEN 'day'
+        WHEN CAST(substr(start_local_time, 1, 2) AS INTEGER) >= 5
+          AND CAST(substr(start_local_time, 1, 2) AS INTEGER) < 13 THEN 'day'
+        WHEN CAST(substr(start_local_time, 1, 2) AS INTEGER) >= 13
+          AND CAST(substr(start_local_time, 1, 2) AS INTEGER) < 20 THEN 'evening'
+        ELSE 'night'
+      END
+      WHERE color_token IS NULL OR trim(color_token) = '';
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;

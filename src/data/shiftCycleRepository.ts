@@ -267,6 +267,76 @@ export async function deleteShiftTemplate(
   });
 }
 
+/**
+ * Appends a new immutable cycle version effective from `effectiveFrom`.
+ *
+ * Rules:
+ * - Existing cycle rows are NEVER updated. Each change creates a new row with a new id.
+ * - Exception: if a row with the exact same `effectiveFrom` already exists (same-day re-change),
+ *   that one row is deleted and replaced. Only same-day rows are touched; older history is preserved.
+ * - Templates are upserted (INSERT … ON CONFLICT DO UPDATE) so callers can pass updated templates.
+ */
+export async function appendShiftCycleVersion(
+  database: ShiftCycleDatabase,
+  templates: readonly ShiftTemplate[],
+  cycle: ShiftCycle,
+  effectiveFrom: LocalDate,
+): Promise<void> {
+  validateShiftCycle(cycle, templates);
+
+  await withDatabaseTransaction(database, async () => {
+    await assertForeignKeysEnabled(database);
+
+    for (const template of templates) {
+      validateShiftTemplate(template);
+      await database.runAsync(
+        'INSERT INTO shift_templates ' +
+          '(id, code, name, start_local_time, end_local_time, break_minutes, standard_minutes, color_token, icon_key) ' +
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
+          'ON CONFLICT(id) DO UPDATE SET code = excluded.code, name = excluded.name, ' +
+          'start_local_time = excluded.start_local_time, end_local_time = excluded.end_local_time, ' +
+          'break_minutes = excluded.break_minutes, standard_minutes = excluded.standard_minutes, ' +
+          'color_token = excluded.color_token, icon_key = excluded.icon_key;',
+        template.id,
+        template.code,
+        template.name,
+        template.startLocalTime,
+        template.endLocalTime,
+        template.breakMinutes,
+        template.standardMinutes ?? 480,
+        template.colorToken ?? null,
+        template.iconKey ?? null,
+      );
+    }
+
+    validateShiftCycle(cycle, await listShiftTemplatesInternal(database));
+
+    // Delete any same-day version (same-day re-change): only touches effectiveFrom = today
+    const sameDay = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM shift_cycles WHERE effective_from = ?;',
+      effectiveFrom,
+    );
+    if (sameDay) {
+      await database.runAsync('DELETE FROM cycle_entries WHERE cycle_id = ?;', sameDay.id);
+      await database.runAsync('DELETE FROM shift_cycles WHERE id = ?;', sameDay.id);
+    }
+
+    // Insert new version with the cycle's own id (which must be a fresh UUID from the caller)
+    await database.runAsync(
+      'INSERT INTO shift_cycles (id, name, timezone, anchor_local_date, start_index, entry_count, effective_from) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?);',
+      cycle.id,
+      cycle.name,
+      cycle.timezone,
+      cycle.anchorLocalDate,
+      cycle.startIndex,
+      cycle.entries.length,
+      effectiveFrom,
+    );
+    await insertCycleEntries(database, cycle);
+  });
+}
+
 export async function createShiftCycle(
   database: ShiftCycleDatabase,
   cycle: ShiftCycle,

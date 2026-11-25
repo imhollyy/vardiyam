@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { randomUUID } from 'expo-crypto';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
-import { listShiftTemplates, listShiftCycles, updateShiftCycle } from '@/src/data/shiftCycleRepository';
+import { listShiftTemplates, listShiftCycles, appendShiftCycleVersion } from '@/src/data/shiftCycleRepository';
 import type { ShiftCycle, ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { buildShiftChangeFromToday } from '@/src/features/shifts/buildShiftChangeFromToday';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
@@ -77,14 +78,14 @@ export default function ShiftChangeScreen() {
         targetTemplateId: selectedTemplateId,
         currentCycle: cycle,
       });
-      const updatedCycle: ShiftCycle = { ...cycle, anchorLocalDate, startIndex };
-      await updateShiftCycle(database, updatedCycle, effectiveFrom);
+      const newCycle: ShiftCycle = { ...cycle, id: randomUUID(), anchorLocalDate, startIndex };
+      await appendShiftCycleVersion(database, templates, newCycle, effectiveFrom);
       router.back();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Kaydedilemedi.');
       setSaving(false);
     }
-  }, [database, selectedTemplateId, cycle, today, router]);
+  }, [database, selectedTemplateId, cycle, today, router, templates]);
 
   if (!loaded) return null;
 

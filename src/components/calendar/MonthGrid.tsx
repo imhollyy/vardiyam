@@ -1,16 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
 
-import type { DerivedDay, LeaveType } from '@/src/domain/payroll/index';
+import type { DerivedDay } from '@/src/domain/payroll/index';
 import type { ShiftTemplate } from '@/src/domain/shift-cycle/index';
-import { fonts, layout, shiftPalette, type ShiftKind } from '@/src/theme/tokens';
-import { colors } from '@/src/theme/tokens';
+import { shiftKindOf } from '@/src/domain/shift-cycle/shiftKind';
+import { colors, fonts, layout, shiftPalette } from '@/src/theme/tokens';
 
 const WEEKDAY_HEADERS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-
-const LEAVE_ABBREV: Record<LeaveType, string> = {
-  ANNUAL: 'İzn', UNPAID: 'ÜI', SICK: 'Rp', EXCUSE: 'Mz',
-  MATERNITY: 'Dğ', BEREAVEMENT: 'Az', SOCIAL: 'Sy', HOURLY: 'Sl', HOLIDAY: 'Tt',
-};
 
 type Theme = (typeof colors)['light'] | (typeof colors)['dark'];
 
@@ -42,7 +37,7 @@ function cellBg(day: DerivedDay | undefined, templateMap: Map<string, ShiftTempl
   if (day.status === 'HOLIDAY') return shiftPalette.holiday[mode].background;
   if (day.status === 'WORKED') {
     const tpl = day.shiftTemplateId ? templateMap.get(day.shiftTemplateId) : undefined;
-    const kind = (tpl?.colorToken ?? 'day') as ShiftKind;
+    const kind = tpl ? shiftKindOf(tpl) : 'day';
     return shiftPalette[kind]?.[mode].background ?? shiftPalette.day[mode].background;
   }
   return undefined;
@@ -54,22 +49,10 @@ function cellFg(day: DerivedDay | undefined, templateMap: Map<string, ShiftTempl
   if (day.status === 'HOLIDAY') return shiftPalette.holiday[mode].text;
   if (day.status === 'WORKED') {
     const tpl = day.shiftTemplateId ? templateMap.get(day.shiftTemplateId) : undefined;
-    const kind = (tpl?.colorToken ?? 'day') as ShiftKind;
+    const kind = tpl ? shiftKindOf(tpl) : 'day';
     return shiftPalette[kind]?.[mode].text ?? inkColor;
   }
   return inkColor;
-}
-
-function cellCode(day: DerivedDay | undefined, templateMap: Map<string, ShiftTemplate>): string | null {
-  if (!day) return null;
-  if (day.status === 'HOLIDAY') return 'T';
-  if (day.status === 'LEAVE') return day.leaveType ? (LEAVE_ABBREV[day.leaveType] ?? 'İ') : 'İ';
-  if (day.status === 'WORKED' && day.shiftTemplateId) {
-    const tpl = templateMap.get(day.shiftTemplateId);
-    if (tpl?.code) return tpl.code;
-    return 'G';
-  }
-  return null;
 }
 
 function fmtMin(minutes: number): string {
@@ -98,18 +81,27 @@ export function MonthGrid({ year, month, today, dayMap, templateMap, theme, mode
           const isToday = date === today;
           const bg = cellBg(day, templateMap, mode);
           const fg = cellFg(day, templateMap, mode, theme.ink);
-          const code = cellCode(day, templateMap);
           const otMin = day?.overtimeMinutes ?? 0;
           const leMin = day?.lateEarlyMinutes ?? 0;
           const dateNum = date.split('-')[2] ?? '';
 
           const isFuture = date > today;
 
+          const tpl = day?.shiftTemplateId ? templateMap.get(day.shiftTemplateId) : undefined;
+          const kindLabel = tpl ? shiftKindOf(tpl) : day?.status === 'LEAVE' ? 'izin' : day?.status === 'HOLIDAY' ? 'tatil' : '';
+          const a11yLabel = [
+            dateNum,
+            kindLabel,
+            tpl?.name,
+            otMin > 0 ? `fazla mesai ${fmtMin(otMin)}` : '',
+            leMin > 0 ? `eksik ${fmtMin(leMin)}` : '',
+          ].filter(Boolean).join(', ');
+
           return (
             <Pressable
               key={date}
               accessibilityRole="button"
-              accessibilityLabel={`${dateNum}${day?.status ? ', ' + day.status : ''}${otMin > 0 ? ', fazla mesai ' + fmtMin(otMin) : ''}`}
+              accessibilityLabel={a11yLabel}
               onPress={() => onDayPress?.(date)}
               style={({ pressed }) => ({ width: '14.28%', minHeight: 50, padding: 2, opacity: pressed ? 0.75 : (isFuture ? 0.6 : 1) })}
             >
@@ -127,11 +119,6 @@ export function MonthGrid({ year, month, today, dayMap, templateMap, theme, mode
                 <Text style={{ fontFamily: isToday ? fonts.extraBold : fonts.semiBold, fontSize: 13, color: fg, lineHeight: 18 }}>
                   {dateNum}
                 </Text>
-                {code ? (
-                  <Text style={{ fontFamily: fonts.bold, fontSize: 8, color: fg, opacity: 0.75, lineHeight: 10 }}>
-                    {code}
-                  </Text>
-                ) : null}
                 {(otMin > 0 || leMin > 0) ? (
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 1, marginTop: 1 }}>
                     {otMin > 0 ? (

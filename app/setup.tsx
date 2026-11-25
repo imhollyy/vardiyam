@@ -83,7 +83,7 @@ const STEP_META: Record<StepId, {
   payday:       { icon: 'calendar-number-outline',  title: 'Maas gunun hangisi?',           subtitle: 'Ayin hangi gunu maas aliyorsun?',                  skippable: true, skipLabel: 'Ayin son gunu' },
   bes:          { icon: 'shield-checkmark-outline', title: 'BES kesintisi var mi?',         subtitle: 'Bireysel emeklilik kesintisi uygulanıyor mu?',      skippable: true, skipLabel: 'Yok' },
   schedule:     { icon: 'time-outline',             title: 'Calisma duzenin',              subtitle: 'Vardiya duzeni ve saatlerini belirle.' },
-  currentShift: { icon: 'swap-horizontal-outline',  title: 'Su an hangi vardiyadasın?',    subtitle: 'Bu hafta hangi vardiyada calısıyorsun?' },
+  currentShift: { icon: 'swap-horizontal-outline',  title: 'Şu an hangi vardiyadasın?',    subtitle: 'Bu hafta hangi vardiyada çalışıyorsun?' },
   hourlyLeave:  { icon: 'hourglass-outline',        title: 'Saatlik izin kurali',           subtitle: 'Saatlik izin aldiginda ne yapilsın?',              skippable: true, skipLabel: 'Maasimdan kesilsin' },
   summary:      { icon: 'checkmark-circle-outline', title: 'Hazir!',                       subtitle: 'Bilgilerin dogru mu? Son bir goz at.' },
 };
@@ -228,7 +228,7 @@ export default function SetupScreen() {
         {meta.skippable && !isLast ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Atla: ${meta.skipLabel ?? 'Simdi degil'}`}
+            accessibilityLabel={`Atla: ${meta.skipLabel ?? 'Şimdi değil'}`}
             onPress={handleSkip}
             style={[styles.navBtn, styles.skipBtnInner]}
           >
@@ -332,7 +332,7 @@ export default function SetupScreen() {
         )}
 
         {currentStep === 'schedule' && (
-          <ScheduleEditor value={schedule} onChange={setSchedule} />
+          <ScheduleEditor value={schedule} onChange={setSchedule} showCurrentShift={false} />
         )}
 
         {currentStep === 'currentShift' && (
@@ -402,7 +402,7 @@ export default function SetupScreen() {
 
       <View style={styles.buttons}>
         <ActionButton
-          label={saving ? 'Kaydediliyor...' : isLast ? 'Basla' : 'Ileri'}
+          label={saving ? 'Kaydediliyor...' : isLast ? 'Başla' : 'İleri'}
           onPress={handleNext}
           disabled={!canAdvance() || saving}
           icon={isLast ? 'checkmark' : 'chevron-forward'}

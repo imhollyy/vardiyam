@@ -15,6 +15,7 @@ import {
   updateShiftCycle,
   updateShiftTemplate,
   saveShiftSchedule,
+  appendShiftCycleVersion,
   ShiftStorageError,
 } from '../../src/data/shiftCycleRepository.ts';
 
@@ -256,6 +257,64 @@ test('MON_SAT fixed-day cycle has 7 entries: 6 shift + 1 off', async () => {
     assert.equal(loaded.entries.length, 7);
     for (let i = 0; i < 6; i++) assert.equal(loaded.entries[i].kind, 'SHIFT');
     assert.equal(loaded.entries[6].kind, 'OFF');
+  } finally { sqlite.close(); }
+});
+
+test('appendShiftCycleVersion: inserts new row, old row untouched', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
+    const c1 = { ...cycle(), id: 'v1', effectiveFrom: '2026-01-05' };
+    await createShiftCycle(database, c1, '2026-01-05');
+
+    const c2 = { ...cycle(), id: 'v2', anchorLocalDate: '2026-01-19', startIndex: 0, effectiveFrom: '2026-01-19' };
+    await appendShiftCycleVersion(database, [day()], c2, '2026-01-19');
+
+    const all = await listShiftCycles(database);
+    assert.equal(all.length, 2, 'both rows must exist');
+    const v1 = await getShiftCycle(database, 'v1');
+    assert.equal(v1.effectiveFrom, '2026-01-05', 'old effectiveFrom must not be touched');
+  } finally { sqlite.close(); }
+});
+
+test('appendShiftCycleVersion: same-day re-change replaces only that row', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
+    const c1 = { ...cycle(), id: 'v1', effectiveFrom: '2026-01-05' };
+    await createShiftCycle(database, c1, '2026-01-05');
+
+    const c2a = { ...cycle(), id: 'v2a', anchorLocalDate: '2026-01-19', effectiveFrom: '2026-01-19' };
+    await appendShiftCycleVersion(database, [day()], c2a, '2026-01-19');
+
+    const c2b = { ...cycle(), id: 'v2b', anchorLocalDate: '2026-01-19', effectiveFrom: '2026-01-19' };
+    await appendShiftCycleVersion(database, [day()], c2b, '2026-01-19');
+
+    const all = await listShiftCycles(database);
+    assert.equal(all.length, 2, 'same-day re-change replaces the same-day row');
+    assert.ok(all.some((c) => c.id === 'v1'), 'original v1 row preserved');
+    assert.ok(all.some((c) => c.id === 'v2b'), 'latest same-day row present');
+    assert.ok(!all.some((c) => c.id === 'v2a'), 'replaced same-day row removed');
+  } finally { sqlite.close(); }
+});
+
+test('appendShiftCycleVersion: older history rows are never modified', async () => {
+  const { sqlite, database } = await setup();
+  try {
+    await createShiftTemplate(database, day());
+    const c1 = { ...cycle(), id: 'h1', anchorLocalDate: '2026-01-05', effectiveFrom: '2026-01-05' };
+    await createShiftCycle(database, c1, '2026-01-05');
+    const c2 = { ...cycle(), id: 'h2', anchorLocalDate: '2026-01-12', effectiveFrom: '2026-01-12' };
+    await appendShiftCycleVersion(database, [day()], c2, '2026-01-12');
+    const c3 = { ...cycle(), id: 'h3', anchorLocalDate: '2026-01-19', effectiveFrom: '2026-01-19' };
+    await appendShiftCycleVersion(database, [day()], c3, '2026-01-19');
+
+    const all = await listShiftCycles(database);
+    assert.equal(all.length, 3);
+    const h1 = await getShiftCycle(database, 'h1');
+    assert.equal(h1.effectiveFrom, '2026-01-05');
+    const h2 = await getShiftCycle(database, 'h2');
+    assert.equal(h2.effectiveFrom, '2026-01-12');
   } finally { sqlite.close(); }
 });
 

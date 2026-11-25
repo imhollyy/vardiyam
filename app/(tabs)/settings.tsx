@@ -22,7 +22,7 @@ import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import {
   listShiftCycles,
   listShiftTemplates,
-  saveShiftSchedule,
+  appendShiftCycleVersion,
 } from '@/src/data/shiftCycleRepository';
 import type { ShiftCycle, ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { getLocalToday, mondayOfLocalDate } from '@/src/features/shifts/dates';
@@ -293,14 +293,14 @@ export default function SettingsScreen() {
         ? Math.round((scheduleValue.currentShiftIndex * entries.length) / phaseCount) % entries.length
         : 0;
       const newCycle = {
-        id: cycle?.id ?? randomUUID(),
-        name: 'Vardiya duezenim',
+        id: randomUUID(),
+        name: 'Vardiya düzenim',
         timezone: 'Europe/Istanbul',
         anchorLocalDate: effectiveFrom,
         startIndex,
         entries,
       };
-      await saveShiftSchedule(database, allTemplates, newCycle, effectiveFrom);
+      await appendShiftCycleVersion(database, allTemplates, newCycle, effectiveFrom);
       await updateSettings(database, {
         workSchedule: scheduleValue.workSchedule,
         shiftPattern: scheduleValue.shiftPattern,
