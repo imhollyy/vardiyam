@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type { WorkSchedule, ShiftPattern } from '@/src/domain/payroll/types';
 import { DEFAULT_SHIFT_HOURS, shiftNominalMinutes, legalMinBreakMinutes } from '@/src/config/shifts';
+import { APP_TIMEZONE } from '@/src/config/app';
 import { Card, CardHeader } from '@/src/components/ui/Card';
 import { ChoiceGroup } from '@/src/components/ui/ChoiceChip';
+import { DateTimePickerField } from '@/src/components/ui/DateTimePickerField';
 import { useAppTheme } from '@/src/theme/AppThemeProvider';
 import { fonts, layout } from '@/src/theme/tokens';
 
@@ -278,33 +280,25 @@ export function ScheduleEditor({ value, onChange, showCurrentShift = true }: Pro
                     {td.name}
                   </Text>
                   <View style={styles.timeRow}>
-                    <TextInput
-                      style={[
-                        styles.timeInput,
-                        { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface },
-                      ]}
-                      value={td.startLocalTime}
-                      onChangeText={(v) => updateTime(i, 'startLocalTime', v)}
-                      placeholder="HH:MM"
-                      placeholderTextColor={theme.muted}
-                      keyboardType="number-pad"
-                      accessibilityLabel={`${td.name} başlangıç saati`}
-                      maxLength={5}
-                    />
+                    <View style={styles.timePickerCell}>
+                      <DateTimePickerField
+                        mode="time"
+                        label="Başlangıç"
+                        value={td.startLocalTime}
+                        timezone={APP_TIMEZONE}
+                        onChange={(v) => updateTime(i, 'startLocalTime', v)}
+                      />
+                    </View>
                     <Ionicons name="arrow-forward" size={16} color={theme.muted} />
-                    <TextInput
-                      style={[
-                        styles.timeInput,
-                        { color: theme.ink, borderColor: theme.border, backgroundColor: theme.surface },
-                      ]}
-                      value={td.endLocalTime}
-                      onChangeText={(v) => updateTime(i, 'endLocalTime', v)}
-                      placeholder="HH:MM"
-                      placeholderTextColor={theme.muted}
-                      keyboardType="number-pad"
-                      accessibilityLabel={`${td.name} bitiş saati`}
-                      maxLength={5}
-                    />
+                    <View style={styles.timePickerCell}>
+                      <DateTimePickerField
+                        mode="time"
+                        label="Bitiş"
+                        value={td.endLocalTime}
+                        timezone={APP_TIMEZONE}
+                        onChange={(v) => updateTime(i, 'endLocalTime', v)}
+                      />
+                    </View>
                   </View>
                   <View style={[styles.breakRow, { borderTopColor: theme.border }]}>
                     <Text
@@ -433,16 +427,7 @@ const styles = StyleSheet.create({
   },
   templateSection: { paddingTop: 10, marginTop: 4, gap: layout.space.sm },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeInput: {
-    borderWidth: 1,
-    borderRadius: layout.radius.input,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: layout.type.body,
-    flex: 1,
-    textAlign: 'center',
-    minHeight: layout.control.minHeight,
-  },
+  timePickerCell: { flex: 1 },
   breakRow: {
     flexDirection: 'row',
     alignItems: 'center',
