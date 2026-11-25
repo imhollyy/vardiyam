@@ -24,6 +24,7 @@ import {
   listShiftTemplates,
   appendShiftCycleVersion,
 } from '@/src/data/shiftCycleRepository';
+import { upsertSalaryEntry } from '@/src/data/salaryHistoryRepository';
 import type { ShiftCycle, ShiftTemplate } from '@/src/domain/shift-cycle/index';
 import { getLocalToday, mondayOfLocalDate } from '@/src/features/shifts/dates';
 import { getSettings, updateSettings } from '@/src/data/settingsRepository';
@@ -179,7 +180,7 @@ const SHIFT_PATTERN_LABEL: Record<string, string> = {
   TWO_SHIFT: '2 vardiya', THREE_SHIFT: '3 vardiya',
 };
 
-type SheetName = 'salary' | 'hourlyLeave' | 'schedule' | null;
+type SheetName = 'salary' | 'hourlyLeave' | 'schedule' | 'raise' | null;
 
 export default function SettingsScreen() {
   const database = useAppDatabase();
@@ -200,6 +201,10 @@ export default function SettingsScreen() {
   const [savingSalary, setSavingSalary] = useState(false);
   const [salaryError, setSalaryError] = useState<string | null>(null);
   const [startDateEdit, setStartDateEdit] = useState('');
+  const [raiseDate, setRaiseDate] = useState('');
+  const [raiseSalaryText, setRaiseSalaryText] = useState('');
+  const [raiseError, setRaiseError] = useState<string | null>(null);
+  const [savingRaise, setSavingRaise] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
@@ -419,6 +424,21 @@ export default function SettingsScreen() {
           </GroupCard>
         ) : null}
 
+        {/* Zam */}
+        {appSettings && (
+          <>
+            <GroupLabel title="" theme={theme} />
+            <GroupCard theme={theme}>
+              <SettingsRow
+                theme={theme}
+                label="Zam geldi"
+                onPress={() => { setRaiseSalaryText(''); setRaiseDate(''); setRaiseError(null); setOpenSheet('raise'); }}
+                first last
+              />
+            </GroupCard>
+          </>
+        )}
+
         {/* Saatlik izin */}
         {appSettings && (
           <>
@@ -628,6 +648,47 @@ export default function SettingsScreen() {
             </View>
           </>
         ) : null}
+      </BottomSheet>
+
+      {/* Raise BottomSheet */}
+      <BottomSheet visible={openSheet === 'raise'} onClose={() => setOpenSheet(null)}>
+        <Text style={{ fontFamily: fonts.extraBold, fontSize: layout.type.section, color: theme.ink, marginBottom: 12 }}>
+          Zam Geldi
+        </Text>
+        <MoneyField label="Yeni maaş" value={raiseSalaryText} onChangeText={setRaiseSalaryText} placeholder="Örn. 30.000" />
+        <DateTimePickerField
+          mode="date"
+          label="Geçerlilik tarihi"
+          value={raiseDate}
+          timezone="Europe/Istanbul"
+          maximumDate={new Date(new Date().getFullYear() + 1, 11, 31)}
+          onChange={setRaiseDate}
+          onError={setRaiseError}
+        />
+        {raiseError ? <Text accessibilityRole="alert" style={{ fontFamily: fonts.bold, color: theme.danger, fontSize: layout.type.caption, marginTop: 4 }}>{raiseError}</Text> : null}
+        <View style={{ gap: 10, marginTop: 12 }}>
+          <ActionButton
+            label={savingRaise ? 'Kaydediliyor…' : 'Kaydet'}
+            disabled={savingRaise}
+            onPress={async () => {
+              let salaryMinor: number;
+              try { salaryMinor = parseTryMinor(raiseSalaryText); } catch { setRaiseError('Maaş tutarı geçersiz.'); return; }
+              if (!raiseDate) { setRaiseError('Geçerlilik tarihi gerekli.'); return; }
+              setSavingRaise(true); setRaiseError(null);
+              try {
+                await upsertSalaryEntry(database, {
+                  id: randomUUID(),
+                  effectiveFrom: raiseDate,
+                  salaryMinor,
+                  createdAt: new Date().toISOString(),
+                });
+                setOpenSheet(null);
+              } catch (err) { setRaiseError(err instanceof Error ? err.message : 'Kaydedilemedi.'); }
+              finally { setSavingRaise(false); }
+            }}
+          />
+          <ActionButton label="Vazgeç" onPress={() => setOpenSheet(null)} variant="secondary" disabled={savingRaise} />
+        </View>
       </BottomSheet>
 
       {/* Reset confirmation modal */}

@@ -31,8 +31,9 @@ import type {
   HourlyLeavePolicy,
 } from './types.ts';
 import { HOURLY_LEAVE_POLICY } from './types.ts';
+import { proRatedSalary, getSalarySlices, type SalaryHistoryEntry } from './salaryHistory.ts';
 
-export type { Settings, DayEntry, ExtraIncome, DerivedDay, DayStatus, MonthlyStatement, LeaveType, ExtraIncomeFrequency, AnnualLeaveResult, HourlyLeavePolicy };
+export type { Settings, DayEntry, ExtraIncome, DerivedDay, DayStatus, MonthlyStatement, LeaveType, ExtraIncomeFrequency, AnnualLeaveResult, HourlyLeavePolicy, SalaryHistoryEntry };
 export { HOURLY_LEAVE_POLICY };
 
 function dayOfWeek(localDate: string): number {
@@ -217,6 +218,24 @@ export function deriveDays(
     const entry = dayEntries.get(localDate);
     const holiday = isOfficialHoliday(localDate);
     const weekend = isWeekendDay(localDate, settings.workSchedule);
+
+    // Before employment start: entire day excluded from calculations
+    if (settings.startDate && localDate < settings.startDate) {
+      return {
+        localDate,
+        status: 'NOT_EMPLOYED' as DayStatus,
+        leaveType: null,
+        leaveHalfDay: false,
+        leaveHours: 0,
+        overtimeMinutes: 0,
+        lateEarlyMinutes: 0,
+        isHoliday: false,
+        isWeekend: weekend,
+        shiftTemplateId: null,
+        shiftNominalMinutes: 0,
+        note: null,
+      };
+    }
 
     let status: DayStatus;
     let leaveType: LeaveType | null = null;
@@ -434,6 +453,7 @@ export function generateMonthlyStatement(
   cumulativeTaxableMinor: number = 0,
   templates: readonly ShiftTemplate[] = [],
   cycles: readonly ShiftCycle[] = [],
+  salaryHistory: SalaryHistoryEntry[] = [],
 ): MonthlyStatement {
   const { start, end } = getPayPeriod(year, month, settings.payday);
   const periodDates = enumerateDays(start, end);
@@ -441,7 +461,13 @@ export function generateMonthlyStatement(
 
   const totalDays = periodDates.length;
   const workedDays = days.filter((d) => d.status === 'WORKED').length;
-  const dailySalaryMinor = Math.round(settings.salaryMinor / 30);
+
+  // Use salary history for pro-rated salary when available; fall back to settings.salaryMinor
+  const effectiveSalaryMinor = salaryHistory.length > 0
+    ? proRatedSalary(start, end, salaryHistory)
+    : settings.salaryMinor;
+
+  const dailySalaryMinor = Math.round(effectiveSalaryMinor / 30);
 
   // Expand to full Mon–Sun weeks so calculateScheduledOvertime groups correctly
   const expandedStart = mondayOfWeek(start);
@@ -478,23 +504,23 @@ export function generateMonthlyStatement(
 
   const totalOvertimeMinutes = hourlyLeaveResult.overtimeMinutes;
   const hourlyLeaveOffsetMinutes = hourlyLeaveResult.offsetFromOvertimeMinutes;
-  const hourlyRate = Math.round(settings.salaryMinor / HOURLY_RATE_DIVISOR);
+  const hourlyRate = Math.round(effectiveSalaryMinor / HOURLY_RATE_DIVISOR);
   const hourlyLeaveDeductionMinor = Math.round(hourlyRate * hourlyLeaveResult.baseDeductionMinutes / 60);
 
-  const overtimeMinor = calculateOvertime(totalOvertimeMinutes, settings.salaryMinor);
+  const overtimeMinor = calculateOvertime(totalOvertimeMinutes, effectiveSalaryMinor);
 
   const holidayWorkedDays = days.filter((d) => d.isHoliday && d.status === 'WORKED').length;
   const holidayBonusMinor = calculateHolidayBonus(holidayWorkedDays, dailySalaryMinor);
 
-  const baseDeductionMinor = calculateDeductions(days, dayEntries, settings.salaryMinor);
+  const baseDeductionMinor = calculateDeductions(days, dayEntries, effectiveSalaryMinor);
   const deductionMinor = baseDeductionMinor + hourlyLeaveDeductionMinor;
   const extraIncomeMinor = calculateExtraIncome(extraIncomes, start, end);
 
-  const grossMinor = settings.salaryMinor + overtimeMinor + holidayBonusMinor
+  const grossMinor = effectiveSalaryMinor + overtimeMinor + holidayBonusMinor
     - deductionMinor + extraIncomeMinor;
 
   const besDeductionMinor = settings.besEnabled
-    ? calculateBes(settings.salaryMinor, settings.besRateBp, settings.salaryType)
+    ? calculateBes(effectiveSalaryMinor, settings.besRateBp, settings.salaryType)
     : 0;
 
   let sgkWorkerMinor = 0;
@@ -513,11 +539,15 @@ export function generateMonthlyStatement(
   const netMinor = grossMinor - sgkWorkerMinor - unemploymentWorkerMinor
     - incomeTaxMinor - stampTaxMinor - besDeductionMinor;
 
+  const salarySlices = salaryHistory.length > 1
+    ? getSalarySlices(start, end, salaryHistory)
+    : undefined;
+
   return {
     periodStart: start,
     periodEnd: end,
     salaryType: settings.salaryType,
-    baseSalaryMinor: settings.salaryMinor,
+    baseSalaryMinor: effectiveSalaryMinor,
     workedDays,
     totalDays,
     scheduledOvertimeMinutes,
@@ -536,5 +566,6 @@ export function generateMonthlyStatement(
     netMinor,
     hourlyLeaveOffsetMinutes,
     hourlyLeaveDeductionMinor,
+    salarySlices,
   };
 }

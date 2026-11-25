@@ -18,6 +18,7 @@ export const TABLES_BY_VERSION: Record<number, readonly string[]> = {
   104: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes'],
   105: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes'],
   106: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes'],
+  107: ['app_metadata', 'settings', 'shift_templates', 'shift_cycles', 'cycle_entries', 'day_entries', 'extra_incomes', 'salary_history'],
 };
 
 const CRITICAL_TRIGGERS = [

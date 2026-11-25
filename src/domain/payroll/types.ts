@@ -48,7 +48,7 @@ export type ExtraIncome = {
   createdAt: string;
 };
 
-export type DayStatus = 'WORKED' | 'OFF' | 'LEAVE' | 'HOLIDAY';
+export type DayStatus = 'WORKED' | 'OFF' | 'LEAVE' | 'HOLIDAY' | 'NOT_EMPLOYED';
 
 export type DerivedDay = {
   localDate: string;
@@ -88,6 +88,7 @@ export type MonthlyStatement = {
   netMinor: number;
   hourlyLeaveOffsetMinutes: number;
   hourlyLeaveDeductionMinor: number;
+  salarySlices?: { from: string; to: string; salaryMinor: number }[];
 };
 
 export type AnnualLeaveResult = {

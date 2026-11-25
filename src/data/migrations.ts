@@ -250,6 +250,30 @@ export const migrations: readonly Migration[] = [
       WHERE color_token IS NULL OR trim(color_token) = '';
     `,
   },
+  {
+    version: 107,
+    sql: `
+      CREATE TABLE salary_history (
+        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
+        effective_from TEXT NOT NULL CHECK (${canonicalLocalDateCheck('effective_from')}),
+        salary_minor INTEGER NOT NULL CHECK (salary_minor > 0),
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S.000Z', 'now')),
+        UNIQUE (effective_from)
+      );
+
+      -- Seed from current settings.salary_minor so history is never empty
+      INSERT OR IGNORE INTO salary_history (id, effective_from, salary_minor)
+      SELECT lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' ||
+             substr(lower(hex(randomblob(2))),2) || '-' ||
+             substr('89ab', abs(random()) % 4 + 1, 1) ||
+             substr(lower(hex(randomblob(2))),2) || '-' ||
+             lower(hex(randomblob(6))),
+             COALESCE(start_date, '2020-01-01'),
+             salary_minor
+      FROM settings
+      WHERE salary_minor > 0;
+    `,
+  },
 ];
 
 export const CURRENT_SCHEMA_VERSION = migrations.at(-1)?.version ?? 0;

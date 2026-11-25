@@ -4,6 +4,7 @@ import { getSettings } from '../../data/settingsRepository.ts';
 import { getDayEntriesInRange } from '../../data/dayEntryRepository.ts';
 import { getAllExtraIncomes } from '../../data/extraIncomeRepository.ts';
 import { listShiftTemplates, listShiftCycles } from '../../data/shiftCycleRepository.ts';
+import { getSalaryHistory } from '../../data/salaryHistoryRepository.ts';
 import { generateMonthlyStatement, getPayPeriodForDate, getPayPeriod, deriveDays, enumerateDays, type MonthlyStatement, type DerivedDay } from '../../domain/payroll/index.ts';
 import type { ShiftTemplate } from '../../domain/shift-cycle/index.ts';
 
@@ -18,6 +19,7 @@ export async function loadPeriodStatement(
   const templates = await listShiftTemplates(database);
   const cycles = await listShiftCycles(database);
   const extras = await getAllExtraIncomes(database);
+  const salaryHistory = await getSalaryHistory(database);
 
   // Fetch a wider range to include partial weeks at the period boundaries
   const rangeStart = expandWeekStart(period.start);
@@ -26,7 +28,7 @@ export async function loadPeriodStatement(
 
   const year = Number(period.end.split('-')[0]);
   const month = Number(period.end.split('-')[1]);
-  return generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates, cycles);
+  return generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates, cycles, salaryHistory);
 }
 
 export type PeriodDetails = {
@@ -50,9 +52,10 @@ export async function loadPeriodDetails(
   const rangeEnd = expandWeekEnd(period.end);
   const entries = await getDayEntriesInRange(database, rangeStart, rangeEnd);
 
+  const salaryHistory2 = await getSalaryHistory(database);
   const year = Number(period.end.split('-')[0]);
   const month = Number(period.end.split('-')[1]);
-  const statement = generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates, cycles);
+  const statement = generateMonthlyStatement(settings, entries, extras, year, month, cumulativeTaxableMinor, templates, cycles, salaryHistory2);
 
   const { start, end } = getPayPeriod(year, month, settings.payday);
   const periodDates = enumerateDays(start, end);

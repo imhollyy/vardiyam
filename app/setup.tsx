@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,9 +7,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAppDatabase } from '@/src/data/AppDatabaseProvider';
 import { markSetupCompleted, updateSettings } from '@/src/data/settingsRepository';
 import { saveShiftSchedule } from '@/src/data/shiftCycleRepository';
+import { upsertSalaryEntry } from '@/src/data/salaryHistoryRepository';
 import type { SalaryType, HourlyLeavePolicy } from '@/src/domain/payroll/types';
 import { PAYDAY_LAST, HOURLY_LEAVE_POLICY } from '@/src/domain/payroll/types';
-import { buildSetupPayload } from '@/src/features/setup/buildSetupPayload';
+import { buildSetupPayload, parseSetupStartDate } from '@/src/features/setup/buildSetupPayload';
 import {
   ScheduleEditor,
   defaultScheduleEditorDrafts,
@@ -26,7 +27,7 @@ import { MoneyField } from '@/src/components/ui/MoneyField';
 import { ActionButton } from '@/src/components/ui/ActionButton';
 import { PageHeading } from '@/src/components/ui/PageHeading';
 
-type StepId = 'salary' | 'salaryType' | 'payday' | 'bes' | 'schedule' | 'currentShift' | 'hourlyLeave' | 'summary';
+type StepId = 'salary' | 'salaryType' | 'payday' | 'bes' | 'schedule' | 'currentShift' | 'hourlyLeave' | 'startDate' | 'summary';
 
 const BES_RATE_OPTIONS: { value: string; label: string }[] = [
   { value: '300', label: '%3 (varsayılan)' },
@@ -85,6 +86,7 @@ const STEP_META: Record<StepId, {
   schedule:     { icon: 'time-outline',             title: 'Calisma duzenin',              subtitle: 'Vardiya duzeni ve saatlerini belirle.' },
   currentShift: { icon: 'swap-horizontal-outline',  title: 'Şu an hangi vardiyadasın?',    subtitle: 'Bu hafta hangi vardiyada çalışıyorsun?' },
   hourlyLeave:  { icon: 'hourglass-outline',        title: 'Saatlik izin kurali',           subtitle: 'Saatlik izin aldiginda ne yapilsın?',              skippable: true, skipLabel: 'Maasimdan kesilsin' },
+  startDate:    { icon: 'briefcase-outline',        title: 'Ise ne zaman basladın?',        subtitle: 'GG.AA.YYYY formatında gir (örn: 15.03.2023)',       skippable: true, skipLabel: 'Atla' },
   summary:      { icon: 'checkmark-circle-outline', title: 'Hazir!',                       subtitle: 'Bilgilerin dogru mu? Son bir goz at.' },
 };
 
@@ -96,6 +98,7 @@ export default function SetupScreen() {
   const [salary, setSalary] = useState<SalaryDraft>(INITIAL_SALARY);
   const [schedule, setSchedule] = useState<ScheduleEditorValue>(INITIAL_SCHEDULE);
   const [hourlyLeavePolicy, setHourlyLeavePolicy] = useState<HourlyLeavePolicy>(HOURLY_LEAVE_POLICY.BASE_PAY);
+  const [startDateText, setStartDateText] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,7 +107,7 @@ export default function SetupScreen() {
     if (schedule.shiftPattern === 'TWO_SHIFT' || schedule.shiftPattern === 'THREE_SHIFT') {
       list.push('currentShift');
     }
-    list.push('hourlyLeave', 'summary');
+    list.push('hourlyLeave', 'startDate', 'summary');
     return list;
   }, [schedule.shiftPattern]);
 
@@ -137,6 +140,7 @@ export default function SetupScreen() {
       const pad = (n: number) => String(n).padStart(2, '0');
       const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
       const templateIds = schedule.templateDrafts.map(() => randomUUID());
+      const resolvedStartDate = parseSetupStartDate(startDateText);
       const payload = buildSetupPayload(
         {
           salaryText: salary.salaryText,
@@ -148,7 +152,7 @@ export default function SetupScreen() {
           shiftPattern: schedule.shiftPattern,
           templateDrafts: schedule.templateDrafts,
           currentShiftIndex: schedule.currentShiftIndex,
-          startDate: '',
+          startDate: startDateText,
         },
         templateIds,
         randomUUID(),
@@ -162,10 +166,17 @@ export default function SetupScreen() {
         shiftPattern: payload.shiftPattern,
         besEnabled: payload.besEnabled,
         besRateBp: payload.besRateBp,
-        startDate: null,
+        startDate: resolvedStartDate,
         hourlyLeavePolicy,
       });
       await saveShiftSchedule(database, payload.templates, payload.cycle, payload.effectiveFrom);
+      // Seed salary history with the initial salary
+      await upsertSalaryEntry(database, {
+        id: randomUUID(),
+        effectiveFrom: resolvedStartDate ?? '2020-01-01',
+        salaryMinor: payload.salaryMinor,
+        createdAt: new Date().toISOString(),
+      });
       await markSetupCompleted(database);
       router.replace('/(tabs)');
     } catch (e) {
@@ -173,7 +184,7 @@ export default function SetupScreen() {
     } finally {
       setSaving(false);
     }
-  }, [database, salary, schedule, router, hourlyLeavePolicy]);
+  }, [database, salary, schedule, router, hourlyLeavePolicy, startDateText]);
 
   const handleNext = useCallback(() => {
     if (isLast) { void handleFinish(); }
@@ -197,6 +208,9 @@ export default function SetupScreen() {
         break;
       case 'hourlyLeave':
         setHourlyLeavePolicy(HOURLY_LEAVE_POLICY.BASE_PAY);
+        break;
+      case 'startDate':
+        setStartDateText('');
         break;
       default: break;
     }
@@ -371,6 +385,32 @@ export default function SetupScreen() {
           </Card>
         )}
 
+        {currentStep === 'startDate' && (
+          <Card>
+            <TextInput
+              style={[styles.dateInput, {
+                backgroundColor: theme.surface,
+                borderColor: theme.border,
+                color: theme.ink,
+                fontFamily: fonts.regular,
+              }]}
+              value={startDateText}
+              onChangeText={setStartDateText}
+              placeholder="GG.AA.YYYY"
+              placeholderTextColor={theme.muted}
+              keyboardType="numeric"
+              maxLength={10}
+              autoFocus
+              accessibilityLabel="Ise baslama tarihi"
+            />
+            {startDateText.length > 0 && parseSetupStartDate(startDateText) === null && (
+              <Text style={{ color: theme.danger, fontSize: layout.type.caption, marginTop: 6 }}>
+                Gecersiz tarih. Ornek: 15.03.2023
+              </Text>
+            )}
+          </Card>
+        )}
+
         {currentStep === 'summary' && (
           <View style={styles.stepBody}>
             <Card>
@@ -505,4 +545,5 @@ const styles = StyleSheet.create({
   buttons: { paddingHorizontal: layout.screen.horizontal, paddingTop: 12, paddingBottom: layout.screen.bottom },
   error: { marginTop: 4, textAlign: 'center', fontSize: layout.type.caption },
   hint: { fontSize: layout.type.caption, textAlign: 'center', lineHeight: 18 },
+  dateInput: { borderWidth: StyleSheet.hairlineWidth, borderRadius: layout.radius.control, padding: 14, fontSize: 18, minHeight: 56 },
 });
